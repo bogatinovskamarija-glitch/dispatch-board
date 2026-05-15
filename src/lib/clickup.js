@@ -56,23 +56,26 @@ export async function fetchEquipment() {
 
 function getField(task, ...names) {
   for (const name of names) {
-    const f = task.custom_fields?.find(cf => cf.name.toLowerCase() === name.toLowerCase())
-    if (!f) continue
-    if (f.value === undefined || f.value === null || f.value === '') continue
-    // Date fields store Unix ms as a string
-    if (f.type === 'date') {
-      return new Date(Number(f.value)).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' })
+    // Iterate all fields — there can be multiple fields with the same name (workspace-level duplicates)
+    for (const f of task.custom_fields ?? []) {
+      if (f.name.toLowerCase() !== name.toLowerCase()) continue
+      if (f.value === undefined || f.value === null || f.value === '') continue
+      // Date fields store Unix ms as a string
+      if (f.type === 'date') {
+        return new Date(Number(f.value)).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' })
+      }
+      // Location fields store an object with formatted_address
+      if (typeof f.value === 'object') {
+        return f.value.formatted_address || f.value.address || ''
+      }
+      // Dropdowns: new_drop_down stores value as orderindex, old stores as option UUID
+      const opts = f.type_config?.options
+      if (opts) {
+        const opt = opts.find(o => o.id === f.value) ?? opts.find(o => String(o.orderindex) === String(f.value))
+        if (opt) return opt.name
+      }
+      return String(f.value)
     }
-    // Location fields store an object with formatted_address
-    if (typeof f.value === 'object') {
-      return f.value.formatted_address || f.value.address || ''
-    }
-    const opts = f.type_config?.options
-    if (opts) {
-      const opt = opts.find(o => o.id === f.value) ?? opts.find(o => String(o.orderindex) === String(f.value))
-      if (opt) return opt.name
-    }
-    return String(f.value)
   }
   return ''
 }
