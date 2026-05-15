@@ -9,7 +9,14 @@ export function useLoads(date, company) {
   const fetchLoads = useCallback(async () => {
     setLoading(true)
     setError(null)
-    let q = supabase.from('loads').select('*').eq('date', date).order('company').order('truck_number')
+    // Show any load whose range covers this day:
+    // created on or before today AND (no delivery date yet OR delivery date is today or later)
+    let q = supabase.from('loads')
+      .select('*')
+      .lte('date', date)
+      .or(`delivery_date.is.null,delivery_date.gte.${date}`)
+      .order('company')
+      .order('truck_number')
     if (company && company !== 'all') q = q.eq('company', company)
     const { data, error } = await q
     if (error) setError(error.message)
@@ -49,8 +56,14 @@ export function useWeekLoads(weekStart, weekEnd, company) {
   useEffect(() => {
     async function fetch() {
       setLoading(true)
-      let q = supabase.from('loads').select('*')
-        .gte('date', weekStart).lte('date', weekEnd).order('company').order('truck_number')
+      // Fetch any load whose range overlaps this week:
+      // created on or before week end AND (no delivery date OR delivery date is within/after week start)
+      let q = supabase.from('loads')
+        .select('*')
+        .lte('date', weekEnd)
+        .or(`delivery_date.is.null,delivery_date.gte.${weekStart}`)
+        .order('company')
+        .order('truck_number')
       if (company && company !== 'all') q = q.eq('company', company)
       const { data } = await q
       setLoads(data ?? [])
