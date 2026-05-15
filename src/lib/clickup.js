@@ -58,10 +58,17 @@ function getField(task, ...names) {
   for (const name of names) {
     const f = task.custom_fields?.find(cf => cf.name.toLowerCase() === name.toLowerCase())
     if (!f) continue
-    if (f.value !== undefined && f.value !== null && f.value !== '') {
-      const opt = f.type_config?.options?.find(o => o.id === f.value)
-      return opt ? opt.name : String(f.value)
+    if (f.value === undefined || f.value === null || f.value === '') continue
+    // Date fields store Unix ms as a string
+    if (f.type === 'date') {
+      return new Date(Number(f.value)).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' })
     }
+    // Location fields store an object with formatted_address
+    if (typeof f.value === 'object') {
+      return f.value.formatted_address || f.value.address || ''
+    }
+    const opt = f.type_config?.options?.find(o => o.id === f.value)
+    return opt ? opt.name : String(f.value)
   }
   return ''
 }
