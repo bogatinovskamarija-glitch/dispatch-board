@@ -67,8 +67,12 @@ function getField(task, ...names) {
     if (typeof f.value === 'object') {
       return f.value.formatted_address || f.value.address || ''
     }
-    const opt = f.type_config?.options?.find(o => o.id === f.value)
-    return opt ? opt.name : String(f.value)
+    const opts = f.type_config?.options
+    if (opts) {
+      const opt = opts.find(o => o.id === f.value) ?? opts.find(o => String(o.orderindex) === String(f.value))
+      if (opt) return opt.name
+    }
+    return String(f.value)
   }
   return ''
 }
