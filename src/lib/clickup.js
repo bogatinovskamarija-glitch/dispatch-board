@@ -68,26 +68,35 @@ function getField(task, ...names) {
 
 function normalizeDriver(task, company) {
   return {
-    id:        task.id,
-    name:      task.name,
+    id:               task.id,
+    name:             task.name,
     company,
-    phone:     getField(task, 'phone', 'phone number', 'cell'),
-    altPhone:  getField(task, 'alt phone', 'alternative phone', 'phone 2'),
-    hometown:  getField(task, 'hometown', 'home city', 'home'),
-    cdl:       getField(task, 'cdl', 'cdl number', 'license'),
-    cdlExpiry: getField(task, 'cdl expiry', 'license expiry', 'cdl exp'),
-    medCard:   getField(task, 'medical card', 'med card', 'medical'),
-    notes:     task.description ?? '',
+    phone:            getField(task, 'phone', 'phone number', 'cell'),
+    altPhone:         getField(task, 'alt phone', 'alternative phone', 'phone 2'),
+    address:          getField(task, 'address', 'home address', 'street address'),
+    hometown:         getField(task, 'hometown', 'home city', 'home'),
+    cdl:              getField(task, 'cdl', 'cdl number', 'license'),
+    cdlExpiry:        getField(task, 'cdl expiry', 'license expiry', 'cdl exp'),
+    medCard:          getField(task, 'medical card', 'med card', 'medical'),
+    medCardExpiry:    getField(task, 'med card expiry', 'medical card expiry', 'med exp', 'medical expiry'),
+    tankerEndorsement: getField(task, 'tanker endorsement', 'tanker'),
+    notes:            task.description ?? '',
   }
 }
 
 function normalizeTruck(task, company) {
   return {
-    id:          task.id,
-    truckNumber: task.name,
+    id:            task.id,
+    truckNumber:   task.name,
     company,
-    type:        getField(task, 'type', 'equipment type', 'truck type') || 'REEF',
-    isTanker:    ['yes', 'true', '1'].includes(getField(task, 'tanker').toLowerCase()),
+    type:          getField(task, 'type', 'equipment type', 'truck type') || 'REEF',
+    isTanker:      ['yes', 'true', '1'].includes(getField(task, 'tanker').toLowerCase()),
+    year:          getField(task, 'year', 'truck year'),
+    make:          getField(task, 'make', 'manufacturer'),
+    model:         getField(task, 'model', 'truck model'),
+    vin:           getField(task, 'vin', 'vin number'),
+    licensePlate:  getField(task, 'license plate', 'plate', 'license number'),
+    dotInspection: getField(task, 'dot inspection', 'dot expiry', 'annual inspection', 'inspection expiry'),
   }
 }
 
@@ -96,5 +105,11 @@ function normalizeTrailer(task) {
     id:            task.id,
     trailerNumber: task.name,
     type:          getField(task, 'type', 'trailer type') || 'REEF',
+    year:          getField(task, 'year', 'trailer year'),
+    make:          getField(task, 'make', 'manufacturer'),
+    model:         getField(task, 'model', 'trailer model'),
+    vin:           getField(task, 'vin', 'vin number'),
+    licensePlate:  getField(task, 'license plate', 'plate', 'license number'),
+    dotInspection: getField(task, 'dot inspection', 'dot expiry', 'annual inspection', 'inspection expiry'),
   }
 }

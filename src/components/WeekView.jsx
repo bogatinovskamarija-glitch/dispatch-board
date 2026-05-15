@@ -31,9 +31,12 @@ export default function WeekView({ loads, loading, weekStart, today, onLoadClick
   const caratTrucks     = [...truckMap.entries()].filter(([, v]) => v.company === 'carat')
   const proFreightTrucks = [...truckMap.entries()].filter(([, v]) => v.company === 'pro_freight')
 
+  const dayStr = day => format(day)
+  const loadDay = l => l.delivery_date || l.date
+
   // Per-day revenue for footer
   const dayRevenue = days.map(day => {
-    const dayLoads = loads.filter(l => l.date === format(day))
+    const dayLoads = loads.filter(l => loadDay(l) === dayStr(day))
     return {
       total: dayLoads.reduce((s, l) => s + (Number(l.price) || 0), 0),
       count: dayLoads.filter(l => l.price).length,
@@ -42,7 +45,7 @@ export default function WeekView({ loads, loading, weekStart, today, onLoadClick
   const weekTotal = dayRevenue.reduce((s, d) => s + d.total, 0)
 
   function loadsForTruckDay(truckNumber, day) {
-    return loads.filter(l => l.truck_number === truckNumber && l.date === format(day))
+    return loads.filter(l => l.truck_number === truckNumber && loadDay(l) === dayStr(day))
   }
 
   function renderTruckRows(entries) {

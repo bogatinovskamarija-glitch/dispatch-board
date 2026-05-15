@@ -30,14 +30,17 @@ export default function DriverSidebar({ clickupId, name, onClose }) {
               <div className="sidebar-section-title">Contact</div>
               <InfoRow label="Phone"     value={driver.phone    || '—'} />
               <InfoRow label="Alt Phone" value={driver.altPhone || '—'} />
-              <InfoRow label="Hometown"  value={driver.hometown || '—'} />
+              {driver.address  && <InfoRow label="Address"   value={driver.address} />}
+              {driver.hometown && <InfoRow label="Hometown"  value={driver.hometown} />}
             </div>
 
             <div className="sidebar-section">
               <div className="sidebar-section-title">License & Compliance</div>
-              <InfoRow label="CDL"          value={driver.cdl       || '—'} />
-              <InfoRow label="CDL Expiry"   value={driver.cdlExpiry || '—'} />
-              <InfoRow label="Medical Card" value={driver.medCard   || '—'} />
+              <InfoRow label="CDL #"             value={driver.cdl             || '—'} />
+              <InfoRow label="CDL Expiry"        value={driver.cdlExpiry       || '—'} />
+              <InfoRow label="Med Card #"        value={driver.medCard         || '—'} />
+              <InfoRow label="Med Card Expiry"   value={driver.medCardExpiry   || '—'} />
+              {driver.tankerEndorsement && <InfoRow label="Tanker Endorsement" value={driver.tankerEndorsement} />}
             </div>
 
             {driver.notes && (

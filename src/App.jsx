@@ -7,15 +7,16 @@ import DayView from './components/DayView'
 import WeekView from './components/WeekView'
 import LoadModal from './components/LoadModal'
 import DriverSidebar from './components/DriverSidebar'
+import EquipmentSidebar from './components/EquipmentSidebar'
 
 const today = new Date()
 today.setHours(0, 0, 0, 0)
 
 function exportCSV(loads) {
   const cols = [
-    'date','company','status','truck_number','trailer_number','equipment_type','is_tanker',
-    'driver_name','phone','pickup_location','delivery_location','zip',
-    'delivery_date','delivery_appt','load_number','broker','total_miles','price','safety_notes','notes','hometown',
+    'date','company','status','truck_number','trailer_number','equipment_type',
+    'driver_name','phone','pickup_location','pickup_date','delivery_location','zip',
+    'delivery_date','delivery_appt','load_number','broker','total_miles','price','safety_notes','notes',
   ]
   const rows = [cols.join(',')]
   for (const l of loads) {
@@ -37,8 +38,9 @@ export default function App() {
   const [view, setView]       = useState('day')
   const [currentDay, setDay]  = useState(today)
   const [company, setCompany] = useState('all')
-  const [modal, setModal]     = useState(null)
-  const [sidebar, setSidebar] = useState(null)
+  const [modal, setModal]         = useState(null)
+  const [sidebar, setSidebar]     = useState(null)
+  const [equipSidebar, setEquip]  = useState(null)
 
   const weekStart = startOfWeek(currentDay)
   const weekEnd   = addDays(weekStart, 6)
@@ -127,6 +129,8 @@ export default function App() {
           onEdit={l => setModal(l)}
           onDelete={handleDelete}
           onDriverClick={(id, name) => setSidebar({ clickupId: id, name })}
+          onTruckClick={t => setEquip({ equipment: t, equipType: 'truck' })}
+          onTrailerClick={t => setEquip({ equipment: t, equipType: 'trailer' })}
         />
       ) : (
         <WeekView
@@ -155,6 +159,14 @@ export default function App() {
           clickupId={sidebar.clickupId}
           name={sidebar.name}
           onClose={() => setSidebar(null)}
+        />
+      )}
+
+      {equipSidebar && (
+        <EquipmentSidebar
+          equipment={equipSidebar.equipment}
+          equipType={equipSidebar.equipType}
+          onClose={() => setEquip(null)}
         />
       )}
     </>

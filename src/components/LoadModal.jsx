@@ -11,7 +11,7 @@ const STATUSES = [
 const BLANK = {
   status: 'empty', company: 'carat', truck_number: '', trailer_number: '',
   equipment_type: 'REEF', is_tanker: false, driver_name: '', driver_clickup_id: '',
-  phone: '', pickup_location: '', delivery_location: '', zip: '',
+  phone: '', pickup_location: '', pickup_date: '', delivery_location: '', zip: '',
   delivery_date: '', delivery_appt: '', load_number: '', broker: '',
   total_miles: '', price: '', safety_notes: '', notes: '', hometown: '',
 }
@@ -24,7 +24,7 @@ export default function LoadModal({ load, date, drivers, trucks, trailers, onSav
 
   useEffect(() => {
     if (load) {
-      setForm({ ...BLANK, ...load, delivery_date: load.delivery_date ?? '', total_miles: load.total_miles ?? '', price: load.price ?? '' })
+      setForm({ ...BLANK, ...load, pickup_date: load.pickup_date ?? '', delivery_date: load.delivery_date ?? '', total_miles: load.total_miles ?? '', price: load.price ?? '' })
     } else {
       setForm({ ...BLANK, date })
     }
@@ -74,8 +74,9 @@ export default function LoadModal({ load, date, drivers, trucks, trailers, onSav
     try {
       const payload = {
         ...form,
-        total_miles: form.total_miles ? Number(form.total_miles) : null,
-        price:       form.price       ? Number(form.price)       : null,
+        total_miles:  form.total_miles  ? Number(form.total_miles) : null,
+        price:        form.price        ? Number(form.price)       : null,
+        pickup_date:  form.pickup_date  || null,
         delivery_date: form.delivery_date || null,
         date: form.date || date,
       }
@@ -120,7 +121,7 @@ export default function LoadModal({ load, date, drivers, trucks, trailers, onSav
             {/* EQUIPMENT */}
             <div className="form-section">
               <div className="form-section-title">Equipment</div>
-              <div className="form-grid-3">
+              <div className="form-grid">
                 <div className="form-group">
                   <label>Truck #</label>
                   <select value={form.truck_number} onChange={onTruckChange}>
@@ -152,13 +153,6 @@ export default function LoadModal({ load, date, drivers, trucks, trailers, onSav
                   <select value={form.company} onChange={e => set('company', e.target.value)}>
                     <option value="carat">Carat Expedited</option>
                     <option value="pro_freight">Pro Freight Transportation</option>
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label>Tanker</label>
-                  <select value={form.is_tanker ? 'yes' : 'no'} onChange={e => set('is_tanker', e.target.value === 'yes')}>
-                    <option value="no">No</option>
-                    <option value="yes">Yes</option>
                   </select>
                 </div>
               </div>
@@ -205,11 +199,15 @@ export default function LoadModal({ load, date, drivers, trucks, trailers, onSav
               <div className="form-section-title">Route</div>
               <div className="form-grid">
                 <div className="form-group">
-                  <label>Pick Up</label>
+                  <label>Pick Up Location</label>
                   <input type="text" placeholder="City, State" value={form.pickup_location} onChange={e => set('pickup_location', e.target.value)} />
                 </div>
                 <div className="form-group">
-                  <label>Delivery</label>
+                  <label>Pickup Date</label>
+                  <input type="date" value={form.pickup_date} onChange={e => set('pickup_date', e.target.value)} />
+                </div>
+                <div className="form-group">
+                  <label>Delivery Location</label>
                   <input type="text" placeholder="City, State" value={form.delivery_location} onChange={e => set('delivery_location', e.target.value)} />
                 </div>
                 <div className="form-group">
@@ -261,10 +259,6 @@ export default function LoadModal({ load, date, drivers, trucks, trailers, onSav
                 <div className="form-group">
                   <label>Notes</label>
                   <textarea placeholder="General notes, updates…" value={form.notes} onChange={e => set('notes', e.target.value)} />
-                </div>
-                <div className="form-group">
-                  <label>Hometown</label>
-                  <input type="text" placeholder="Ft Lauderdale, FL" value={form.hometown} onChange={e => set('hometown', e.target.value)} />
                 </div>
               </div>
             </div>

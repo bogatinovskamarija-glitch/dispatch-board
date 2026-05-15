@@ -5,7 +5,7 @@ const fmt = n => n ? '$' + Number(n).toLocaleString('en-US') : '—'
 const dpm = (price, miles) =>
   price && miles ? '$' + (price / miles).toFixed(2) + '/mi' : null
 
-export default function DayView({ loads, loading, trucks, trailers, drivers, onEdit, onDelete, onDriverClick }) {
+export default function DayView({ loads, loading, trucks, trailers, drivers, onEdit, onDelete, onDriverClick, onTruckClick, onTrailerClick }) {
   const truckOpts = trucks.map(e => ({
     value: e.truckNumber,
     label: e.truckNumber,
@@ -33,21 +33,39 @@ export default function DayView({ loads, loading, trucks, trailers, drivers, onE
         <td><StatusBadge status={load.status} /></td>
 
         <td>
-          <SelectCell
-            value={load.truck_number}
-            options={truckOpts}
-            onChange={v => onEdit({ ...load, truck_number: v })}
-            placeholder="—"
-          />
+          <div className="equip-cell">
+            <SelectCell
+              value={load.truck_number}
+              options={truckOpts}
+              onChange={v => onEdit({ ...load, truck_number: v })}
+              placeholder="—"
+            />
+            {load.truck_number && (
+              <button
+                className="equip-info-btn"
+                title="Truck info"
+                onClick={() => { const t = trucks.find(t => t.truckNumber === load.truck_number); if (t) onTruckClick(t) }}
+              >ⓘ</button>
+            )}
+          </div>
         </td>
 
         <td>
-          <SelectCell
-            value={load.trailer_number}
-            options={trailerOpts}
-            onChange={v => onEdit({ ...load, trailer_number: v })}
-            placeholder="—"
-          />
+          <div className="equip-cell">
+            <SelectCell
+              value={load.trailer_number}
+              options={trailerOpts}
+              onChange={v => onEdit({ ...load, trailer_number: v })}
+              placeholder="—"
+            />
+            {load.trailer_number && (
+              <button
+                className="equip-info-btn"
+                title="Trailer info"
+                onClick={() => { const t = trailers.find(t => t.trailerNumber === load.trailer_number); if (t) onTrailerClick(t) }}
+              >ⓘ</button>
+            )}
+          </div>
         </td>
 
         <td>
@@ -78,6 +96,7 @@ export default function DayView({ loads, loading, trucks, trailers, drivers, onE
               <div>
                 <div className="route-city">{load.pickup_location?.split(',')[0] ?? '?'}</div>
                 <div className="route-state">{load.pickup_location?.split(',')[1]?.trim() ?? ''}</div>
+                {load.pickup_date && <div className="route-date">{new Date(load.pickup_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' })}</div>}
               </div>
               <div className="route-arrow">→</div>
               <div>
