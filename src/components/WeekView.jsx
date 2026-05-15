@@ -1,4 +1,5 @@
-import { addDays, format, isSameDay, startOfWeek } from '../lib/dateUtils'
+import React from 'react'
+import { addDays, format, isSameDay } from '../lib/dateUtils'
 
 const STATUS_CLASS = {
   covered:   'wdc-covered',
@@ -10,30 +11,37 @@ const STATUS_CLASS = {
 
 const fmt$ = n => n ? '$' + Number(n).toLocaleString('en-US') : null
 
-export default function WeekView({ loads, loading, weekStart, today, onLoadClick }) {
-  const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
+export default function WeekView({ loads, loading, weekStart, today, onLoadClick, fleet = [] }) {
+  const days     = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
+  const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
-  // Gather unique trucks across the week
-  const truckMap = new Map()
-  for (const l of loads) {
-    const key = l.truck_number ?? l.id
-    if (!truckMap.has(key)) {
-      truckMap.set(key, {
-        truck:  l.truck_number,
-        type:   l.equipment_type,
-        trailer: l.trailer_number,
-        driver: l.driver_name,
-        company: l.company,
-      })
+  // Build row sources: use fleet if populated, else derive from loads
+  let caratRows, proRows
+  if (fleet.length > 0) {
+    caratRows = fleet.filter(e => e.company === 'carat')
+    proRows   = fleet.filter(e => e.company === 'pro_freight')
+  } else {
+    const truckMap = new Map()
+    for (const l of loads) {
+      const key = l.truck_number ?? l.id
+      if (!truckMap.has(key)) {
+        truckMap.set(key, {
+          id: key,
+          truck_number:   l.truck_number,
+          equipment_type: l.equipment_type,
+          trailer_number: l.trailer_number,
+          driver_name:    l.driver_name,
+          company:        l.company,
+        })
+      }
     }
+    caratRows = [...truckMap.values()].filter(v => v.company === 'carat')
+    proRows   = [...truckMap.values()].filter(v => v.company === 'pro_freight')
   }
-
-  const caratTrucks     = [...truckMap.entries()].filter(([, v]) => v.company === 'carat')
-  const proFreightTrucks = [...truckMap.entries()].filter(([, v]) => v.company === 'pro_freight')
 
   const dayStr = day => format(day)
 
-  // Per-day revenue counts only on delivery date to avoid double-counting
+  // Revenue counts only on delivery date to avoid double-counting
   const dayRevenue = days.map(day => {
     const d = dayStr(day)
     const dayLoads = loads.filter(l => (l.delivery_date || l.date) === d)
@@ -54,17 +62,19 @@ export default function WeekView({ loads, loading, weekStart, today, onLoadClick
     })
   }
 
-  function renderTruckRows(entries) {
-    return entries.map(([key, meta]) => (
-      <div className="week-row" key={key}>
+  function renderTruckRows(rows) {
+    return rows.map(entry => (
+      <React.Fragment key={entry.id}>
         <div className="week-truck-cell">
-          <div className="wtc-truck">Truck {meta.truck ?? '—'}</div>
-          <div className="wtc-type">{meta.type}{meta.trailer ? ` · ${meta.trailer}` : ''}</div>
-          {meta.driver && <div className="wtc-driver">{meta.driver}</div>}
+          <div className="wtc-truck">Truck {entry.truck_number ?? '—'}</div>
+          <div className="wtc-type">
+            {entry.equipment_type}{entry.trailer_number ? ` · ${entry.trailer_number}` : ''}
+          </div>
+          {entry.driver_name && <div className="wtc-driver">{entry.driver_name}</div>}
         </div>
         {days.map((day, i) => {
-          const isToday = isSameDay(day, today)
-          const dayLoads = loadsForTruckDay(meta.truck, day)
+          const isToday  = isSameDay(day, today)
+          const dayLoads = loadsForTruckDay(entry.truck_number, day)
           return (
             <div key={i} className={`week-day-cell${isToday ? ' today-col' : ''}`}>
               {dayLoads.length > 0 ? dayLoads.map(l => (
@@ -79,7 +89,7 @@ export default function WeekView({ loads, loading, weekStart, today, onLoadClick
                       : l.pickup_location || l.delivery_location || '—'}
                   </div>
                   {l.broker && <div className="wdc-broker">{l.broker}{l.load_number ? ` · ${l.load_number}` : ''}</div>}
-                  {l.price && <div className="wdc-price">{fmt$(l.price)}</div>}
+                  {l.price  && <div className="wdc-price">{fmt$(l.price)}</div>}
                 </div>
               )) : (
                 <span className="wdc-empty-state">—</span>
@@ -87,59 +97,58 @@ export default function WeekView({ loads, loading, weekStart, today, onLoadClick
             </div>
           )
         })}
-      </div>
+      </React.Fragment>
     ))
   }
 
-  const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+  const hasRows = caratRows.length > 0 || proRows.length > 0
 
   return (
     <div className="week-wrap">
       <div className="week-grid">
 
-        {/* HEADER */}
-        <div className="week-header">
-          <div className="week-header-cell" style={{ textAlign: 'left', background: '#F9FAFB' }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '.04em' }}>
-              Truck / Driver
-            </div>
-          </div>
-          {days.map((day, i) => {
-            const isToday = isSameDay(day, today)
-            return (
-              <div key={i} className={`week-header-cell${isToday ? ' today-header' : ''}`}>
-                <div>{DAY_NAMES[i]}</div>
-                <div className="wh-num">{day.getDate()}</div>
-              </div>
-            )
-          })}
+        {/* Header row — 8 direct grid children */}
+        <div className="week-header-label">
+          <span style={{ fontSize: 11, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '.04em' }}>
+            Truck / Driver
+          </span>
         </div>
+        {days.map((day, i) => {
+          const isToday = isSameDay(day, today)
+          return (
+            <div key={i} className={`week-header-cell${isToday ? ' today-header' : ''}`}>
+              <div>{DAY_NAMES[i]}</div>
+              <div className="wh-num">{day.getDate()}</div>
+            </div>
+          )
+        })}
 
+        {/* Body */}
         {loading ? (
           <div className="empty-week">Loading week…</div>
         ) : (
           <>
-            {caratTrucks.length > 0 && (
+            {caratRows.length > 0 && (
               <>
                 <div className="week-section-label">Carat Expedited</div>
-                {renderTruckRows(caratTrucks)}
+                {renderTruckRows(caratRows)}
               </>
             )}
-            {proFreightTrucks.length > 0 && (
+            {proRows.length > 0 && (
               <>
                 <div className="week-section-label">Pro Freight Transportation</div>
-                {renderTruckRows(proFreightTrucks)}
+                {renderTruckRows(proRows)}
               </>
             )}
-            {loads.length === 0 && (
+            {!hasRows && (
               <div className="empty-week">No loads this week.</div>
             )}
           </>
         )}
 
-        {/* REVENUE FOOTER */}
-        {!loading && loads.length > 0 && (
-          <div className="week-revenue-row">
+        {/* Revenue footer — 8 direct grid children */}
+        {!loading && hasRows && (
+          <>
             <div className="wrf-label">
               <div>Week Total</div>
               <div className="wrf-total">{fmt$(weekTotal)}</div>
@@ -153,7 +162,7 @@ export default function WeekView({ loads, loading, weekStart, today, onLoadClick
                 </div>
               )
             })}
-          </div>
+          </>
         )}
 
       </div>

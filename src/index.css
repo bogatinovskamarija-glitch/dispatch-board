@@ -184,31 +184,39 @@ tbody tr:hover { background: #FAFAFA; }
 
 /* ── WEEK VIEW ── */
 .week-wrap { padding: 0 24px 24px; overflow-x: auto; }
-.week-grid { background: #fff; border-radius: 12px; border: 1px solid #E5E7EB; overflow: hidden; min-width: 900px; }
-.week-header { display: grid; grid-template-columns: 160px repeat(7,1fr); border-bottom: 1px solid #E5E7EB; background: #F9FAFB; }
+.week-grid {
+  display: grid;
+  grid-template-columns: 160px repeat(7, 1fr);
+  background: #fff; border-radius: 12px; border: 1px solid #E5E7EB; overflow: hidden; min-width: 900px;
+}
+.week-header-label {
+  padding: 10px 12px; background: #F9FAFB; border-right: 1px solid #E5E7EB; border-bottom: 1px solid #E5E7EB;
+  display: flex; align-items: center;
+}
 .week-header-cell {
   padding: 10px 12px; font-size: 11px; font-weight: 600; color: #6B7280;
-  text-transform: uppercase; letter-spacing: .04em; text-align: center; border-right: 1px solid #E5E7EB;
+  text-transform: uppercase; letter-spacing: .04em; text-align: center;
+  border-right: 1px solid #E5E7EB; border-bottom: 1px solid #E5E7EB; background: #F9FAFB;
 }
 .week-header-cell:last-child { border-right: none; }
 .week-header-cell.today-header { background: #111827; color: #fff; }
 .wh-num { font-size: 18px; font-weight: 700; margin-top: 2px; }
 .week-section-label {
-  display: block; padding: 6px 16px; background: #F9FAFB; font-size: 11px; font-weight: 700;
+  grid-column: 1 / -1;
+  padding: 6px 16px; background: #F9FAFB; font-size: 11px; font-weight: 700;
   color: #9CA3AF; text-transform: uppercase; letter-spacing: .06em;
   border-top: 1px solid #E5E7EB; border-bottom: 1px solid #E5E7EB;
 }
-.week-row { display: grid; grid-template-columns: 160px repeat(7,1fr); border-bottom: 1px solid #F3F4F6; min-height: 60px; }
-.week-row:hover { background: #FAFAFA; }
 .week-truck-cell {
-  padding: 10px 12px; border-right: 1px solid #E5E7EB;
+  padding: 10px 12px; border-right: 1px solid #E5E7EB; border-bottom: 1px solid #F3F4F6;
   display: flex; flex-direction: column; justify-content: center; gap: 3px; background: #FAFAFA;
+  min-height: 60px;
 }
 .wtc-truck  { font-weight: 600; font-size: 13px; }
 .wtc-type   { font-size: 11px; color: #9CA3AF; }
 .wtc-driver { font-size: 11px; color: #6B7280; }
 .week-day-cell {
-  padding: 8px; border-right: 1px solid #F3F4F6;
+  padding: 8px; border-right: 1px solid #F3F4F6; border-bottom: 1px solid #F3F4F6;
   display: flex; align-items: center; justify-content: center; min-height: 60px;
 }
 .week-day-cell:last-child { border-right: none; }
@@ -224,18 +232,30 @@ tbody tr:hover { background: #FAFAFA; }
 .wdc-broker { font-size: 10px; color: #6B7280; margin-top: 1px; }
 .wdc-price  { font-size: 10px; font-weight: 600; color: #15803D; margin-top: 2px; }
 .wdc-empty-state { color: #D1D5DB; font-size: 12px; }
-.week-revenue-row { display: grid; grid-template-columns: 160px repeat(7,1fr); border-top: 2px solid #E5E7EB; background: #F9FAFB; }
+.empty-week { grid-column: 1 / -1; text-align: center; color: #9CA3AF; padding: 32px; }
 .wrf-label {
   padding: 10px 12px; font-size: 11px; font-weight: 700; color: #6B7280;
   text-transform: uppercase; letter-spacing: .04em; border-right: 1px solid #E5E7EB;
+  border-top: 2px solid #E5E7EB; background: #F9FAFB;
   display: flex; flex-direction: column; justify-content: center; gap: 3px;
 }
 .wrf-total  { font-size: 16px; font-weight: 700; color: #111827; text-transform: none; letter-spacing: 0; }
-.wrf-day { padding: 10px 8px; border-right: 1px solid #F3F4F6; display: flex; flex-direction: column; justify-content: center; gap: 2px; }
+.wrf-day {
+  padding: 10px 8px; border-right: 1px solid #F3F4F6; border-top: 2px solid #E5E7EB;
+  display: flex; flex-direction: column; justify-content: center; gap: 2px; background: #F9FAFB;
+}
 .wrf-day:last-child { border-right: none; }
 .wrf-day.today-col { background: #FFFBEB; }
 .wrf-amount { font-size: 13px; font-weight: 700; }
 .wrf-count  { font-size: 10px; color: #9CA3AF; }
+
+/* ── FLEET GHOST ROWS ── */
+.row-fleet-ghost td { background: #FAFAFA; }
+.fleet-ghost-badge {
+  display: inline-flex; align-items: center; padding: 3px 8px;
+  border-radius: 20px; font-size: 11px; font-weight: 600;
+  background: #F3F4F6; color: #9CA3AF; border: 1px dashed #D1D5DB; white-space: nowrap;
+}
 
 /* ── MODAL ── */
 .modal-overlay {

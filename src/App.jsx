@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useLoads, useWeekLoads } from './hooks/useLoads'
 import { useDrivers, useEquipment } from './hooks/useClickUp'
+import { useFleet } from './hooks/useFleet'
 import { format, addDays, startOfWeek, formatDisplay, formatWeekRange } from './lib/dateUtils'
 import StatsRow from './components/StatsRow'
 import DayView from './components/DayView'
@@ -8,6 +9,7 @@ import WeekView from './components/WeekView'
 import LoadModal from './components/LoadModal'
 import DriverSidebar from './components/DriverSidebar'
 import EquipmentSidebar from './components/EquipmentSidebar'
+import FleetModal from './components/FleetModal'
 
 const today = new Date()
 today.setHours(0, 0, 0, 0)
@@ -41,6 +43,7 @@ export default function App() {
   const [modal, setModal]         = useState(null)
   const [sidebar, setSidebar]     = useState(null)
   const [equipSidebar, setEquip]  = useState(null)
+  const [fleetOpen, setFleetOpen] = useState(false)
 
   const weekStart = startOfWeek(currentDay)
   const weekEnd   = addDays(weekStart, 6)
@@ -49,6 +52,7 @@ export default function App() {
   const { loads: weekLoads, loading: weekLoading } = useWeekLoads(format(weekStart), format(weekEnd), company)
   const { drivers } = useDrivers()
   const { trucks, trailers } = useEquipment()
+  const { fleet, addFleetEntry, updateFleetEntry, removeFleetEntry } = useFleet()
 
   async function handleSave(payload) {
     if (payload.id) await updateLoad(payload.id, payload)
@@ -95,6 +99,7 @@ export default function App() {
           <button className="btn btn-ghost" onClick={() => exportCSV(isDay ? loads : weekLoads)}>
             ↓ Export CSV
           </button>
+          <button className="btn btn-ghost" onClick={() => setFleetOpen(true)}>⊞ Fleet Roster</button>
           <button className="btn btn-primary" onClick={() => setModal('add')}>+ Add Load</button>
         </div>
       </div>
@@ -126,6 +131,7 @@ export default function App() {
           trucks={trucks}
           trailers={trailers}
           drivers={drivers}
+          fleet={fleet}
           onEdit={l => setModal(l)}
           onDelete={handleDelete}
           onDriverClick={(id, name) => setSidebar({ clickupId: id, name })}
@@ -138,6 +144,7 @@ export default function App() {
           loading={weekLoading}
           weekStart={weekStart}
           today={today}
+          fleet={fleet}
           onLoadClick={l => setModal(l)}
         />
       )}
@@ -167,6 +174,17 @@ export default function App() {
           equipment={equipSidebar.equipment}
           equipType={equipSidebar.equipType}
           onClose={() => setEquip(null)}
+        />
+      )}
+
+      {fleetOpen && (
+        <FleetModal
+          fleet={fleet}
+          drivers={drivers}
+          onAdd={addFleetEntry}
+          onUpdate={updateFleetEntry}
+          onRemove={removeFleetEntry}
+          onClose={() => setFleetOpen(false)}
         />
       )}
     </>

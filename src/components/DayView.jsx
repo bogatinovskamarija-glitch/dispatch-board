@@ -5,7 +5,7 @@ const fmt = n => n ? '$' + Number(n).toLocaleString('en-US') : '—'
 const dpm = (price, miles) =>
   price && miles ? '$' + (price / miles).toFixed(2) + '/mi' : null
 
-export default function DayView({ loads, loading, trucks, trailers, drivers, onEdit, onDelete, onDriverClick, onTruckClick, onTrailerClick }) {
+export default function DayView({ loads, loading, trucks, trailers, drivers, fleet = [], onEdit, onDelete, onDriverClick, onTruckClick, onTrailerClick }) {
   const truckOpts = trucks.map(e => ({
     value: e.truckNumber,
     label: e.truckNumber,
@@ -24,10 +24,125 @@ export default function DayView({ loads, loading, trucks, trailers, drivers, onE
     sub: d.company,
   }))
 
-  const carat    = loads.filter(l => l.company === 'carat')
-  const proFreight = loads.filter(l => l.company === 'pro_freight')
+  // Merge fleet entries with today's loads
+  function buildRows(fleetEntries, loadsList) {
+    const result       = []
+    const coveredTrucks = new Set()
+    for (const entry of fleetEntries) {
+      const truckLoads = loadsList.filter(l => l.truck_number === entry.truck_number)
+      if (truckLoads.length > 0) {
+        truckLoads.forEach(l => result.push(l))
+      } else {
+        result.push({
+          _ghost:           true,
+          _fleetId:         entry.id,
+          company:          entry.company,
+          truck_number:     entry.truck_number,
+          trailer_number:   entry.trailer_number,
+          equipment_type:   entry.equipment_type,
+          driver_name:      entry.driver_name,
+          driver_clickup_id:entry.driver_clickup_id,
+          phone:            entry.phone,
+        })
+      }
+      coveredTrucks.add(entry.truck_number)
+    }
+    // Include any loads for trucks not in the fleet roster
+    loadsList.filter(l => !coveredTrucks.has(l.truck_number)).forEach(l => result.push(l))
+    return result
+  }
+
+  const caratLoads = loads.filter(l => l.company === 'carat')
+  const proLoads   = loads.filter(l => l.company === 'pro_freight')
+
+  let carat, proFreight
+  if (fleet.length > 0) {
+    carat      = buildRows(fleet.filter(e => e.company === 'carat'),       caratLoads)
+    proFreight = buildRows(fleet.filter(e => e.company === 'pro_freight'), proLoads)
+  } else {
+    carat      = caratLoads
+    proFreight = proLoads
+  }
+
+  function renderGhostRow(entry) {
+    const prefill = {
+      company:          entry.company,
+      truck_number:     entry.truck_number,
+      trailer_number:   entry.trailer_number,
+      equipment_type:   entry.equipment_type,
+      driver_name:      entry.driver_name,
+      driver_clickup_id:entry.driver_clickup_id,
+      phone:            entry.phone,
+    }
+    return (
+      <tr key={entry._fleetId} className="row-fleet-ghost">
+        <td>
+          <span className="fleet-ghost-badge">No load</span>
+        </td>
+
+        <td>
+          <div className="equip-cell">
+            <span style={{ fontSize: 12, fontWeight: 500 }}>{entry.truck_number || '—'}</span>
+            {entry.truck_number && (
+              <button
+                className="equip-info-btn"
+                title="Truck info"
+                onClick={() => { const t = trucks.find(t => t.truckNumber === entry.truck_number); if (t) onTruckClick(t) }}
+              >ⓘ</button>
+            )}
+          </div>
+        </td>
+
+        <td>
+          <div className="equip-cell">
+            <span style={{ fontSize: 12, fontWeight: 500 }}>{entry.trailer_number || '—'}</span>
+            {entry.trailer_number && (
+              <button
+                className="equip-info-btn"
+                title="Trailer info"
+                onClick={() => { const t = trailers.find(t => t.trailerNumber === entry.trailer_number); if (t) onTrailerClick(t) }}
+              >ⓘ</button>
+            )}
+          </div>
+        </td>
+
+        <td>
+          <span style={{ fontSize: 11, fontWeight: 600, color: '#6B7280' }}>{entry.equipment_type ?? '—'}</span>
+        </td>
+
+        <td>
+          <div className="driver-cell">
+            {entry.driver_name ? (
+              <button className="clickup-link" onClick={() => onDriverClick(entry.driver_clickup_id, entry.driver_name)}>
+                {entry.driver_name}
+              </button>
+            ) : (
+              <span style={{ color: '#9CA3AF', fontStyle: 'italic', fontSize: 12 }}>No driver</span>
+            )}
+            {entry.phone && <div className="driver-phone">{entry.phone}</div>}
+          </div>
+        </td>
+
+        <td colSpan={7} style={{ color: '#D1D5DB', fontStyle: 'italic', fontSize: 12 }}>
+          No load assigned for today
+        </td>
+
+        <td>
+          <div className="actions-cell">
+            <button
+              className="action-btn"
+              title="Add load for this truck"
+              onClick={() => onEdit(prefill)}
+            >+</button>
+          </div>
+        </td>
+      </tr>
+    )
+  }
 
   function renderRow(load) {
+    if (load._ghost) return renderGhostRow(load)
+
     return (
       <tr key={load.id} className={`row-${load.status}`}>
         <td><StatusBadge status={load.status} /></td>
@@ -145,7 +260,7 @@ export default function DayView({ loads, loading, trucks, trailers, drivers, onE
 
         <td>
           <div className="actions-cell">
-            <button className="action-btn" title="Edit" onClick={() => onEdit(load)}>✎</button>
+            <button className="action-btn" title="Edit"   onClick={() => onEdit(load)}>✎</button>
             <button className="action-btn danger" title="Delete" onClick={() => onDelete(load.id)}>✕</button>
           </div>
         </td>
@@ -190,7 +305,7 @@ export default function DayView({ loads, loading, trucks, trailers, drivers, onE
                   {proFreight.map(renderRow)}
                 </>
               )}
-              {loads.length === 0 && (
+              {carat.length === 0 && proFreight.length === 0 && (
                 <tr className="loading-row"><td colSpan={13}>No loads for this day. Click + Add Load to get started.</td></tr>
               )}
             </>
