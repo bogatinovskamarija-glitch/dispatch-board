@@ -31,10 +31,10 @@ export default function EquipmentSidebar({ equipment, equipType, onClose }) {
 
         <div className="sidebar-section">
           <div className="sidebar-section-title">Registration & Compliance</div>
-          {equipment.vin           && <InfoRow label="VIN"              value={equipment.vin} mono />}
-          {equipment.licensePlate  && <InfoRow label="License Plate"    value={equipment.licensePlate} />}
-          {equipment.dotInspection && <InfoRow label="DOT Inspection"   value={equipment.dotInspection} />}
-          {!equipment.vin && !equipment.licensePlate && !equipment.dotInspection && (
+          {equipment.vin           && <InfoRow label="VIN"             value={equipment.vin} mono />}
+          {equipment.plate         && <InfoRow label="License Plate"   value={equipment.plate} />}
+          {equipment.dotInspection && <InfoRow label="DOT Inspection"  value={equipment.dotInspection} />}
+          {!equipment.vin && !equipment.plate && !equipment.dotInspection && (
             <p style={{ fontSize: 12, color: '#9CA3AF' }}>No compliance data in ClickUp yet.</p>
           )}
         </div>

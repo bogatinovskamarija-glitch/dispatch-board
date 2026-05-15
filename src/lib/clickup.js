@@ -68,20 +68,25 @@ function getField(task, ...names) {
 
 function normalizeDriver(task, company) {
   return {
-    id:               task.id,
-    name:             task.name,
+    id:           task.id,
+    name:         task.name,
     company,
-    phone:            getField(task, 'phone', 'phone number', 'cell'),
-    altPhone:         getField(task, 'alt phone', 'alternative phone', 'phone 2'),
-    address:          getField(task, 'address', 'home address', 'street address'),
-    hometown:         getField(task, 'hometown', 'home city', 'home'),
-    cdl:              getField(task, 'cdl', 'cdl number', 'license'),
-    cdlExpiry:        getField(task, 'cdl expiry', 'license expiry', 'cdl exp'),
-    medCard:          getField(task, 'medical card', 'med card', 'medical'),
-    medCardExpiry:    getField(task, 'med card expiry', 'medical card expiry', 'med exp', 'medical expiry'),
-    tankerEndorsement: getField(task, 'tanker endorsement', 'tanker'),
-    notes:            task.description ?? '',
+    phone:        getField(task, 'phone', 'phone number', 'cell'),
+    altPhone:     getField(task, 'alt phone', 'alternative phone', 'phone 2'),
+    address:      getField(task, 'address', 'home address'),
+    hometown:     getField(task, 'hometown', 'home city', 'home'),
+    cdlNumber:    getField(task, 'cdl number'),
+    cdlState:     getField(task, 'cdl state'),
+    cdlExpiry:    getField(task, 'cdl', 'cdl expiry', 'license expiry'),
+    medCert:      getField(task, 'med cert', 'medical certificate', 'medical card', 'med card'),
+    endorsements: getField(task, 'endorsements', 'endorsement', 'tanker endorsement'),
+    notes:        task.description ?? '',
   }
+}
+
+function fmtDue(ms) {
+  if (!ms) return ''
+  return new Date(Number(ms)).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' })
 }
 
 function normalizeTruck(task, company) {
@@ -91,12 +96,11 @@ function normalizeTruck(task, company) {
     company,
     type:          getField(task, 'type', 'equipment type', 'truck type') || 'REEF',
     isTanker:      ['yes', 'true', '1'].includes(getField(task, 'tanker').toLowerCase()),
-    year:          getField(task, 'year', 'truck year'),
-    make:          getField(task, 'make', 'manufacturer'),
-    model:         getField(task, 'model', 'truck model'),
+    year:          getField(task, 'year'),
+    make:          getField(task, 'make'),
     vin:           getField(task, 'vin', 'vin number'),
-    licensePlate:  getField(task, 'license plate', 'plate', 'license number'),
-    dotInspection: getField(task, 'dot inspection', 'dot expiry', 'annual inspection', 'inspection expiry'),
+    plate:         getField(task, 'plate', 'license plate'),
+    dotInspection: fmtDue(task.due_date),
   }
 }
 
@@ -105,11 +109,10 @@ function normalizeTrailer(task) {
     id:            task.id,
     trailerNumber: task.name,
     type:          getField(task, 'type', 'trailer type') || 'REEF',
-    year:          getField(task, 'year', 'trailer year'),
-    make:          getField(task, 'make', 'manufacturer'),
-    model:         getField(task, 'model', 'trailer model'),
+    year:          getField(task, 'year'),
+    make:          getField(task, 'make'),
     vin:           getField(task, 'vin', 'vin number'),
-    licensePlate:  getField(task, 'license plate', 'plate', 'license number'),
-    dotInspection: getField(task, 'dot inspection', 'dot expiry', 'annual inspection', 'inspection expiry'),
+    plate:         getField(task, 'plate', 'license plate'),
+    dotInspection: fmtDue(task.due_date),
   }
 }
