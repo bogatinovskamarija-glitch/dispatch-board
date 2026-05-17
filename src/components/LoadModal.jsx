@@ -8,12 +8,27 @@ const STATUSES = [
   { value: 'no_driver', label: 'No Driver', dot: '#9CA3AF' },
 ]
 
+const BLANK_STOP = { type: 'pickup', location: '', date: '', appt: '' }
+
+const DEFAULT_STOPS = [
+  { type: 'pickup',   location: '', date: '', appt: '' },
+  { type: 'delivery', location: '', date: '', appt: '' },
+]
+
 const BLANK = {
   status: 'empty', company: 'carat', truck_number: '', trailer_number: '',
   equipment_type: 'REEF', is_tanker: false, driver_name: '', driver_clickup_id: '',
-  phone: '', pickup_location: '', pickup_date: '', delivery_location: '', zip: '',
-  delivery_date: '', delivery_appt: '', load_number: '', broker: '',
+  phone: '', zip: '', load_number: '', broker: '',
   total_miles: '', price: '', safety_notes: '', notes: '', hometown: '',
+  stops: DEFAULT_STOPS,
+}
+
+function stopsFromLoad(load) {
+  if (load.stops?.length) return load.stops
+  return [
+    { type: 'pickup',   location: load.pickup_location   || '', date: load.pickup_date   || '', appt: '' },
+    { type: 'delivery', location: load.delivery_location || '', date: load.delivery_date || '', appt: load.delivery_appt || '' },
+  ]
 }
 
 export default function LoadModal({ load, date, drivers, trucks, trailers, onSave, onClose }) {
@@ -24,7 +39,12 @@ export default function LoadModal({ load, date, drivers, trucks, trailers, onSav
 
   useEffect(() => {
     if (load) {
-      setForm({ ...BLANK, ...load, pickup_date: load.pickup_date ?? '', delivery_date: load.delivery_date ?? '', total_miles: load.total_miles ?? '', price: load.price ?? '' })
+      setForm({
+        ...BLANK, ...load,
+        total_miles: load.total_miles ?? '',
+        price:       load.price       ?? '',
+        stops:       stopsFromLoad(load),
+      })
     } else {
       setForm({ ...BLANK, date })
     }
@@ -32,6 +52,21 @@ export default function LoadModal({ load, date, drivers, trucks, trailers, onSav
 
   function set(field, value) {
     setForm(f => ({ ...f, [field]: value }))
+  }
+
+  function updateStop(i, field, value) {
+    setForm(f => {
+      const stops = f.stops.map((s, idx) => idx === i ? { ...s, [field]: value } : s)
+      return { ...f, stops }
+    })
+  }
+
+  function addStop() {
+    setForm(f => ({ ...f, stops: [...f.stops, { ...BLANK_STOP }] }))
+  }
+
+  function removeStop(i) {
+    setForm(f => ({ ...f, stops: f.stops.filter((_, idx) => idx !== i) }))
   }
 
   function onDriverChange(e) {
@@ -72,13 +107,23 @@ export default function LoadModal({ load, date, drivers, trucks, trailers, onSav
     setSaving(true)
     setErr(null)
     try {
+      const stops      = form.stops.filter(s => s.location || s.date)
+      const pickups    = stops.filter(s => s.type === 'pickup')
+      const deliveries = stops.filter(s => s.type === 'delivery')
+      const firstPickup   = pickups[0]
+      const lastDelivery  = deliveries[deliveries.length - 1]
+
       const payload = {
         ...form,
-        total_miles:  form.total_miles  ? Number(form.total_miles) : null,
-        price:        form.price        ? Number(form.price)       : null,
-        pickup_date:  form.pickup_date  || null,
-        delivery_date: form.delivery_date || null,
-        date: form.date || date,
+        stops,
+        pickup_location:  firstPickup?.location  || '',
+        pickup_date:      firstPickup?.date       || null,
+        delivery_location: lastDelivery?.location || '',
+        delivery_date:    lastDelivery?.date      || null,
+        delivery_appt:    lastDelivery?.appt      || '',
+        total_miles:  form.total_miles ? Number(form.total_miles) : null,
+        price:        form.price       ? Number(form.price)       : null,
+        date:         form.date || date,
       }
       await onSave(payload)
       onClose()
@@ -194,34 +239,61 @@ export default function LoadModal({ load, date, drivers, trucks, trailers, onSav
               </div>
             </div>
 
-            {/* ROUTE */}
+            {/* ROUTE — dynamic stops */}
             <div className="form-section">
-              <div className="form-section-title">Route</div>
-              <div className="form-grid">
-                <div className="form-group">
-                  <label>Pick Up Location</label>
-                  <input type="text" placeholder="City, State" value={form.pickup_location} onChange={e => set('pickup_location', e.target.value)} />
+              <div className="form-section-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span>Route</span>
+                <button type="button" className="btn btn-ghost" style={{ padding: '2px 10px', fontSize: 11, height: 24 }} onClick={addStop}>
+                  + Add Stop
+                </button>
+              </div>
+
+              <div className="stops-header">
+                <span>Type</span>
+                <span>Location</span>
+                <span>Date</span>
+                <span>Appt</span>
+                <span />
+              </div>
+
+              {form.stops.map((stop, i) => (
+                <div key={i} className="stop-row">
+                  <select
+                    value={stop.type}
+                    onChange={e => updateStop(i, 'type', e.target.value)}
+                    className={`stop-type-${stop.type}`}
+                  >
+                    <option value="pickup">Pickup</option>
+                    <option value="delivery">Delivery</option>
+                  </select>
+                  <input
+                    type="text"
+                    placeholder="City, State"
+                    value={stop.location}
+                    onChange={e => updateStop(i, 'location', e.target.value)}
+                  />
+                  <input
+                    type="date"
+                    value={stop.date}
+                    onChange={e => updateStop(i, 'date', e.target.value)}
+                  />
+                  <input
+                    type="text"
+                    placeholder="e.g. 3:30 AM"
+                    value={stop.appt}
+                    onChange={e => updateStop(i, 'appt', e.target.value)}
+                  />
+                  {form.stops.length > 1 ? (
+                    <button type="button" className="stop-remove" onClick={() => removeStop(i)} title="Remove stop">✕</button>
+                  ) : (
+                    <span />
+                  )}
                 </div>
-                <div className="form-group">
-                  <label>Pickup Date</label>
-                  <input type="date" value={form.pickup_date} onChange={e => set('pickup_date', e.target.value)} />
-                </div>
-                <div className="form-group">
-                  <label>Delivery Location</label>
-                  <input type="text" placeholder="City, State" value={form.delivery_location} onChange={e => set('delivery_location', e.target.value)} />
-                </div>
-                <div className="form-group">
-                  <label>Delivery Date</label>
-                  <input type="date" value={form.delivery_date} onChange={e => set('delivery_date', e.target.value)} />
-                </div>
-                <div className="form-group">
-                  <label>Delivery Appt</label>
-                  <input type="text" placeholder="3:30 AM" value={form.delivery_appt} onChange={e => set('delivery_appt', e.target.value)} />
-                </div>
-                <div className="form-group">
-                  <label>Zip</label>
-                  <input type="text" placeholder="08873" value={form.zip} onChange={e => set('zip', e.target.value)} />
-                </div>
+              ))}
+
+              <div className="form-group" style={{ marginTop: 10, maxWidth: 160 }}>
+                <label>Zip</label>
+                <input type="text" placeholder="08873" value={form.zip} onChange={e => set('zip', e.target.value)} />
               </div>
             </div>
 

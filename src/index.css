@@ -358,5 +358,29 @@ textarea { resize: vertical; min-height: 60px; }
 /* ── ROUTE DATE ── */
 .route-date { font-size: 10px; color: #6366F1; font-weight: 600; margin-top: 1px; }
 
+/* ── MULTI-STOP ROUTE ── */
+.stops-header {
+  display: grid; grid-template-columns: 90px 1fr 130px 110px 28px;
+  gap: 8px; padding: 0 0 4px; font-size: 10px; font-weight: 700;
+  color: #9CA3AF; text-transform: uppercase; letter-spacing: .04em;
+}
+.stop-row {
+  display: grid; grid-template-columns: 90px 1fr 130px 110px 28px;
+  gap: 8px; align-items: center; margin-bottom: 6px;
+}
+.stop-row select, .stop-row input { margin: 0; }
+.stop-type-pickup  { background: #EFF6FF; color: #1D4ED8; border-color: #BFDBFE; font-weight: 600; }
+.stop-type-delivery { background: #F0FDF4; color: #15803D; border-color: #BBF7D0; font-weight: 600; }
+.stop-remove {
+  width: 24px; height: 24px; border: 1px solid #E5E7EB; background: transparent;
+  border-radius: 5px; cursor: pointer; color: #9CA3AF; font-size: 11px;
+  display: flex; align-items: center; justify-content: center; transition: all .15s;
+}
+.stop-remove:hover { background: #FEE2E2; border-color: #FECACA; color: #B91C1C; }
+.route-stops-badge {
+  font-size: 10px; font-weight: 700; color: #6366F1; background: #EEF2FF;
+  border-radius: 4px; padding: 1px 5px; white-space: nowrap;
+}
+
 /* ── MISC ── */
 .loading-row td { text-align: center; color: #9CA3AF; padding: 32px; }

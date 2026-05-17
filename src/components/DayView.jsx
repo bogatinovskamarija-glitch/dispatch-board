@@ -213,6 +213,9 @@ export default function DayView({ loads, loading, trucks, trailers, drivers, fle
                 <div className="route-state">{load.pickup_location?.split(',')[1]?.trim() ?? ''}</div>
                 {load.pickup_date && <div className="route-date">{new Date(load.pickup_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' })}</div>}
               </div>
+              {load.stops?.length > 2 && (
+                <div className="route-stops-badge">+{load.stops.length - 2}</div>
+              )}
               <div className="route-arrow">→</div>
               <div>
                 <div className="route-city">{load.delivery_location?.split(',')[0] ?? '?'}</div>
