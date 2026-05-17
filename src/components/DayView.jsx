@@ -5,7 +5,7 @@ const fmt = n => n ? '$' + Number(n).toLocaleString('en-US') : '—'
 const dpm = (price, miles) =>
   price && miles ? '$' + (price / miles).toFixed(2) + '/mi' : null
 
-export default function DayView({ loads, loading, trucks, trailers, drivers, fleet = [], onEdit, onDelete, onDriverClick, onTruckClick, onTrailerClick }) {
+export default function DayView({ loads, loading, trucks, trailers, drivers, fleet = [], statusFilter, onEdit, onDelete, onDriverClick, onTruckClick, onTrailerClick }) {
   const truckOpts = trucks.map(e => ({
     value: e.truckNumber,
     label: e.truckNumber,
@@ -62,6 +62,12 @@ export default function DayView({ loads, loading, trucks, trailers, drivers, fle
   } else {
     carat      = caratLoads
     proFreight = proLoads
+  }
+
+  // Apply status filter — ghost rows have no status so hide them when filtering
+  if (statusFilter) {
+    carat      = carat.filter(r => r.status === statusFilter)
+    proFreight = proFreight.filter(r => r.status === statusFilter)
   }
 
   function renderGhostRow(entry) {

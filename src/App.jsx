@@ -40,10 +40,11 @@ export default function App() {
   const [view, setView]       = useState('day')
   const [currentDay, setDay]  = useState(today)
   const [company, setCompany] = useState('all')
-  const [modal, setModal]         = useState(null)
-  const [sidebar, setSidebar]     = useState(null)
-  const [equipSidebar, setEquip]  = useState(null)
-  const [fleetOpen, setFleetOpen] = useState(false)
+  const [modal, setModal]           = useState(null)
+  const [sidebar, setSidebar]       = useState(null)
+  const [equipSidebar, setEquip]    = useState(null)
+  const [fleetOpen, setFleetOpen]   = useState(false)
+  const [statusFilter, setFilter]   = useState(null)
 
   const weekStart = startOfWeek(currentDay)
   const weekEnd   = addDays(weekStart, 6)
@@ -122,12 +123,17 @@ export default function App() {
         </div>
       </div>
 
-      <StatsRow loads={isDay ? loads : weekLoads} />
+      <StatsRow
+        loads={isDay ? loads : weekLoads}
+        statusFilter={isDay ? statusFilter : null}
+        onFilterChange={isDay ? setFilter : () => {}}
+      />
 
       {isDay ? (
         <DayView
           loads={loads}
           loading={loading}
+          statusFilter={statusFilter}
           trucks={trucks}
           trailers={trailers}
           drivers={drivers}
