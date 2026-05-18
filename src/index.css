@@ -360,6 +360,26 @@ textarea { resize: vertical; min-height: 60px; }
 .cu-badge:hover { background: #E0E7FF; }
 .sidebar-loading { padding: 20px; font-size: 12px; color: #9CA3AF; text-align: center; }
 
+/* ── DRIVER ATTACHMENTS ── */
+.attachment-grid { display: flex; flex-direction: column; gap: 10px; margin-top: 6px; }
+.attachment-item {
+  cursor: pointer; border-radius: 8px; overflow: hidden;
+  border: 1px solid #E5E7EB; background: #F9FAFB; transition: box-shadow .15s;
+}
+.attachment-item:hover { box-shadow: 0 2px 8px rgba(0,0,0,.12); }
+.attachment-thumb { width: 100%; max-height: 220px; object-fit: contain; display: block; background: #F9FAFB; }
+.attachment-label { font-size: 10px; color: #6B7280; padding: 4px 8px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; }
+.attachment-placeholder { font-size: 11px; color: #9CA3AF; padding: 8px 0; }
+.attachment-link { font-size: 12px; color: #4F46E5; text-decoration: none; }
+.attachment-link:hover { text-decoration: underline; }
+.attachment-lightbox {
+  position: fixed; inset: 0; background: rgba(0,0,0,.85); z-index: 2000;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  cursor: zoom-out; padding: 24px;
+}
+.attachment-lightbox img { max-width: 90vw; max-height: 85vh; object-fit: contain; border-radius: 8px; }
+.attachment-lightbox-hint { color: rgba(255,255,255,.5); font-size: 12px; margin-top: 12px; }
+
 /* ── EQUIPMENT CELL ── */
 .equip-cell { display: flex; align-items: center; gap: 4px; }
 .equip-info-btn {

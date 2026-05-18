@@ -80,6 +80,15 @@ function getField(task, ...names) {
   return ''
 }
 
+const IMAGE_EXTS = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'heic'])
+
+export async function fetchAttachmentBlob(url) {
+  const res = await fetch(url, { headers })
+  if (!res.ok) return null
+  const blob = await res.blob()
+  return URL.createObjectURL(blob)
+}
+
 function normalizeDriver(task, company) {
   return {
     id:           task.id,
@@ -97,6 +106,9 @@ function normalizeDriver(task, company) {
     twic:         getField(task, 'twic', 'twic card'),
     driverType:   getField(task, 'driver type', 'type'),
     notes:        task.description ?? '',
+    attachments:  (task.attachments ?? [])
+      .filter(a => IMAGE_EXTS.has((a.extension || '').toLowerCase()))
+      .map(a => ({ id: a.id, title: a.title || a.id, url: a.url })),
   }
 }
 
