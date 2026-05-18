@@ -41,6 +41,8 @@ export default function DriverSidebar({ clickupId, name, onClose }) {
               <InfoRow           label="CDL Expiry"              value={driver.cdlExpiry  || '—'} />
               <InfoRow           label="Med Cert Expiry"         value={driver.medCert    || '—'} />
               {driver.endorsements && <InfoRow label="Endorsements" value={driver.endorsements} />}
+              {driver.twic        && <InfoRow label="TWIC"         value={driver.twic} />}
+              {driver.driverType  && <InfoRow label="Driver Type"  value={driver.driverType} />}
             </div>
 
             {driver.notes && (

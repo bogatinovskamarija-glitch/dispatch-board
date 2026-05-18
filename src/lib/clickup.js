@@ -94,6 +94,8 @@ function normalizeDriver(task, company) {
     cdlExpiry:    getField(task, 'cdl', 'cdl expiry', 'license expiry'),
     medCert:      getField(task, 'med cert', 'medical certificate', 'medical card', 'med card'),
     endorsements: getField(task, 'endorsements', 'endorsement', 'tanker endorsement'),
+    twic:         getField(task, 'twic', 'twic card'),
+    driverType:   getField(task, 'driver type', 'type'),
     notes:        task.description ?? '',
   }
 }
