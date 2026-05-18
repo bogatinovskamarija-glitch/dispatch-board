@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { fetchDrivers, fetchEquipment, fetchDriver } from '../lib/clickup'
+import { fetchDrivers, fetchEquipment, fetchDriver, fetchTruckDetail, fetchTrailerDetail } from '../lib/clickup'
 
 export function useDrivers() {
   const [drivers, setDrivers] = useState([])
@@ -47,4 +47,21 @@ export function useDriverDetail(clickupId) {
   }, [clickupId])
 
   return { driver, loading }
+}
+
+export function useEquipmentDetail(taskId, equipType) {
+  const [detail, setDetail]   = useState(null)
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (!taskId) return
+    setLoading(true)
+    const fetch = equipType === 'truck' ? fetchTruckDetail : fetchTrailerDetail
+    fetch(taskId)
+      .then(setDetail)
+      .catch(() => setDetail(null))
+      .finally(() => setLoading(false))
+  }, [taskId, equipType])
+
+  return { detail, loading }
 }

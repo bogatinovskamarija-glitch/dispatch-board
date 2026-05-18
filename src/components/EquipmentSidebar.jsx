@@ -1,11 +1,16 @@
 import { useState, useEffect } from 'react'
 import { fetchAttachmentBlob } from '../lib/clickup'
+import { useEquipmentDetail } from '../hooks/useClickUp'
 
 export default function EquipmentSidebar({ equipment, equipType, onClose }) {
-  const isTruck   = equipType === 'truck'
-  const number    = isTruck ? equipment.truckNumber : equipment.trailerNumber
-  const label     = isTruck ? `Truck ${number}` : `Trailer ${number}`
-  const initials  = isTruck ? 'TR' : 'TL'
+  const isTruck  = equipType === 'truck'
+  const number   = isTruck ? equipment.truckNumber : equipment.trailerNumber
+  const label    = isTruck ? `Truck ${number}` : `Trailer ${number}`
+  const initials = isTruck ? 'TR' : 'TL'
+
+  // Fetch individual task to get attachments (list endpoint doesn't return them)
+  const { detail, loading: detailLoading } = useEquipmentDetail(equipment.id, equipType)
+  const data = detail ?? equipment
 
   return (
     <>
@@ -24,29 +29,32 @@ export default function EquipmentSidebar({ equipment, equipType, onClose }) {
 
         <div className="sidebar-section">
           <div className="sidebar-section-title">Details</div>
-          {equipment.year         && <InfoRow label="Year"          value={equipment.year} />}
-          {equipment.make         && <InfoRow label="Make"          value={equipment.make} />}
-          {equipment.model        && <InfoRow label="Model"         value={equipment.model} />}
-          {!equipment.year && !equipment.make && !equipment.model && (
-            <p style={{ fontSize: 12, color: '#9CA3AF' }}>No details in ClickUp yet.</p>
-          )}
+          {detailLoading && <p style={{ fontSize: 12, color: '#9CA3AF' }}>Loading…</p>}
+          {!detailLoading && <>
+            {data.year  && <InfoRow label="Year"  value={data.year} />}
+            {data.make  && <InfoRow label="Make"  value={data.make} />}
+            {data.model && <InfoRow label="Model" value={data.model} />}
+            {!data.year && !data.make && !data.model && (
+              <p style={{ fontSize: 12, color: '#9CA3AF' }}>No details in ClickUp yet.</p>
+            )}
+          </>}
         </div>
 
         <div className="sidebar-section">
           <div className="sidebar-section-title">Registration & Compliance</div>
-          {equipment.vin           && <InfoRow label="VIN"             value={equipment.vin} mono />}
-          {equipment.plate         && <InfoRow label="License Plate"   value={equipment.plate} />}
-          {equipment.dotInspection && <InfoRow label="DOT Inspection"  value={equipment.dotInspection} />}
-          {!equipment.vin && !equipment.plate && !equipment.dotInspection && (
+          {data.vin           && <InfoRow label="VIN"            value={data.vin} mono />}
+          {data.plate         && <InfoRow label="License Plate"  value={data.plate} />}
+          {data.dotInspection && <InfoRow label="DOT Inspection" value={data.dotInspection} />}
+          {!data.vin && !data.plate && !data.dotInspection && !detailLoading && (
             <p style={{ fontSize: 12, color: '#9CA3AF' }}>No compliance data in ClickUp yet.</p>
           )}
         </div>
 
-        {equipment.attachments?.length > 0 && (
+        {data.attachments?.length > 0 && (
           <div className="sidebar-section">
             <div className="sidebar-section-title">Documents & Photos</div>
             <div className="attachment-grid">
-              {equipment.attachments.map(a => (
+              {data.attachments.map(a => (
                 <AttachmentImage key={a.id} url={a.url} title={a.title} />
               ))}
             </div>

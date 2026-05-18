@@ -40,6 +40,23 @@ export async function fetchDriver(clickupId) {
   return normalizeDriver(task, company)
 }
 
+export async function fetchTruckDetail(taskId) {
+  if (!taskId) return null
+  const res = await fetch(`${BASE}/task/${taskId}`, { headers })
+  if (!res.ok) return null
+  const task = await res.json()
+  const company = task.list?.id === LIST_IDS.caratTrucks ? 'carat' : 'pro_freight'
+  return normalizeTruck(task, company)
+}
+
+export async function fetchTrailerDetail(taskId) {
+  if (!taskId) return null
+  const res = await fetch(`${BASE}/task/${taskId}`, { headers })
+  if (!res.ok) return null
+  const task = await res.json()
+  return normalizeTrailer(task)
+}
+
 export async function fetchEquipment() {
   const [caratTasks, proTasks, trailerTasks] = await Promise.all([
     fetchList(LIST_IDS.caratTrucks),
