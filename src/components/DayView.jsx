@@ -290,6 +290,10 @@ export default function DayView({ loads, loading, trucks, trailers, drivers, fle
             : '—'}
         </td>
 
+        <td style={{ maxWidth: 120, whiteSpace: 'normal', fontSize: 11, color: '#B91C1C', fontWeight: 500 }}>
+          {load.safety_notes ?? ''}
+        </td>
+
         <td style={{ maxWidth: 140, whiteSpace: 'normal', fontSize: 11, color: '#6B7280' }}>
           {load.notes ?? ''}
         </td>
@@ -362,6 +366,10 @@ export default function DayView({ loads, loading, trucks, trailers, drivers, fle
         <td>{load.price ? <div className="price-main">{fmt(load.price)}</div> : '—'}</td>
         <td>{dpm(load.price, load.total_miles) ? <div className="price-main">{dpm(load.price, load.total_miles)}</div> : '—'}</td>
 
+        <td style={{ maxWidth: 120, whiteSpace: 'normal', fontSize: 11, color: '#B91C1C', fontWeight: 500 }}>
+          {load.safety_notes ?? ''}
+        </td>
+
         <td style={{ maxWidth: 140, whiteSpace: 'normal', fontSize: 11, color: '#6B7280' }}>
           {load.notes ?? ''}
         </td>
@@ -402,29 +410,30 @@ export default function DayView({ loads, loading, trucks, trailers, drivers, fle
             <th>Miles</th>
             <th>Revenue</th>
             <th>$/Mile</th>
+            <th>Safety Notes</th>
             <th>Notes</th>
             <th></th>
           </tr>
         </thead>
         <tbody>
           {loading ? (
-            <tr className="loading-row"><td colSpan={13}>Loading loads…</td></tr>
+            <tr className="loading-row"><td colSpan={14}>Loading loads…</td></tr>
           ) : (
             <>
               {caratGroups.length > 0 && (
                 <>
-                  <tr className="section-row"><td colSpan={13}>Carat Expedited</td></tr>
+                  <tr className="section-row"><td colSpan={14}>Carat Expedited</td></tr>
                   {caratGroups.map(renderGroup)}
                 </>
               )}
               {proFreightGroups.length > 0 && (
                 <>
-                  <tr className="section-row"><td colSpan={13}>Pro Freight Transportation</td></tr>
+                  <tr className="section-row"><td colSpan={14}>Pro Freight Transportation</td></tr>
                   {proFreightGroups.map(renderGroup)}
                 </>
               )}
               {caratGroups.length === 0 && proFreightGroups.length === 0 && (
-                <tr className="loading-row"><td colSpan={13}>No loads for this day. Click + Add Load to get started.</td></tr>
+                <tr className="loading-row"><td colSpan={14}>No loads for this day. Click + Add Load to get started.</td></tr>
               )}
             </>
           )}
