@@ -117,6 +117,12 @@ function fmtDue(ms) {
   return new Date(Number(ms)).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' })
 }
 
+function normalizeAttachments(task) {
+  return (task.attachments ?? [])
+    .filter(a => IMAGE_EXTS.has((a.extension || '').toLowerCase()))
+    .map(a => ({ id: a.id, title: a.title || a.id, url: a.url }))
+}
+
 function normalizeTruck(task, company) {
   return {
     id:            task.id,
@@ -129,6 +135,7 @@ function normalizeTruck(task, company) {
     vin:           getField(task, 'vin', 'vin number'),
     plate:         getField(task, 'plate', 'license plate'),
     dotInspection: fmtDue(task.due_date),
+    attachments:   normalizeAttachments(task),
   }
 }
 
@@ -142,5 +149,6 @@ function normalizeTrailer(task) {
     vin:           getField(task, 'vin', 'vin number'),
     plate:         getField(task, 'plate', 'license plate'),
     dotInspection: fmtDue(task.due_date),
+    attachments:   normalizeAttachments(task),
   }
 }
