@@ -10,31 +10,10 @@ import LoadModal from './components/LoadModal'
 import DriverSidebar from './components/DriverSidebar'
 import EquipmentSidebar from './components/EquipmentSidebar'
 import FleetModal from './components/FleetModal'
+import ExportModal from './components/ExportModal'
 
 const today = new Date()
 today.setHours(0, 0, 0, 0)
-
-function exportCSV(loads) {
-  const cols = [
-    'date','company','status','truck_number','trailer_number','equipment_type',
-    'driver_name','phone','pickup_location','pickup_date','delivery_location','zip',
-    'delivery_date','delivery_appt','load_number','broker','total_miles','price','safety_notes','notes',
-  ]
-  const rows = [cols.join(',')]
-  for (const l of loads) {
-    rows.push(cols.map(c => {
-      const v = l[c] ?? ''
-      return typeof v === 'string' && v.includes(',') ? `"${v}"` : v
-    }).join(','))
-  }
-  const blob = new Blob([rows.join('\n')], { type: 'text/csv' })
-  const url  = URL.createObjectURL(blob)
-  const a    = document.createElement('a')
-  a.href = url
-  a.download = `loads-${format(today)}.csv`
-  a.click()
-  URL.revokeObjectURL(url)
-}
 
 export default function App() {
   const [view, setView]       = useState('day')
@@ -44,6 +23,7 @@ export default function App() {
   const [sidebar, setSidebar]       = useState(null)
   const [equipSidebar, setEquip]    = useState(null)
   const [fleetOpen, setFleetOpen]   = useState(false)
+  const [exportOpen, setExportOpen] = useState(false)
   const [statusFilter, setFilter]   = useState(null)
 
   const weekStart = startOfWeek(currentDay)
@@ -97,7 +77,7 @@ export default function App() {
         </div>
 
         <div className="topbar-right">
-          <button className="btn btn-ghost" onClick={() => exportCSV(isDay ? loads : weekLoads)}>
+          <button className="btn btn-ghost" onClick={() => setExportOpen(true)}>
             ↓ Export CSV
           </button>
           <button className="btn btn-ghost" onClick={() => setFleetOpen(true)}>⊞ Fleet Roster</button>
@@ -181,6 +161,10 @@ export default function App() {
           equipType={equipSidebar.equipType}
           onClose={() => setEquip(null)}
         />
+      )}
+
+      {exportOpen && (
+        <ExportModal onClose={() => setExportOpen(false)} />
       )}
 
       {fleetOpen && (
