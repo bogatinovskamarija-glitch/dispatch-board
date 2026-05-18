@@ -67,8 +67,9 @@ export default function DayView({ loads, loading, trucks, trailers, drivers, fle
         groups[seen.get(key)].push(row)
       }
     }
-    // Within each group sort by pickup date ascending so current load is first
-    return groups.map(g => g.slice().sort((a, b) => (a.date || '') <= (b.date || '') ? -1 : 1))
+    // Sort by pickup_date ascending so the soonest load is always first
+    const key = r => r.pickup_date || r.date || ''
+    return groups.map(g => g.slice().sort((a, b) => key(a) <= key(b) ? -1 : 1))
   }
 
   const caratLoads = loads.filter(l => l.company === 'carat')
@@ -312,9 +313,7 @@ export default function DayView({ loads, loading, trucks, trailers, drivers, fle
   function renderNextRow(load) {
     return (
       <tr key={`next-${load.id}`} className="row-next-load">
-        <td>
-          <span className="next-load-badge">Next</span>
-        </td>
+        <td><StatusBadge status={load.status} /></td>
 
         {/* truck / trailer / type / driver: same as primary — leave blank */}
         <td /><td /><td /><td />

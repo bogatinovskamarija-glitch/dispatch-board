@@ -75,6 +75,7 @@ body {
 .dot-pink   { background: #DB2777; }
 .dot-red    { background: #DC2626; }
 .dot-grey   { background: #9CA3AF; }
+.dot-indigo { background: #4F46E5; }
 
 .status-badge {
   display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px;
@@ -91,6 +92,8 @@ body {
 .badge-broken .dot    { background: #DC2626; }
 .badge-no_driver { background: #F3F4F6; color: #4B5563; }
 .badge-no_driver .dot { background: #9CA3AF; }
+.badge-prebooked { background: #EEF2FF; color: #3730A3; }
+.badge-prebooked .dot { background: #4F46E5; }
 
 /* ── STATS ROW ── */
 .stats-row { padding: 0 24px 12px; display: flex; gap: 10px; flex-wrap: wrap; }
@@ -123,10 +126,11 @@ td { padding: 9px 10px; border-bottom: 1px solid #F3F4F6; vertical-align: middle
 td:first-child { padding-left: 14px; }
 tbody tr:last-child td { border-bottom: none; }
 tbody tr:hover { background: #FAFAFA; }
-.row-covered  td:first-child { box-shadow: inset 3px 0 0 #16A34A; }
-.row-empty    td:first-child { box-shadow: inset 3px 0 0 #CA8A04; }
-.row-home     td:first-child { box-shadow: inset 3px 0 0 #DB2777; }
-.row-broken   td:first-child { box-shadow: inset 3px 0 0 #DC2626; }
+.row-covered   td:first-child { box-shadow: inset 3px 0 0 #16A34A; }
+.row-empty     td:first-child { box-shadow: inset 3px 0 0 #CA8A04; }
+.row-home      td:first-child { box-shadow: inset 3px 0 0 #DB2777; }
+.row-broken    td:first-child { box-shadow: inset 3px 0 0 #DC2626; }
+.row-prebooked td:first-child { box-shadow: inset 3px 0 0 #4F46E5; }
 .row-no_driver td:first-child{ box-shadow: inset 3px 0 0 #9CA3AF; }
 .section-row td {
   background: #F9FAFB; padding: 6px 14px; font-size: 11px; font-weight: 700;
@@ -267,11 +271,7 @@ tbody tr:hover { background: #FAFAFA; }
   padding-top: 5px; padding-bottom: 5px;
 }
 .row-next-load td:first-child { border-left: 3px solid #7C3AED; }
-.next-load-badge {
-  display: inline-flex; align-items: center; padding: 2px 7px;
-  border-radius: 20px; font-size: 10px; font-weight: 700; letter-spacing: .3px;
-  background: #EDE9FE; color: #5B21B6; border: 1px solid #C4B5FD; white-space: nowrap;
-}
+
 
 /* ── CHAIN BUTTON ── */
 .action-btn.chain { color: #6D28D9; }

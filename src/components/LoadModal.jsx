@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
 
 const STATUSES = [
-  { value: 'covered',   label: 'Covered',   dot: '#16A34A' },
-  { value: 'empty',     label: 'Empty',     dot: '#CA8A04' },
-  { value: 'home',      label: 'At Home',   dot: '#DB2777' },
-  { value: 'broken',    label: 'Broken',    dot: '#DC2626' },
-  { value: 'no_driver', label: 'No Driver', dot: '#9CA3AF' },
+  { value: 'covered',   label: 'Covered',    dot: '#16A34A' },
+  { value: 'empty',     label: 'Empty',      dot: '#CA8A04' },
+  { value: 'home',      label: 'At Home',    dot: '#DB2777' },
+  { value: 'broken',    label: 'Broken',     dot: '#DC2626' },
+  { value: 'no_driver', label: 'No Driver',  dot: '#9CA3AF' },
+  { value: 'prebooked', label: 'Pre-Booked', dot: '#4F46E5' },
 ]
 
 const BLANK_STOP = { type: 'pickup', location: '', date: '', appt: '' }

@@ -4,6 +4,7 @@ const LABELS = {
   home:      'At Home',
   broken:    'Broken Down',
   no_driver: 'No Driver',
+  prebooked: 'Pre-Booked',
 }
 
 export default function StatusBadge({ status }) {

@@ -6,7 +6,7 @@ export default function StatsRow({ loads, statusFilter, onFilterChange }) {
     if (!truckStatus.has(key)) truckStatus.set(key, l.status)
   }
 
-  const counts = { covered: 0, empty: 0, home: 0, broken: 0, no_driver: 0 }
+  const counts = { covered: 0, empty: 0, home: 0, broken: 0, no_driver: 0, prebooked: 0 }
   for (const s of truckStatus.values()) {
     if (counts[s] !== undefined) counts[s]++
   }
@@ -22,11 +22,12 @@ export default function StatsRow({ loads, statusFilter, onFilterChange }) {
   }
 
   const CARDS = [
-    { status: 'covered',   dot: 'dot-green',  label: 'Covered',   count: counts.covered   },
-    { status: 'empty',     dot: 'dot-yellow', label: 'Empty',     count: counts.empty     },
-    { status: 'home',      dot: 'dot-pink',   label: 'At Home',   count: counts.home      },
-    { status: 'broken',    dot: 'dot-red',    label: 'Broken',    count: counts.broken    },
-    { status: 'no_driver', dot: 'dot-grey',   label: 'No Driver', count: counts.no_driver },
+    { status: 'covered',   dot: 'dot-green',  label: 'Covered',    count: counts.covered   },
+    { status: 'empty',     dot: 'dot-yellow', label: 'Empty',      count: counts.empty     },
+    { status: 'home',      dot: 'dot-pink',   label: 'At Home',    count: counts.home      },
+    { status: 'broken',    dot: 'dot-red',    label: 'Broken',     count: counts.broken    },
+    { status: 'no_driver', dot: 'dot-grey',   label: 'No Driver',  count: counts.no_driver },
+    { status: 'prebooked', dot: 'dot-indigo', label: 'Pre-Booked', count: counts.prebooked },
   ]
 
   return (
