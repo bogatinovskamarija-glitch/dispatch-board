@@ -106,7 +106,7 @@ export default function App() {
 
       <StatsRow
         loads={isDay ? loads : weekLoads}
-        statusFilter={isDay ? statusFilter : null}
+        statusFilter={isDay ? statusFilter : []}
         onFilterChange={isDay ? setFilter : () => {}}
       />
 
