@@ -1,3 +1,4 @@
+import { Fragment } from 'react'
 import StatusBadge from './StatusBadge'
 import SelectCell from './SelectCell'
 
@@ -26,7 +27,7 @@ export default function DayView({ loads, loading, trucks, trailers, drivers, fle
 
   // Merge fleet entries with today's loads
   function buildRows(fleetEntries, loadsList) {
-    const result       = []
+    const result        = []
     const coveredTrucks = new Set()
     for (const entry of fleetEntries) {
       const truckLoads = loadsList.filter(l => l.truck_number === entry.truck_number)
@@ -34,22 +35,40 @@ export default function DayView({ loads, loading, trucks, trailers, drivers, fle
         truckLoads.forEach(l => result.push(l))
       } else {
         result.push({
-          _ghost:           true,
-          _fleetId:         entry.id,
-          company:          entry.company,
-          truck_number:     entry.truck_number,
-          trailer_number:   entry.trailer_number,
-          equipment_type:   entry.equipment_type,
-          driver_name:      entry.driver_name,
-          driver_clickup_id:entry.driver_clickup_id,
-          phone:            entry.phone,
+          _ghost:            true,
+          _fleetId:          entry.id,
+          company:           entry.company,
+          truck_number:      entry.truck_number,
+          trailer_number:    entry.trailer_number,
+          equipment_type:    entry.equipment_type,
+          driver_name:       entry.driver_name,
+          driver_clickup_id: entry.driver_clickup_id,
+          phone:             entry.phone,
         })
       }
       coveredTrucks.add(entry.truck_number)
     }
-    // Include any loads for trucks not in the fleet roster
     loadsList.filter(l => !coveredTrucks.has(l.truck_number)).forEach(l => result.push(l))
     return result
+  }
+
+  // Group rows by truck so multiple loads for the same truck appear in one slot
+  function groupByTruck(rows) {
+    const groups = []
+    const seen   = new Map()
+    for (const row of rows) {
+      const key = row._ghost
+        ? `ghost_${row._fleetId}`
+        : (row.truck_number || `notruck_${row.id}`)
+      if (!seen.has(key)) {
+        seen.set(key, groups.length)
+        groups.push([row])
+      } else {
+        groups[seen.get(key)].push(row)
+      }
+    }
+    // Within each group sort by pickup date ascending so current load is first
+    return groups.map(g => g.slice().sort((a, b) => (a.date || '') <= (b.date || '') ? -1 : 1))
   }
 
   const caratLoads = loads.filter(l => l.company === 'carat')
@@ -70,16 +89,23 @@ export default function DayView({ loads, loading, trucks, trailers, drivers, fle
     proFreight = proFreight.filter(r => r.status === statusFilter)
   }
 
-  function renderGhostRow(entry) {
-    const prefill = {
-      company:          entry.company,
-      truck_number:     entry.truck_number,
-      trailer_number:   entry.trailer_number,
-      equipment_type:   entry.equipment_type,
-      driver_name:      entry.driver_name,
-      driver_clickup_id:entry.driver_clickup_id,
-      phone:            entry.phone,
+  const caratGroups      = groupByTruck(carat)
+  const proFreightGroups = groupByTruck(proFreight)
+
+  // Prefill for chain / ghost add — equipment + driver, no id
+  function chainPrefill(load) {
+    return {
+      company:           load.company,
+      truck_number:      load.truck_number,
+      trailer_number:    load.trailer_number,
+      equipment_type:    load.equipment_type,
+      driver_name:       load.driver_name,
+      driver_clickup_id: load.driver_clickup_id,
+      phone:             load.phone,
     }
+  }
+
+  function renderGhostRow(entry) {
     return (
       <tr key={entry._fleetId} className="row-fleet-ghost">
         <td>
@@ -138,7 +164,7 @@ export default function DayView({ loads, loading, trucks, trailers, drivers, fle
             <button
               className="action-btn"
               title="Add load for this truck"
-              onClick={() => onEdit(prefill)}
+              onClick={() => onEdit(chainPrefill(entry))}
             >+</button>
           </div>
         </td>
@@ -269,11 +295,95 @@ export default function DayView({ loads, loading, trucks, trailers, drivers, fle
 
         <td>
           <div className="actions-cell">
+            <button
+              className="action-btn chain"
+              title="Add next load (same truck & driver)"
+              onClick={() => onEdit(chainPrefill(load))}
+            >+</button>
             <button className="action-btn" title="Edit"   onClick={() => onEdit(load)}>✎</button>
             <button className="action-btn danger" title="Delete" onClick={() => onDelete(load.id)}>✕</button>
           </div>
         </td>
       </tr>
+    )
+  }
+
+  // Compact row for 2nd, 3rd, … loads on the same truck
+  function renderNextRow(load) {
+    return (
+      <tr key={`next-${load.id}`} className="row-next-load">
+        <td>
+          <span className="next-load-badge">Next</span>
+        </td>
+
+        {/* truck / trailer / type / driver: same as primary — leave blank */}
+        <td /><td /><td /><td />
+
+        <td>
+          {load.pickup_location || load.delivery_location ? (
+            <div className="route-cell">
+              <div>
+                <div className="route-city">{load.pickup_location?.split(',')[0] ?? '?'}</div>
+                <div className="route-state">{load.pickup_location?.split(',')[1]?.trim() ?? ''}</div>
+                {load.pickup_date && <div className="route-date">{new Date(load.pickup_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' })}</div>}
+              </div>
+              {load.stops?.length > 2 && (
+                <div className="route-stops-badge">+{load.stops.length - 2}</div>
+              )}
+              <div className="route-arrow">→</div>
+              <div>
+                <div className="route-city">{load.delivery_location?.split(',')[0] ?? '?'}</div>
+                <div className="route-state">{load.delivery_location?.split(',')[1]?.trim() ?? ''}</div>
+              </div>
+            </div>
+          ) : (
+            <span style={{ color: '#9CA3AF' }}>—</span>
+          )}
+        </td>
+
+        <td>
+          {load.load_number ? (
+            <>
+              <div className="load-number">{load.load_number}</div>
+              <div className="load-broker">{load.broker}</div>
+            </>
+          ) : '—'}
+        </td>
+
+        <td>
+          {load.delivery_date ? (
+            <>
+              <div>{new Date(load.delivery_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' })}</div>
+              {load.delivery_appt && <div style={{ fontSize: 11, color: '#6B7280' }}>{load.delivery_appt}</div>}
+            </>
+          ) : '—'}
+        </td>
+
+        <td>{load.total_miles ? load.total_miles.toLocaleString() : '—'}</td>
+        <td>{load.price ? <div className="price-main">{fmt(load.price)}</div> : '—'}</td>
+        <td>{dpm(load.price, load.total_miles) ? <div className="price-main">{dpm(load.price, load.total_miles)}</div> : '—'}</td>
+
+        <td style={{ maxWidth: 140, whiteSpace: 'normal', fontSize: 11, color: '#6B7280' }}>
+          {load.notes ?? ''}
+        </td>
+
+        <td>
+          <div className="actions-cell">
+            <button className="action-btn" title="Edit"   onClick={() => onEdit(load)}>✎</button>
+            <button className="action-btn danger" title="Delete" onClick={() => onDelete(load.id)}>✕</button>
+          </div>
+        </td>
+      </tr>
+    )
+  }
+
+  function renderGroup(group) {
+    const [primary, ...rest] = group
+    return (
+      <Fragment key={primary._ghost ? `ghost_${primary._fleetId}` : primary.id}>
+        {renderRow(primary)}
+        {rest.map(renderNextRow)}
+      </Fragment>
     )
   }
 
@@ -302,19 +412,19 @@ export default function DayView({ loads, loading, trucks, trailers, drivers, fle
             <tr className="loading-row"><td colSpan={13}>Loading loads…</td></tr>
           ) : (
             <>
-              {carat.length > 0 && (
+              {caratGroups.length > 0 && (
                 <>
                   <tr className="section-row"><td colSpan={13}>Carat Expedited</td></tr>
-                  {carat.map(renderRow)}
+                  {caratGroups.map(renderGroup)}
                 </>
               )}
-              {proFreight.length > 0 && (
+              {proFreightGroups.length > 0 && (
                 <>
                   <tr className="section-row"><td colSpan={13}>Pro Freight Transportation</td></tr>
-                  {proFreight.map(renderRow)}
+                  {proFreightGroups.map(renderGroup)}
                 </>
               )}
-              {carat.length === 0 && proFreight.length === 0 && (
+              {caratGroups.length === 0 && proFreightGroups.length === 0 && (
                 <tr className="loading-row"><td colSpan={13}>No loads for this day. Click + Add Load to get started.</td></tr>
               )}
             </>

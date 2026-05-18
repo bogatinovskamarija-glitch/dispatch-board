@@ -261,6 +261,22 @@ tbody tr:hover { background: #FAFAFA; }
   background: #F3F4F6; color: #9CA3AF; border: 1px dashed #D1D5DB; white-space: nowrap;
 }
 
+/* ── NEXT LOAD ROWS ── */
+.row-next-load td {
+  background: #F5F3FF; border-top: none !important;
+  padding-top: 5px; padding-bottom: 5px;
+}
+.row-next-load td:first-child { border-left: 3px solid #7C3AED; }
+.next-load-badge {
+  display: inline-flex; align-items: center; padding: 2px 7px;
+  border-radius: 20px; font-size: 10px; font-weight: 700; letter-spacing: .3px;
+  background: #EDE9FE; color: #5B21B6; border: 1px solid #C4B5FD; white-space: nowrap;
+}
+
+/* ── CHAIN BUTTON ── */
+.action-btn.chain { color: #6D28D9; }
+.action-btn.chain:hover { background: #EDE9FE; border-color: #C4B5FD; color: #4C1D95; }
+
 /* ── MODAL ── */
 .modal-overlay {
   position: fixed; inset: 0; background: rgba(0,0,0,.35);
