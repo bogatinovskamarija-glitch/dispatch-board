@@ -18,7 +18,11 @@ export default function StatsRow({ loads, statusFilter, onFilterChange }) {
   const fmt = n => '$' + n.toLocaleString('en-US', { minimumFractionDigits: 0 })
 
   function toggle(status) {
-    onFilterChange(statusFilter === status ? null : status)
+    onFilterChange(
+      statusFilter.includes(status)
+        ? statusFilter.filter(s => s !== status)
+        : [...statusFilter, status]
+    )
   }
 
   const CARDS = [
@@ -35,7 +39,7 @@ export default function StatsRow({ loads, statusFilter, onFilterChange }) {
       {CARDS.map(c => (
         <div
           key={c.status}
-          className={`stat-card stat-card-btn${statusFilter === c.status ? ' stat-active' : ''}`}
+          className={`stat-card stat-card-btn${statusFilter.includes(c.status) ? ' stat-active' : ''}`}
           onClick={() => toggle(c.status)}
           title={`Filter by ${c.label}`}
         >

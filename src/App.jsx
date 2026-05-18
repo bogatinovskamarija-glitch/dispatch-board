@@ -24,7 +24,7 @@ export default function App() {
   const [equipSidebar, setEquip]    = useState(null)
   const [fleetOpen, setFleetOpen]   = useState(false)
   const [exportOpen, setExportOpen] = useState(false)
-  const [statusFilter, setFilter]   = useState(null)
+  const [statusFilter, setFilter]   = useState([])
 
   const weekStart = startOfWeek(currentDay)
   const weekEnd   = addDays(weekStart, 6)

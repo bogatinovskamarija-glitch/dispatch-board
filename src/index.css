@@ -318,7 +318,7 @@ textarea { resize: vertical; min-height: 60px; }
   font-size: 11px; font-weight: 600; color: #6366F1; cursor: pointer; white-space: nowrap; font-family: inherit; display: flex; align-items: center;
 }
 .cu-btn:hover { background: #EEF2FF; border-color: #C7D2FE; }
-.status-picker { display: grid; grid-template-columns: repeat(5,1fr); gap: 6px; }
+.status-picker { display: grid; grid-template-columns: repeat(3,1fr); gap: 6px; }
 .status-opt {
   display: flex; flex-direction: column; align-items: center; gap: 4px;
   padding: 8px 4px; border: 2px solid #E5E7EB; border-radius: 8px; cursor: pointer;
@@ -330,6 +330,7 @@ textarea { resize: vertical; min-height: 60px; }
 .status-opt[data-s="home"].active      { background: #FCE7F3; border-color: #DB2777; color: #BE185D; }
 .status-opt[data-s="broken"].active    { background: #FEE2E2; border-color: #DC2626; color: #B91C1C; }
 .status-opt[data-s="no_driver"].active { background: #F3F4F6; border-color: #9CA3AF; color: #4B5563; }
+.status-opt[data-s="prebooked"].active { background: #EEF2FF; border-color: #4F46E5; color: #3730A3; }
 
 /* ── SIDEBAR ── */
 .sidebar-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.2); z-index: 900; }

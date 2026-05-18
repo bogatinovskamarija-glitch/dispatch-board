@@ -85,9 +85,9 @@ export default function DayView({ loads, loading, trucks, trailers, drivers, fle
   }
 
   // Apply status filter — ghost rows have no status so hide them when filtering
-  if (statusFilter) {
-    carat      = carat.filter(r => r.status === statusFilter)
-    proFreight = proFreight.filter(r => r.status === statusFilter)
+  if (statusFilter.length > 0) {
+    carat      = carat.filter(r => statusFilter.includes(r.status))
+    proFreight = proFreight.filter(r => statusFilter.includes(r.status))
   }
 
   const caratGroups      = groupByTruck(carat)
