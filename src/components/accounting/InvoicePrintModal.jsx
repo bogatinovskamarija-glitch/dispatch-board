@@ -2,22 +2,22 @@ import { useState } from 'react'
 import BrokerPicker from './BrokerPicker'
 import { createInvoice, updateInvoice } from '../../hooks/useAccounting'
 
-// Company info & branding
+// Company info
 const CO = {
   carat: {
     name:    'CARAT EXPEDITED INC',
     address: '475 S Frontage Rd Ste 210',
     city:    'Burr Ridge, IL 60527',
     phone:   '630-491-5555',
-    color:   '#6B1F1F',   // dark maroon
+    color:   '#111827',
     logo:    '/logo-carat.png',
   },
   pro_freight: {
     name:    'PRO FREIGHT TRANSPORTATION INC',
-    address: '',
-    city:    '',
+    address: '2526 Alligator Creek Rd',
+    city:    'Clearwater, FL 33765',
     phone:   '',
-    color:   '#0D1B4B',   // dark navy
+    color:   '#111827',
     logo:    '/logo-pro-freight.png',
   },
 }
@@ -30,10 +30,11 @@ export default function InvoicePrintModal({ loads, existingInvoice, company: com
   const co = CO[loadCompany] || CO.carat
 
   // Pre-fill from existing invoice if re-opening from history
-  const [broker,        setBroker]        = useState(existingInvoice ? { name: existingInvoice.bill_to_name } : null)
-  const [billToAddress, setBillToAddress] = useState(existingInvoice?.bill_to_address || '')
-  const [remitTo,       setRemitTo]       = useState(existingInvoice?.remit_to || '')
-  const [notes,         setNotes]         = useState(existingInvoice?.notes || '')
+  const [broker,          setBroker]          = useState(existingInvoice ? { name: existingInvoice.bill_to_name } : null)
+  const [billToAddress,   setBillToAddress]   = useState(existingInvoice?.bill_to_address || '')
+  const [factoringName,   setFactoringName]   = useState(existingInvoice?.factoring_name || '')
+  const [factoringAddress,setFactoringAddress]= useState(existingInvoice?.factoring_address || '')
+  const [notes,           setNotes]           = useState(existingInvoice?.notes || '')
   const [saving,        setSaving]        = useState(false)
 
   const total        = loads.reduce((s, l) => s + (Number(l.price) || 0), 0)
@@ -53,11 +54,12 @@ export default function InvoicePrintModal({ loads, existingInvoice, company: com
     setSaving(true)
     try {
       const invoiceData = {
-        bill_to_name:    broker?.name || '',
-        bill_to_address: billToAddress,
-        remit_to:        remitTo,
+        bill_to_name:       broker?.name || '',
+        bill_to_address:    billToAddress,
+        factoring_name:     factoringName,
+        factoring_address:  factoringAddress,
         notes,
-        company:         loadCompany,
+        company:            loadCompany,
         total,
       }
       if (isExisting) {
@@ -98,8 +100,12 @@ export default function InvoicePrintModal({ loads, existingInvoice, company: com
                 <textarea rows={2} value={billToAddress} onChange={e => setBillToAddress(e.target.value)} placeholder="Street, City, State ZIP" />
               </div>
               <div className="form-group">
-                <label>Remit To (factoring / leave blank for company)</label>
-                <textarea rows={2} value={remitTo} onChange={e => setRemitTo(e.target.value)} placeholder="Pro Funding Inc — or leave blank" />
+                <label>Remit To — Factoring Company Name</label>
+                <input value={factoringName} onChange={e => setFactoringName(e.target.value)} placeholder="e.g. Pro Funding Inc (leave blank to use company address)" />
+              </div>
+              <div className="form-group">
+                <label>Remit To — Factoring Address</label>
+                <textarea rows={2} value={factoringAddress} onChange={e => setFactoringAddress(e.target.value)} placeholder="Street, City, State ZIP" />
               </div>
               <div className="form-group">
                 <label>Notes</label>
@@ -111,7 +117,7 @@ export default function InvoicePrintModal({ loads, existingInvoice, company: com
           {/* ─── Printable invoice ─── */}
           <div className="print-doc" id="print-area">
 
-            <div className="inv-header" style={{ borderBottom: `3px solid ${co.color}`, paddingBottom: 16, marginBottom: 20 }}>
+            <div className="inv-header">
               <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
                 <img
                   src={co.logo}
@@ -120,14 +126,14 @@ export default function InvoicePrintModal({ loads, existingInvoice, company: com
                   onError={e => { e.target.style.display = 'none' }}
                 />
                 <div className="inv-company">
-                  <div className="inv-company-name" style={{ color: co.color }}>{co.name}</div>
+                  <div className="inv-company-name">{co.name}</div>
                   {co.address && <div>{co.address}</div>}
                   {co.city    && <div>{co.city}</div>}
                   {co.phone   && <div>Phone: {co.phone}</div>}
                 </div>
               </div>
               <div className="inv-meta">
-                <div className="inv-title" style={{ color: co.color }}>INVOICE</div>
+                <div className="inv-title">INVOICE</div>
                 <table className="inv-meta-table">
                   <tbody>
                     <tr><td>Invoice #</td><td><strong>{isExisting ? invoiceNum : 'Pending'}</strong></td></tr>
@@ -145,21 +151,23 @@ export default function InvoicePrintModal({ loads, existingInvoice, company: com
               </div>
               <div className="inv-party">
                 <div className="inv-party-label">REMIT TO</div>
-                {remitTo
-                  ? remitTo.split('\n').map((line, i) => <div key={i}>{line}</div>)
-                  : (
-                    <>
-                      <div><strong>{co.name}</strong></div>
-                      {co.address && <div>{co.address}</div>}
-                      {co.city    && <div>{co.city}</div>}
-                    </>
-                  )
-                }
+                {factoringName ? (
+                  <>
+                    <div><strong>{factoringName}</strong></div>
+                    {factoringAddress && factoringAddress.split('\n').map((line, i) => <div key={i}>{line}</div>)}
+                  </>
+                ) : (
+                  <>
+                    <div><strong>{co.name}</strong></div>
+                    {co.address && <div>{co.address}</div>}
+                    {co.city    && <div>{co.city}</div>}
+                  </>
+                )}
               </div>
             </div>
 
             <table className="inv-loads-table">
-              <thead style={{ background: co.color }}>
+              <thead>
                 <tr>
                   <th>Load #</th>
                   <th>Pickup Date</th>
@@ -185,8 +193,8 @@ export default function InvoicePrintModal({ loads, existingInvoice, company: com
               </tbody>
               <tfoot>
                 <tr>
-                  <td colSpan={6} className="inv-total-label" style={{ borderTopColor: co.color }}>TOTAL DUE</td>
-                  <td className="inv-total-val" style={{ borderTopColor: co.color, color: co.color }}>{fmt(total)}</td>
+                  <td colSpan={6} className="inv-total-label">TOTAL DUE</td>
+                  <td className="inv-total-val">{fmt(total)}</td>
                 </tr>
               </tfoot>
             </table>

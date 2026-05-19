@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useBrokerSearch, createBroker } from '../../hooks/useBrokers'
 
 // Searchable broker dropdown with inline Add New Broker form
-export default function BrokerPicker({ value, onChange, company = 'all' }) {
+export default function BrokerPicker({ value, onChange, company = 'all' }) {  // eslint-disable-line no-unused-vars
   const [query,    setQuery]    = useState(value?.name || '')
   const [open,     setOpen]     = useState(false)
   const [addMode,  setAddMode]  = useState(false)
@@ -10,7 +10,7 @@ export default function BrokerPicker({ value, onChange, company = 'all' }) {
   const [saving,   setSaving]   = useState(false)
   const wrapRef = useRef(null)
 
-  const { brokers, loading } = useBrokerSearch(query, company)
+  const { brokers, loading } = useBrokerSearch(query, 'all')  // search all brokers regardless of company
 
   // Close dropdown on outside click
   useEffect(() => {

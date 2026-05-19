@@ -28,7 +28,13 @@ export default function DriversPanel({ profiles, drivers, saveProfile, removePro
     e.preventDefault()
     setSaving(true)
     try {
-      await saveProfile({ ...form, id: editing === 'new' ? undefined : editing })
+      const payload = {
+        ...form,
+        id:             editing === 'new' ? undefined : editing,
+        pay_rate:       form.pay_rate       !== '' ? Number(form.pay_rate)       : null,
+        commission_pct: form.commission_pct !== '' ? Number(form.commission_pct) : null,
+      }
+      await saveProfile(payload)
       setEditing(null)
     } catch (err) {
       alert('Error: ' + err.message)

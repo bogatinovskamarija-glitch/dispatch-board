@@ -4,15 +4,15 @@ const CO = {
     address: '475 S Frontage Rd Ste 210',
     city:    'Burr Ridge, IL 60527',
     phone:   '630-491-5555',
-    color:   '#6B1F1F',
+    color:   '#111827',
     logo:    '/logo-carat.png',
   },
   pro_freight: {
     name:    'PRO FREIGHT TRANSPORTATION INC',
-    address: '',
-    city:    '',
+    address: '2526 Alligator Creek Rd',
+    city:    'Clearwater, FL 33765',
     phone:   '',
-    color:   '#0D1B4B',
+    color:   '#111827',
     logo:    '/logo-pro-freight.png',
   },
 }
@@ -48,7 +48,7 @@ export default function PaystubPrintModal({
           <div className="print-doc" id="print-area">
 
             {/* Header */}
-            <div className="inv-header" style={{ borderBottom: `3px solid ${co.color}`, paddingBottom: 16, marginBottom: 20 }}>
+            <div className="inv-header">
               <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
                 <img
                   src={co.logo}
@@ -57,14 +57,14 @@ export default function PaystubPrintModal({
                   onError={e => { e.target.style.display = 'none' }}
                 />
                 <div className="inv-company">
-                  <div className="inv-company-name" style={{ color: co.color }}>{co.name}</div>
+                  <div className="inv-company-name">{co.name}</div>
                   {co.address && <div>{co.address}</div>}
                   {co.city    && <div>{co.city}</div>}
                   {co.phone   && <div>Phone: {co.phone}</div>}
                 </div>
               </div>
               <div className="inv-meta">
-                <div className="inv-title" style={{ color: co.color, fontSize: 18 }}>DRIVER PAY REPORT</div>
+                <div className="inv-title" style={{ fontSize: 18 }}>DRIVER PAY REPORT</div>
                 <table className="inv-meta-table">
                   <tbody>
                     <tr><td>Driver</td>      <td><strong>{driver.name}</strong></td></tr>
@@ -85,7 +85,7 @@ export default function PaystubPrintModal({
 
             {/* Load table */}
             <table className="inv-loads-table">
-              <thead style={{ background: co.color }}>
+              <thead>
                 <tr>
                   <th>Load #</th>
                   <th>Pickup</th>
@@ -118,8 +118,8 @@ export default function PaystubPrintModal({
               </tbody>
               <tfoot>
                 <tr>
-                  <td colSpan={isPerMile ? 8 : 7} className="inv-total-label" style={{ fontWeight: 600, borderTopColor: co.color }}>Sub-Total</td>
-                  <td className="inv-amount" style={{ fontWeight: 700, borderTop: `2px solid ${co.color}` }}>{fmt(loadTotal)}</td>
+                  <td colSpan={isPerMile ? 8 : 7} className="inv-total-label" style={{ fontWeight: 600 }}>Sub-Total</td>
+                  <td className="inv-amount" style={{ fontWeight: 700 }}>{fmt(loadTotal)}</td>
                 </tr>
               </tfoot>
             </table>
@@ -127,7 +127,7 @@ export default function PaystubPrintModal({
             {/* Additions */}
             {additions.length > 0 && (
               <div className="paystub-adddeds">
-                <div className="paystub-addded-title" style={{ color: co.color }}>Additions</div>
+                <div className="paystub-addded-title" style={{ color: '#111827' }}>Additions</div>
                 {additions.map((a, i) => (
                   <div key={i} className="paystub-addded-row">
                     <span>{a.label}</span>
@@ -141,7 +141,7 @@ export default function PaystubPrintModal({
             {/* Deductions */}
             {deductions.length > 0 && (
               <div className="paystub-adddeds">
-                <div className="paystub-addded-title" style={{ color: co.color }}>Deductions</div>
+                <div className="paystub-addded-title" style={{ color: '#111827' }}>Deductions</div>
                 {isOO && commissionPct && (
                   <div className="paystub-commission-note">Commission rate: {commissionPct}% of ${fmt(loadTotal)}</div>
                 )}
@@ -156,7 +156,7 @@ export default function PaystubPrintModal({
             )}
 
             {/* Grand Total */}
-            <div className="paystub-grand-print" style={{ background: co.color }}>
+            <div className="paystub-grand-print">
               <span>Grand Total</span>
               <span>{fmt(grandTotal)} USD</span>
             </div>
