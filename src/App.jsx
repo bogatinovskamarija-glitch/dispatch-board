@@ -101,6 +101,8 @@ export default function App() {
           <div className="legend-item"><div className="legend-dot dot-red" /> Broken Down</div>
           <div className="legend-item"><div className="legend-dot dot-grey" /> No Driver</div>
           <div className="legend-item"><div className="legend-dot dot-indigo" /> Pre-Booked</div>
+          <div className="legend-item"><div className="legend-dot dot-sky" /> At Pick Up</div>
+          <div className="legend-item"><div className="legend-dot dot-orange" /> At Delivery</div>
         </div>
       </div>
 

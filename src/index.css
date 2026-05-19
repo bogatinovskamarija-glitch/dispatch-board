@@ -75,7 +75,9 @@ body {
 .dot-pink   { background: #DB2777; }
 .dot-red    { background: #DC2626; }
 .dot-grey   { background: #9CA3AF; }
-.dot-indigo { background: #4F46E5; }
+.dot-indigo  { background: #4F46E5; }
+.dot-sky     { background: #0284C7; }
+.dot-orange  { background: #EA580C; }
 
 .status-badge {
   display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px;
@@ -92,8 +94,12 @@ body {
 .badge-broken .dot    { background: #DC2626; }
 .badge-no_driver { background: #F3F4F6; color: #4B5563; }
 .badge-no_driver .dot { background: #9CA3AF; }
-.badge-prebooked { background: #EEF2FF; color: #3730A3; }
-.badge-prebooked .dot { background: #4F46E5; }
+.badge-prebooked   { background: #EEF2FF; color: #3730A3; }
+.badge-prebooked .dot   { background: #4F46E5; }
+.badge-at_pickup   { background: #E0F2FE; color: #075985; }
+.badge-at_pickup .dot   { background: #0284C7; }
+.badge-at_delivery { background: #FFF7ED; color: #9A3412; }
+.badge-at_delivery .dot { background: #EA580C; }
 
 /* ── STATS ROW ── */
 .stats-row { padding: 0 24px 12px; display: flex; gap: 10px; flex-wrap: wrap; }
@@ -130,7 +136,9 @@ tbody tr:hover { background: #FAFAFA; }
 .row-empty     td:first-child { box-shadow: inset 3px 0 0 #CA8A04; }
 .row-home      td:first-child { box-shadow: inset 3px 0 0 #DB2777; }
 .row-broken    td:first-child { box-shadow: inset 3px 0 0 #DC2626; }
-.row-prebooked td:first-child { box-shadow: inset 3px 0 0 #4F46E5; }
+.row-prebooked   td:first-child { box-shadow: inset 3px 0 0 #4F46E5; }
+.row-at_pickup   td:first-child { box-shadow: inset 3px 0 0 #0284C7; }
+.row-at_delivery td:first-child { box-shadow: inset 3px 0 0 #EA580C; }
 .row-no_driver td:first-child{ box-shadow: inset 3px 0 0 #9CA3AF; }
 .section-row td {
   background: #F9FAFB; padding: 6px 14px; font-size: 11px; font-weight: 700;
@@ -235,10 +243,14 @@ tbody tr:hover { background: #FAFAFA; }
 .wdc-empty    { background: #FEF9C3; border-left: 3px solid #CA8A04; }
 .wdc-home     { background: #FCE7F3; border-left: 3px solid #DB2777; }
 .wdc-broken   { background: #FEE2E2; border-left: 3px solid #DC2626; }
-.wdc-no_driver{ background: #F3F4F6; border-left: 3px solid #9CA3AF; }
+.wdc-no_driver  { background: #F3F4F6; border-left: 3px solid #9CA3AF; }
+.wdc-prebooked  { background: #EEF2FF; border-left: 3px solid #4F46E5; }
+.wdc-at_pickup  { background: #E0F2FE; border-left: 3px solid #0284C7; }
+.wdc-at_delivery{ background: #FFF7ED; border-left: 3px solid #EA580C; }
 .wdc-route  { font-weight: 600; color: #111827; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .wdc-broker { font-size: 10px; color: #6B7280; margin-top: 1px; }
 .wdc-price  { font-size: 10px; font-weight: 600; color: #15803D; margin-top: 2px; }
+.wdc-dpm    { font-size: 10px; color: #6B7280; margin-top: 1px; }
 .wdc-empty-state { color: #D1D5DB; font-size: 12px; }
 .empty-week { grid-column: 1 / -1; text-align: center; color: #9CA3AF; padding: 32px; }
 .wrf-label {
@@ -330,7 +342,9 @@ textarea { resize: vertical; min-height: 60px; }
 .status-opt[data-s="home"].active      { background: #FCE7F3; border-color: #DB2777; color: #BE185D; }
 .status-opt[data-s="broken"].active    { background: #FEE2E2; border-color: #DC2626; color: #B91C1C; }
 .status-opt[data-s="no_driver"].active { background: #F3F4F6; border-color: #9CA3AF; color: #4B5563; }
-.status-opt[data-s="prebooked"].active { background: #EEF2FF; border-color: #4F46E5; color: #3730A3; }
+.status-opt[data-s="prebooked"].active   { background: #EEF2FF; border-color: #4F46E5; color: #3730A3; }
+.status-opt[data-s="at_pickup"].active   { background: #E0F2FE; border-color: #0284C7; color: #075985; }
+.status-opt[data-s="at_delivery"].active { background: #FFF7ED; border-color: #EA580C; color: #9A3412; }
 
 /* ── SIDEBAR ── */
 .sidebar-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.2); z-index: 900; }

@@ -6,7 +6,9 @@ const STATUSES = [
   { value: 'home',      label: 'At Home',    dot: '#DB2777' },
   { value: 'broken',    label: 'Broken',     dot: '#DC2626' },
   { value: 'no_driver', label: 'No Driver',  dot: '#9CA3AF' },
-  { value: 'prebooked', label: 'Pre-Booked', dot: '#4F46E5' },
+  { value: 'prebooked',   label: 'Pre-Booked',  dot: '#4F46E5' },
+  { value: 'at_pickup',   label: 'At Pick Up',  dot: '#0284C7' },
+  { value: 'at_delivery', label: 'At Delivery', dot: '#EA580C' },
 ]
 
 const BLANK_STOP = { type: 'pickup', location: '', date: '', appt: '' }

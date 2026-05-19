@@ -2,14 +2,18 @@ import React from 'react'
 import { addDays, format, isSameDay } from '../lib/dateUtils'
 
 const STATUS_CLASS = {
-  covered:   'wdc-covered',
-  empty:     'wdc-empty',
-  home:      'wdc-home',
-  broken:    'wdc-broken',
-  no_driver: 'wdc-no_driver',
+  covered:    'wdc-covered',
+  empty:      'wdc-empty',
+  home:       'wdc-home',
+  broken:     'wdc-broken',
+  no_driver:  'wdc-no_driver',
+  prebooked:  'wdc-prebooked',
+  at_pickup:  'wdc-at_pickup',
+  at_delivery:'wdc-at_delivery',
 }
 
 const fmt$ = n => n ? '$' + Number(n).toLocaleString('en-US') : null
+const dpm  = (price, miles) => price && miles ? '$' + (price / miles).toFixed(2) + '/mi' : null
 
 export default function WeekView({ loads, loading, weekStart, today, onLoadClick, fleet = [] }) {
   const days     = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
@@ -90,6 +94,7 @@ export default function WeekView({ loads, loading, weekStart, today, onLoadClick
                   </div>
                   {l.broker && <div className="wdc-broker">{l.broker}{l.load_number ? ` · ${l.load_number}` : ''}</div>}
                   {l.price  && <div className="wdc-price">{fmt$(l.price)}</div>}
+                  {dpm(l.price, l.total_miles) && <div className="wdc-dpm">{dpm(l.price, l.total_miles)}</div>}
                 </div>
               )) : (
                 <span className="wdc-empty-state">—</span>
