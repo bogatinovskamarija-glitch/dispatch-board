@@ -439,3 +439,144 @@ textarea { resize: vertical; min-height: 60px; }
 
 /* ── MISC ── */
 .loading-row td { text-align: center; color: #9CA3AF; padding: 32px; }
+
+/* ─────────────────────────────────────────────
+   ACCOUNTING MODULE
+───────────────────────────────────────────── */
+.acct-wrap  { min-height: 100vh; background: #F0F2F5; }
+.acct-body  { padding: 24px 32px; max-width: 1400px; margin: 0 auto; }
+
+.acct-tab-content { background: #fff; border-radius: 10px; border: 1px solid #E5E7EB; padding: 20px 24px; }
+
+.acct-toolbar       { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; gap: 12px; }
+.acct-toolbar-left  { display: flex; align-items: center; gap: 10px; }
+.acct-toolbar-right { display: flex; align-items: center; gap: 8px; }
+.acct-count { font-size: 13px; color: #6B7280; }
+.acct-empty { text-align: center; padding: 48px 24px; color: #9CA3AF; font-size: 13px; line-height: 1.6; }
+.acct-error { color: #B91C1C; font-size: 12px; margin-bottom: 12px; }
+
+/* Accounting tables */
+.acct-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.acct-table th {
+  background: #F9FAFB; color: #6B7280; font-weight: 600; font-size: 11px;
+  text-transform: uppercase; letter-spacing: .04em;
+  padding: 8px 12px; border-bottom: 1px solid #E5E7EB; text-align: left;
+}
+.acct-table td { padding: 9px 12px; border-bottom: 1px solid #F3F4F6; vertical-align: middle; }
+.acct-table tbody tr:hover { background: #F9FAFB; cursor: pointer; }
+.acct-table tbody tr:last-child td { border-bottom: none; }
+.acct-row-selected { background: #EEF2FF !important; }
+.acct-route { max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #374151; }
+.acct-price { font-weight: 600; color: #059669; text-align: right; }
+
+/* Paystub controls */
+.paystub-controls { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 20px; }
+.paystub-driver-input { min-width: 200px; }
+.form-group-btn { display: flex; flex-direction: column; }
+.pay-amount-input {
+  width: 100px; padding: 5px 8px; border: 1px solid #D1D5DB; border-radius: 6px;
+  font-size: 13px; text-align: right;
+}
+.pay-amount-input:focus { outline: none; border-color: #6366F1; }
+
+/* Paystub table footer */
+.acct-table.acct-table-paystub tfoot td { border-top: 2px solid #E5E7EB; background: #F9FAFB; }
+.acct-subtotal-label { text-align: right; font-weight: 700; font-size: 13px; padding: 10px 12px; }
+.acct-subtotal-val   { font-weight: 700; font-size: 14px; color: #059669; padding: 10px 12px; }
+
+/* Additions & Deductions */
+.adddeds-grid    { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin: 24px 0 16px; }
+.addded-section  { background: #F9FAFB; border: 1px solid #E5E7EB; border-radius: 8px; padding: 14px 16px; }
+.addded-header   { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-weight: 600; font-size: 13px; }
+.addded-row      { display: flex; gap: 8px; margin-bottom: 7px; align-items: center; }
+.addded-row input { flex: 1; padding: 5px 8px; border: 1px solid #D1D5DB; border-radius: 6px; font-size: 13px; }
+.addded-row input[type="number"] { flex: 0 0 100px; text-align: right; }
+.addded-total    { font-size: 12px; font-weight: 700; color: #059669; margin-top: 6px; text-align: right; }
+.btn-xs { padding: 2px 10px !important; font-size: 11px !important; height: 24px; }
+
+/* Grand total bar */
+.paystub-grand-total {
+  display: flex; justify-content: flex-end; align-items: center; gap: 32px;
+  background: #1E3A8A; color: #fff; border-radius: 8px;
+  padding: 14px 24px; margin-bottom: 16px;
+  font-size: 15px; font-weight: 700;
+}
+.paystub-grand-amount { font-size: 22px; font-weight: 800; }
+.paystub-actions { display: flex; justify-content: flex-end; }
+
+/* ─────────────────────────────────────────────
+   PRINT DOCUMENT (invoice / paystub)
+───────────────────────────────────────────── */
+.invoice-controls { margin-bottom: 24px; padding-bottom: 20px; border-bottom: 1px solid #E5E7EB; }
+
+.print-doc {
+  background: #fff; font-size: 13px; line-height: 1.5;
+  padding: 8px 0;
+}
+
+/* Invoice / Paystub header */
+.inv-header        { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 28px; }
+.inv-company       { font-size: 13px; line-height: 1.7; color: #374151; }
+.inv-company-name  { font-size: 16px; font-weight: 800; color: #111827; margin-bottom: 4px; }
+.inv-meta          { text-align: right; }
+.inv-title         { font-size: 26px; font-weight: 900; color: #1E3A8A; letter-spacing: -.5px; margin-bottom: 8px; }
+.inv-meta-table    { margin-left: auto; font-size: 12px; }
+.inv-meta-table td { padding: 2px 6px; color: #6B7280; }
+.inv-meta-table td:first-child { text-align: right; }
+.inv-meta-table td:last-child  { color: #111827; }
+
+/* Bill To / Remit To */
+.inv-parties     { display: flex; gap: 48px; margin-bottom: 24px; }
+.inv-party       { font-size: 13px; line-height: 1.6; }
+.inv-party-label { font-size: 10px; font-weight: 700; color: #6B7280; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 4px; }
+
+/* Invoice loads table */
+.inv-loads-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 0; }
+.inv-loads-table th {
+  background: #1E3A8A; color: #fff; font-weight: 600; font-size: 11px;
+  padding: 8px 10px; text-align: left;
+}
+.inv-loads-table td { padding: 8px 10px; border-bottom: 1px solid #F3F4F6; }
+.inv-loads-table tbody tr:nth-child(even) { background: #F9FAFB; }
+.inv-amount    { text-align: right; font-weight: 600; }
+.inv-total-label { text-align: right; font-weight: 700; font-size: 13px; padding: 12px 10px; border-top: 2px solid #1E3A8A; }
+.inv-total-val   { text-align: right; font-weight: 800; font-size: 15px; color: #1E3A8A; border-top: 2px solid #1E3A8A; padding: 12px 10px; }
+.inv-notes { margin-top: 20px; font-size: 12px; color: #6B7280; border-top: 1px solid #E5E7EB; padding-top: 12px; }
+
+/* Additions / Deductions on printed paystub */
+.paystub-adddeds        { margin-top: 16px; }
+.paystub-addded-title   { font-size: 11px; font-weight: 700; color: #6B7280; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 6px; }
+.paystub-addded-row     { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #F3F4F6; font-size: 12px; }
+.paystub-addded-amount  { font-weight: 600; }
+
+/* Grand total on printed paystub */
+.paystub-grand-print {
+  display: flex; justify-content: space-between;
+  margin-top: 20px; padding: 12px 16px;
+  background: #1E3A8A; color: #fff;
+  font-weight: 800; font-size: 15px; border-radius: 4px;
+}
+
+/* Wide modal for invoice / paystub preview */
+.modal-wide { max-width: 860px !important; width: 95vw !important; }
+
+/* ─────────────────────────────────────────────
+   PRINT MEDIA — only .print-doc is visible
+───────────────────────────────────────────── */
+@media print {
+  /* Make everything invisible, then reveal only the doc */
+  body * { visibility: hidden; }
+  .print-doc, .print-doc * { visibility: visible; }
+  .print-doc {
+    position: fixed !important;
+    top: 0; left: 0;
+    width: 100%; padding: 32px 40px;
+    background: #fff;
+  }
+  /* Remove modal chrome */
+  .modal-overlay { background: transparent !important; }
+  .modal { box-shadow: none !important; }
+  /* Force white backgrounds */
+  .inv-loads-table th { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .paystub-grand-print { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}

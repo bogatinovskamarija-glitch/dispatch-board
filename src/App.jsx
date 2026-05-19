@@ -11,6 +11,7 @@ import DriverSidebar from './components/DriverSidebar'
 import EquipmentSidebar from './components/EquipmentSidebar'
 import FleetModal from './components/FleetModal'
 import ExportModal from './components/ExportModal'
+import AccountingView from './components/AccountingView'
 
 const today = new Date()
 today.setHours(0, 0, 0, 0)
@@ -22,8 +23,9 @@ export default function App() {
   const [modal, setModal]           = useState(null)
   const [sidebar, setSidebar]       = useState(null)
   const [equipSidebar, setEquip]    = useState(null)
-  const [fleetOpen, setFleetOpen]   = useState(false)
-  const [exportOpen, setExportOpen] = useState(false)
+  const [fleetOpen, setFleetOpen]       = useState(false)
+  const [exportOpen, setExportOpen]     = useState(false)
+  const [accountingOpen, setAccounting] = useState(false)
   const [statusFilter, setFilter]   = useState([])
 
   const weekStart = startOfWeek(currentDay)
@@ -53,6 +55,15 @@ export default function App() {
     ? formatDisplay(currentDay, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
     : formatWeekRange(weekStart)
 
+  if (accountingOpen) {
+    return (
+      <AccountingView
+        drivers={drivers}
+        onClose={() => setAccounting(false)}
+      />
+    )
+  }
+
   return (
     <>
       <div className="topbar">
@@ -77,6 +88,9 @@ export default function App() {
         </div>
 
         <div className="topbar-right">
+          <button className="btn btn-ghost" onClick={() => setAccounting(true)}>
+            $ Accounting
+          </button>
           <button className="btn btn-ghost" onClick={() => setExportOpen(true)}>
             ↓ Export CSV
           </button>

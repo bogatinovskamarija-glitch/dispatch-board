@@ -22,7 +22,7 @@ const BLANK = {
   status: 'empty', company: 'carat', truck_number: '', trailer_number: '',
   equipment_type: 'REEF', is_tanker: false, driver_name: '', driver_clickup_id: '',
   phone: '', zip: '', load_number: '', broker: '',
-  total_miles: '', price: '', safety_notes: '', notes: '', hometown: '',
+  total_miles: '', empty_miles: '', price: '', safety_notes: '', notes: '', hometown: '',
   stops: DEFAULT_STOPS,
 }
 
@@ -124,8 +124,9 @@ export default function LoadModal({ load, date, drivers, trucks, trailers, onSav
         delivery_location: lastDelivery?.location || '',
         delivery_date:    lastDelivery?.date      || null,
         delivery_appt:    lastDelivery?.appt      || '',
-        total_miles:  form.total_miles ? Number(form.total_miles) : null,
-        price:        form.price       ? Number(form.price)       : null,
+        total_miles:  form.total_miles  ? Number(form.total_miles)  : null,
+        empty_miles:  form.empty_miles  ? Number(form.empty_miles)  : null,
+        price:        form.price        ? Number(form.price)        : null,
         date:         form.date || date,
       }
       await onSave(payload)
@@ -315,6 +316,10 @@ export default function LoadModal({ load, date, drivers, trucks, trailers, onSav
                 <div className="form-group">
                   <label>Total Miles</label>
                   <input type="number" placeholder="1377" value={form.total_miles} onChange={e => set('total_miles', e.target.value)} />
+                </div>
+                <div className="form-group">
+                  <label>Empty Miles</label>
+                  <input type="number" placeholder="0" value={form.empty_miles} onChange={e => set('empty_miles', e.target.value)} />
                 </div>
                 <div className="form-group">
                   <label>Price ($)</label>
