@@ -558,7 +558,92 @@ textarea { resize: vertical; min-height: 60px; }
 }
 
 /* Wide modal for invoice / paystub preview */
-.modal-wide { max-width: 860px !important; width: 95vw !important; }
+.modal-wide { max-width: 900px !important; width: 95vw !important; }
+
+/* ── Invoice logo ── */
+.inv-logo { height: 52px; width: auto; object-fit: contain; }
+
+/* ── Broker picker dropdown ── */
+.broker-dropdown {
+  position: absolute; z-index: 200; top: calc(100% + 4px); left: 0; right: 0;
+  background: #fff; border: 1px solid #D1D5DB; border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.12); max-height: 260px; overflow-y: auto;
+}
+.broker-dd-item    { padding: 8px 12px; cursor: pointer; }
+.broker-dd-item:hover { background: #F3F4F6; }
+.broker-dd-name    { font-weight: 500; font-size: 13px; }
+.broker-dd-sub     { font-size: 11px; color: #6B7280; }
+.broker-dd-hint    { color: #9CA3AF; font-size: 12px; cursor: default; }
+.broker-dd-add     { color: #4F46E5; font-weight: 600; border-top: 1px solid #E5E7EB; }
+
+/* Add broker inline form */
+.broker-add-form {
+  position: absolute; z-index: 200; top: calc(100% + 4px); left: 0; right: 0;
+  background: #fff; border: 1px solid #D1D5DB; border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.12); padding: 16px;
+}
+.broker-add-title { font-weight: 700; font-size: 13px; margin-bottom: 12px; }
+
+/* ── Driver Profiles Panel ── */
+.drivers-panel {
+  background: #F9FAFB; border: 1px solid #E5E7EB; border-radius: 8px;
+  margin-bottom: 20px; overflow: hidden;
+}
+.drivers-panel-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 16px; cursor: pointer; font-weight: 600; font-size: 13px;
+  background: #F3F4F6; border-bottom: 1px solid #E5E7EB;
+}
+.drivers-panel-header:hover { background: #E9EBF0; }
+.drivers-panel-toggle { font-size: 12px; color: #6B7280; }
+.drivers-table { margin: 0; }
+.drivers-table td, .drivers-table th { padding: 8px 12px; }
+
+/* Profile badges */
+.profile-badge { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 12px; }
+.badge-co { background: #DBEAFE; color: #1E40AF; }
+.badge-oo { background: #FEF3C7; color: #92400E; }
+
+/* Driver profile form */
+.driver-profile-form {
+  padding: 16px; border-top: 1px solid #E5E7EB; background: #fff;
+}
+.driver-profile-form-title { font-weight: 700; font-size: 13px; margin-bottom: 12px; }
+
+/* ── Paystub enhancements ── */
+.paystub-section-divider { border: none; border-top: 1px solid #E5E7EB; margin: 20px 0; }
+.paystub-profile-badge   { display: flex; align-items: center; gap: 8px; padding-top: 22px; }
+.paystub-rate-hint       { font-size: 12px; color: #6B7280; }
+
+.addded-row-3 { display: grid; grid-template-columns: 1fr 100px 120px auto; gap: 8px; align-items: center; margin-bottom: 7px; }
+.addded-row-3 input { padding: 5px 8px; border: 1px solid #D1D5DB; border-radius: 6px; font-size: 13px; }
+
+.addded-col-labels {
+  display: grid; grid-template-columns: 1fr 100px 120px;
+  font-size: 10px; color: #9CA3AF; text-transform: uppercase;
+  letter-spacing: .05em; padding: 2px 0 8px; margin-top: -4px;
+}
+
+.commission-control {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px; color: #6B7280; padding: 4px 0 8px;
+  border-bottom: 1px dashed #E5E7EB; margin-bottom: 8px;
+}
+
+/* ── Paystub printed additions/deductions with balance column ── */
+.paystub-addded-row {
+  display: grid; grid-template-columns: 1fr auto auto;
+  gap: 16px; padding: 4px 0; border-bottom: 1px solid #F3F4F6; font-size: 12px;
+}
+.paystub-addded-balance { color: #9CA3AF; font-size: 11px; text-align: center; }
+.paystub-addded-amount  { font-weight: 600; text-align: right; min-width: 70px; }
+.paystub-commission-note { font-size: 11px; color: #6B7280; margin-bottom: 6px; }
+
+/* Invoice/paystub history click hint */
+.acct-click-hint { font-size: 11px; color: #6366F1; }
+
+/* ── acct-table improvements ── */
+.acct-table tbody tr:hover .acct-click-hint { text-decoration: underline; }
 
 /* ─────────────────────────────────────────────
    PRINT MEDIA — only .print-doc is visible

@@ -1,15 +1,16 @@
 import { useState } from 'react'
-import { usePendingInvoices, useInvoiceHistory, markLoadsInvoiced } from '../../hooks/useAccounting'
+import { usePendingInvoices, useInvoiceHistory, createInvoice, fetchInvoiceLoads } from '../../hooks/useAccounting'
 import InvoicePrintModal from './InvoicePrintModal'
 
 const fmt = n => '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2 })
 
 export default function InvoicesTab({ company }) {
-  const { loads, loading, refetch }           = usePendingInvoices(company)
-  const { loads: history, loading: histLoad } = useInvoiceHistory(company)
+  const { loads, loading, refetch }          = usePendingInvoices(company)
+  const { invoices, loading: histLoad, refetch: refetchHist } = useInvoiceHistory(company)
+
   const [selected,    setSelected]    = useState(new Set())
   const [showHistory, setShowHistory] = useState(false)
-  const [printLoads,  setPrintLoads]  = useState(null)
+  const [printData,   setPrintData]   = useState(null)  // { loads, invoice? }
 
   function toggleRow(id) {
     setSelected(prev => {
@@ -18,19 +19,31 @@ export default function InvoicesTab({ company }) {
       return next
     })
   }
-
   function toggleAll() {
     setSelected(selected.size === loads.length && loads.length > 0
-      ? new Set()
-      : new Set(loads.map(l => l.id))
-    )
+      ? new Set() : new Set(loads.map(l => l.id)))
   }
 
-  async function handleMarkInvoiced(loadIds) {
-    await markLoadsInvoiced(loadIds)
+  // New invoice from selected loads
+  function openNewInvoice() {
+    setPrintData({ loads: loads.filter(l => selected.has(l.id)), invoice: null })
+  }
+
+  // Re-open an existing invoice from history
+  async function openHistoryInvoice(invoice) {
+    try {
+      const invLoads = await fetchInvoiceLoads(invoice.id)
+      setPrintData({ loads: invLoads, invoice })
+    } catch (e) {
+      alert('Error loading invoice: ' + e.message)
+    }
+  }
+
+  async function handleCreated() {
     setSelected(new Set())
-    setPrintLoads(null)
-    refetch()
+    setPrintData(null)
+    await refetch()
+    if (showHistory) await refetchHist()
   }
 
   const selectedLoads = loads.filter(l => selected.has(l.id))
@@ -45,12 +58,11 @@ export default function InvoicesTab({ company }) {
         <div className="acct-toolbar-left">
           {!showHistory
             ? <span className="acct-count">{loads.length} load{loads.length !== 1 ? 's' : ''} pending invoicing</span>
-            : <span className="acct-count">Invoice history</span>
-          }
+            : <span className="acct-count">Invoice history</span>}
         </div>
         <div className="acct-toolbar-right">
           {!showHistory && selected.size > 0 && (
-            <button className="btn btn-primary" onClick={() => setPrintLoads(selectedLoads)}>
+            <button className="btn btn-primary" onClick={openNewInvoice}>
               Generate Invoice ({selected.size} load{selected.size !== 1 ? 's' : ''} · {fmt(selTotal)})
             </button>
           )}
@@ -60,20 +72,16 @@ export default function InvoicesTab({ company }) {
         </div>
       </div>
 
-      {/* ── Pending tab ── */}
+      {/* ── Pending ── */}
       {!showHistory && (
         loads.length === 0
-          ? <div className="acct-empty">No loads pending invoicing. Once a covered load with a broker and price is added, it will appear here.</div>
+          ? <div className="acct-empty">No loads pending invoicing.<br />Once a load with a broker and price is saved, it appears here.</div>
           : (
             <table className="acct-table">
               <thead>
                 <tr>
                   <th style={{ width: 32 }}>
-                    <input
-                      type="checkbox"
-                      checked={selected.size === loads.length && loads.length > 0}
-                      onChange={toggleAll}
-                    />
+                    <input type="checkbox" checked={selected.size === loads.length && loads.length > 0} onChange={toggleAll} />
                   </th>
                   <th>Broker</th>
                   <th>Load #</th>
@@ -86,11 +94,7 @@ export default function InvoicesTab({ company }) {
               </thead>
               <tbody>
                 {loads.map(l => (
-                  <tr
-                    key={l.id}
-                    className={selected.has(l.id) ? 'acct-row-selected' : ''}
-                    onClick={() => toggleRow(l.id)}
-                  >
+                  <tr key={l.id} className={selected.has(l.id) ? 'acct-row-selected' : ''} onClick={() => toggleRow(l.id)}>
                     <td onClick={e => e.stopPropagation()}>
                       <input type="checkbox" checked={selected.has(l.id)} onChange={() => toggleRow(l.id)} />
                     </td>
@@ -112,37 +116,33 @@ export default function InvoicesTab({ company }) {
           )
       )}
 
-      {/* ── History tab ── */}
+      {/* ── History ── */}
       {showHistory && (
         histLoad
           ? <div className="acct-empty">Loading…</div>
-          : history.length === 0
+          : invoices.length === 0
             ? <div className="acct-empty">No invoices generated yet.</div>
             : (
               <table className="acct-table">
                 <thead>
                   <tr>
-                    <th>Invoiced On</th>
+                    <th>Invoice #</th>
+                    <th>Date</th>
                     <th>Broker</th>
-                    <th>Load #</th>
-                    <th>Truck</th>
-                    <th>Route</th>
-                    <th>Price</th>
+                    <th>Company</th>
+                    <th>Total</th>
+                    <th></th>
                   </tr>
                 </thead>
                 <tbody>
-                  {history.map(l => (
-                    <tr key={l.id}>
-                      <td>{l.invoiced_at ? new Date(l.invoiced_at).toLocaleDateString() : '—'}</td>
-                      <td>{l.broker || '—'}</td>
-                      <td>{l.load_number || '—'}</td>
-                      <td>{l.truck_number || '—'}</td>
-                      <td className="acct-route">
-                        {l.pickup_location && l.delivery_location
-                          ? `${l.pickup_location.split(',')[0]} → ${l.delivery_location.split(',')[0]}`
-                          : '—'}
-                      </td>
-                      <td className="acct-price">{l.price ? fmt(l.price) : '—'}</td>
+                  {invoices.map(inv => (
+                    <tr key={inv.id} style={{ cursor: 'pointer' }} onClick={() => openHistoryInvoice(inv)}>
+                      <td><strong>{inv.invoice_number}</strong></td>
+                      <td>{inv.created_at ? new Date(inv.created_at).toLocaleDateString() : '—'}</td>
+                      <td>{inv.bill_to_name || '—'}</td>
+                      <td>{inv.company === 'carat' ? 'Carat' : 'Pro Freight'}</td>
+                      <td className="acct-price">{inv.total ? fmt(inv.total) : '—'}</td>
+                      <td><span className="acct-click-hint">View / Re-export →</span></td>
                     </tr>
                   ))}
                 </tbody>
@@ -150,11 +150,13 @@ export default function InvoicesTab({ company }) {
             )
       )}
 
-      {printLoads && (
+      {printData && (
         <InvoicePrintModal
-          loads={printLoads}
-          onConfirm={() => handleMarkInvoiced(printLoads.map(l => l.id))}
-          onClose={() => setPrintLoads(null)}
+          loads={printData.loads}
+          existingInvoice={printData.invoice}
+          company={company}
+          onCreated={handleCreated}
+          onClose={() => setPrintData(null)}
         />
       )}
     </div>
