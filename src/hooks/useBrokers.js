@@ -16,7 +16,7 @@ export function useBrokerSearch(query = '', company = 'all') {
         .select('id, name, address, city, state, zip, phone, email, company')
         .ilike('name', `%${query}%`)
         .order('name')
-        .limit(40)
+        .limit(150)
       if (company !== 'all') q = q.eq('company', company)
       const { data } = await q
       if (!cancelled) { setBrokers(data ?? []); setLoading(false) }
