@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import BrokerPicker from './BrokerPicker'
+import FactoringPicker from './FactoringPicker'
 import { createInvoice, updateInvoice } from '../../hooks/useAccounting'
 
 // Company info
@@ -22,6 +23,8 @@ const CO = {
   },
 }
 
+const EXTRA_TYPES = ['TONU', 'Lumper Fee', 'Detention', 'Layover']
+
 const fmt   = n => '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2 })
 const today = () => new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
 
@@ -30,16 +33,20 @@ export default function InvoicePrintModal({ loads, existingInvoice, company: com
   const co = CO[loadCompany] || CO.carat
 
   // Pre-fill from existing invoice if re-opening from history
-  const [broker,          setBroker]          = useState(existingInvoice ? { name: existingInvoice.bill_to_name } : null)
-  const [billToAddress,   setBillToAddress]   = useState(existingInvoice?.bill_to_address || '')
-  const [factoringName,   setFactoringName]   = useState(existingInvoice?.factoring_name || '')
-  const [factoringAddress,setFactoringAddress]= useState(existingInvoice?.factoring_address || '')
-  const [notes,           setNotes]           = useState(existingInvoice?.notes || '')
-  const [saving,        setSaving]        = useState(false)
+  const [broker,           setBroker]           = useState(existingInvoice ? { name: existingInvoice.bill_to_name } : null)
+  const [billToAddress,    setBillToAddress]    = useState(existingInvoice?.bill_to_address    || '')
+  const [factoringName,    setFactoringName]    = useState(existingInvoice?.factoring_name     || '')
+  const [factoringAddress, setFactoringAddress] = useState(existingInvoice?.factoring_address  || '')
+  const [notes,            setNotes]            = useState(existingInvoice?.notes              || '')
+  const [extras,           setExtras]           = useState(existingInvoice?.extra_charges      || [])
+  const [saving,           setSaving]           = useState(false)
 
-  const total        = loads.reduce((s, l) => s + (Number(l.price) || 0), 0)
-  const invoiceNum   = existingInvoice?.invoice_number || '—'
-  const isExisting   = Boolean(existingInvoice)
+  const loadsTotal  = loads.reduce((s, l) => s + (Number(l.price) || 0), 0)
+  const extrasTotal = extras.reduce((s, e) => s + (Number(e.amount) || 0), 0)
+  const total       = loadsTotal + extrasTotal
+
+  const invoiceNum = existingInvoice?.invoice_number || '—'
+  const isExisting = Boolean(existingInvoice)
 
   // Auto-fill address from broker picker
   function handleBrokerChange(b) {
@@ -48,6 +55,23 @@ export default function InvoicePrintModal({ loads, existingInvoice, company: com
       const parts = [b.address, b.city && b.state ? `${b.city}, ${b.state} ${b.zip || ''}`.trim() : (b.city || b.state)].filter(Boolean)
       setBillToAddress(parts.join('\n'))
     }
+  }
+
+  // Auto-fill factoring from saved company
+  function handleFactoringSelect(c) {
+    setFactoringName(c.name)
+    setFactoringAddress(c.address || '')
+  }
+
+  // Extra charges management
+  function addExtra() {
+    setExtras(ex => [...ex, { type: 'TONU', description: '', amount: '' }])
+  }
+  function updateExtra(i, field, val) {
+    setExtras(ex => ex.map((e, idx) => idx === i ? { ...e, [field]: val } : e))
+  }
+  function removeExtra(i) {
+    setExtras(ex => ex.filter((_, idx) => idx !== i))
   }
 
   async function handleMarkInvoiced() {
@@ -59,6 +83,7 @@ export default function InvoicePrintModal({ loads, existingInvoice, company: com
         factoring_name:     factoringName,
         factoring_address:  factoringAddress,
         notes,
+        extra_charges:      extras.filter(e => e.amount !== '' && e.amount !== null),
         company:            loadCompany,
         total,
       }
@@ -99,12 +124,16 @@ export default function InvoicePrintModal({ loads, existingInvoice, company: com
                 <label>Bill To — Address</label>
                 <textarea rows={2} value={billToAddress} onChange={e => setBillToAddress(e.target.value)} placeholder="Street, City, State ZIP" />
               </div>
-              <div className="form-group">
-                <label>Remit To — Factoring Company Name</label>
-                <input value={factoringName} onChange={e => setFactoringName(e.target.value)} placeholder="e.g. Pro Funding Inc (leave blank to use company address)" />
+              <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                <label>Remit To — Factoring Company</label>
+                <FactoringPicker onSelect={handleFactoringSelect} />
               </div>
               <div className="form-group">
-                <label>Remit To — Factoring Address</label>
+                <label>Remit To — Name (or leave blank to use company address)</label>
+                <input value={factoringName} onChange={e => setFactoringName(e.target.value)} placeholder="e.g. Pro Funding Inc" />
+              </div>
+              <div className="form-group">
+                <label>Remit To — Address</label>
                 <textarea rows={2} value={factoringAddress} onChange={e => setFactoringAddress(e.target.value)} placeholder="Street, City, State ZIP" />
               </div>
               <div className="form-group">
@@ -112,13 +141,45 @@ export default function InvoicePrintModal({ loads, existingInvoice, company: com
                 <input value={notes} onChange={e => setNotes(e.target.value)} placeholder="e.g. Net 30" />
               </div>
             </div>
+
+            {/* Extra charges */}
+            <div style={{ marginTop: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                <div style={{ fontWeight: 600, fontSize: 13 }}>Extra Charges</div>
+                <button type="button" className="btn btn-ghost btn-xs" onClick={addExtra}>+ Add</button>
+              </div>
+              {extras.length === 0 && (
+                <div style={{ color: '#9CA3AF', fontSize: 12 }}>No extra charges. Click + Add to include TONU, Lumper Fee, Detention, or Layover.</div>
+              )}
+              {extras.map((e, i) => (
+                <div key={i} className="extra-row">
+                  <select value={e.type} onChange={v => updateExtra(i, 'type', v.target.value)}>
+                    {EXTRA_TYPES.map(t => <option key={t}>{t}</option>)}
+                  </select>
+                  <input
+                    placeholder="Description (optional)"
+                    value={e.description}
+                    onChange={v => updateExtra(i, 'description', v.target.value)}
+                  />
+                  <input
+                    type="number"
+                    step="0.01"
+                    placeholder="Amount"
+                    value={e.amount}
+                    onChange={v => updateExtra(i, 'amount', v.target.value)}
+                    style={{ width: 110 }}
+                  />
+                  <button type="button" className="btn btn-ghost btn-xs" style={{ color: '#B91C1C' }} onClick={() => removeExtra(i)}>✕</button>
+                </div>
+              ))}
+            </div>
           </div>
 
           {/* ─── Printable invoice ─── */}
           <div className="print-doc" id="print-area">
 
             <div className="inv-header">
-              <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
                 <img
                   src={co.logo}
                   alt={co.name}
@@ -188,6 +249,14 @@ export default function InvoicePrintModal({ loads, existingInvoice, company: com
                     <td>{l.delivery_location?.split(',')[0] || '—'}</td>
                     <td>{l.total_miles || '—'}</td>
                     <td className="inv-amount">{l.price ? fmt(l.price) : '—'}</td>
+                  </tr>
+                ))}
+                {extras.filter(e => e.amount).map((e, i) => (
+                  <tr key={`extra-${i}`} className="inv-extra-row">
+                    <td><strong>{e.type}</strong></td>
+                    <td colSpan={4} style={{ color: '#6B7280', fontStyle: 'italic' }}>{e.description || ''}</td>
+                    <td></td>
+                    <td className="inv-amount">{fmt(e.amount)}</td>
                   </tr>
                 ))}
               </tbody>

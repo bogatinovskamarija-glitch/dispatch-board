@@ -89,7 +89,7 @@ export default function App() {
 
         <div className="topbar-right">
           <button className="btn btn-ghost" onClick={() => setAccounting(true)}>
-            $ Accounting
+            Accounting
           </button>
           <button className="btn btn-ghost" onClick={() => setExportOpen(true)}>
             ↓ Export CSV
