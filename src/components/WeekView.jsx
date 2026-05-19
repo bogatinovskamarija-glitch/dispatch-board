@@ -15,7 +15,7 @@ const STATUS_CLASS = {
 const fmt$ = n => n ? '$' + Number(n).toLocaleString('en-US') : null
 const dpm  = (price, miles) => price && miles ? '$' + (price / miles).toFixed(2) + '/mi' : null
 
-export default function WeekView({ loads, loading, weekStart, today, onLoadClick, fleet = [] }) {
+export default function WeekView({ loads, loading, weekStart, today, onLoadClick, fleet = [], statusFilter = [] }) {
   const days     = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
   const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
@@ -60,10 +60,17 @@ export default function WeekView({ loads, loading, weekStart, today, onLoadClick
     const d = dayStr(day)
     return loads.filter(l => {
       if (l.truck_number !== truckNumber) return false
+      if (statusFilter.length > 0 && !statusFilter.includes(l.status)) return false
       const start = l.pickup_date || l.date
       const end   = l.delivery_date || l.date
       return d >= start && d <= end
     })
+  }
+
+  // When filtering, hide truck rows that have no matching loads anywhere this week
+  function truckHasMatch(truckNumber) {
+    if (statusFilter.length === 0) return true
+    return loads.some(l => l.truck_number === truckNumber && statusFilter.includes(l.status))
   }
 
   function renderTruckRows(rows) {
@@ -104,6 +111,11 @@ export default function WeekView({ loads, loading, weekStart, today, onLoadClick
         })}
       </React.Fragment>
     ))
+  }
+
+  if (statusFilter.length > 0) {
+    caratRows = caratRows.filter(e => truckHasMatch(e.truck_number))
+    proRows   = proRows.filter(e => truckHasMatch(e.truck_number))
   }
 
   const hasRows = caratRows.length > 0 || proRows.length > 0

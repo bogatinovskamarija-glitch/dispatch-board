@@ -108,8 +108,8 @@ export default function App() {
 
       <StatsRow
         loads={isDay ? loads : weekLoads}
-        statusFilter={isDay ? statusFilter : []}
-        onFilterChange={isDay ? setFilter : () => {}}
+        statusFilter={statusFilter}
+        onFilterChange={setFilter}
       />
 
       {isDay ? (
@@ -134,6 +134,7 @@ export default function App() {
           weekStart={weekStart}
           today={today}
           fleet={fleet}
+          statusFilter={statusFilter}
           onLoadClick={l => setModal(l)}
         />
       )}
