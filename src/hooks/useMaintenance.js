@@ -175,88 +175,101 @@ export function parseMaintenanceCSV(text, company) {
     'dot inspection':   'dot_inspection',
     'dot':              'dot_inspection',
     'steering tires':   'steering_tires',
+    'steering':         'steering_tires',
   }
 
-  function parseRow(raw) {
-    // Simple CSV parser that handles quoted fields with commas
-    const cols = []
-    let cur = '', inQuote = false
+  // Full CSV parser: handles quoted fields with embedded commas AND newlines
+  function parseCSV(raw) {
+    const rows = []
+    let cols = [], cur = '', inQuote = false
+
     for (let i = 0; i < raw.length; i++) {
       const ch = raw[i]
-      if (ch === '"') { inQuote = !inQuote; continue }
+      if (ch === '"') {
+        // Handle escaped quotes ("")
+        if (inQuote && raw[i + 1] === '"') { cur += '"'; i++; continue }
+        inQuote = !inQuote
+        continue
+      }
       if (ch === ',' && !inQuote) { cols.push(cur.trim()); cur = ''; continue }
+      if ((ch === '\n' || (ch === '\r' && raw[i+1] === '\n')) && !inQuote) {
+        if (ch === '\r') i++ // skip \n of \r\n
+        cols.push(cur.trim())
+        if (cols.some(c => c)) rows.push(cols)  // skip fully blank rows
+        cols = []; cur = ''
+        continue
+      }
+      if (ch === '\r') continue  // bare \r
       cur += ch
     }
     cols.push(cur.trim())
-    return cols
+    if (cols.some(c => c)) rows.push(cols)
+    return rows
   }
 
   function parseDate(dateStr, yearFallback) {
     if (!dateStr) return null
-    // Handle MM/DD/YYYY, M/D/YYYY, MM/DD (partial)
-    const parts = dateStr.split('/')
+    const parts = dateStr.trim().split('/')
     if (parts.length < 2) return null
     const month = parts[0].padStart(2, '0')
     const day   = parts[1].padStart(2, '0')
-    let year  = parts[2]
-    // fix obvious typos like 0202 → skip, or 2032 → plausible
-    if (!year || year.length < 4) year = String(yearFallback)
-    const y = Number(year)
-    const m = Number(month)
-    const d = Number(day)
+    let year = parts[2]
+    // Fix typos (e.g. 0202) — use yearFallback for clearly wrong years
+    if (!year || year.length < 4 || Number(year) < 2010 || Number(year) > 2030) {
+      year = String(yearFallback)
+    }
+    const y = Number(year), m = Number(month), d = Number(day)
     if (y < 2010 || y > 2030 || m < 1 || m > 12 || d < 1 || d > 31) return null
     return `${y}-${month}-${day}`
   }
 
   function parseAmount(amtStr) {
     if (!amtStr) return null
-    const cleaned = amtStr.replace(/[$,]/g, '').trim()
+    const cleaned = amtStr.replace(/[$,\s]/g, '')
     const n = parseFloat(cleaned)
-    return isNaN(n) ? null : n
+    return isNaN(n) || n === 0 ? null : n
   }
 
-  const lines = text.split('\n')
+  const rows = parseCSV(text)
   const records = []
   let skipped = 0
 
-  for (let i = 0; i < lines.length; i++) {
-    const raw = lines[i].trim()
-    if (!raw) continue
-    const cols = parseRow(raw)
+  for (const cols of rows) {
+    const yearVal = (cols[0] || '').trim()
+    const dateStr = (cols[2] || '').trim()
+    const unitNum = (cols[3] || '').trim()
+    const unitRaw = (cols[4] || '').trim()
+    const catRaw  = (cols[5] || '').trim()
+    const desc    = (cols[6] || '').trim()
+    const amtRaw  = (cols[7] || '').trim()
+    const mileage = (cols[8] || '').trim()
+    const pmCode  = (cols[9] || '').trim()
+    const invoice = (cols[10] || '').trim()
 
-    // Skip header row
-    if (cols[0]?.toLowerCase() === 'year') continue
+    // Skip header row and Google Sheets filter row
+    const yearLower = yearVal.toLowerCase()
+    if (yearLower === 'year' || yearLower.startsWith('filter')) { skipped++; continue }
 
-    const yearVal = cols[0]
-    const dateStr = cols[2]
-    const unitNum = cols[3]
-    const unitRaw = cols[4]
-    const catRaw  = cols[5]
-    const desc    = cols[6]
-    const amtRaw  = cols[7]
-    const mileage = cols[8]
-    const pmCode  = cols[9]
-    const invoice = cols[10]
-
-    // Skip year-total / blank rows (no unit and no date)
-    if (!unitNum && (!dateStr || !amtRaw)) { skipped++; continue }
-
-    // Skip rows that are clearly year total lines (e.g., amount like "$297,112.51" with no unit)
-    if (!unitNum || !unitRaw) { skipped++; continue }
-
+    // Skip year-total rows: have a year but no unit number and no date
+    // (These are summary rows like "2024,,,,,,,  $333,204.74,,,")
     const yearNum = parseInt(yearVal, 10)
     if (!yearNum || yearNum < 2010 || yearNum > 2030) { skipped++; continue }
 
-    const date    = parseDate(dateStr, yearNum)
-    const amount  = parseAmount(amtRaw)
-    const unitType = (unitRaw || '').trim().toLowerCase() // 'tractor' or 'trailer'
-    const catKey  = (catRaw || '').trim().toLowerCase()
+    if (!unitNum && !dateStr) { skipped++; continue }  // year-total row
+
+    // Need at least an amount or a description to be worth importing
+    const amount = parseAmount(amtRaw)
+    if (amount == null && !desc && !unitNum) { skipped++; continue }
+
+    const date     = parseDate(dateStr, yearNum)
+    const unitType = unitRaw.toLowerCase() || 'unknown'
+    const catKey   = catRaw.toLowerCase()
     const category = CATEGORY_MAP[catKey] || 'other'
 
     records.push({
       company,
       date,
-      unit_number: String(unitNum).trim(),
+      unit_number: unitNum || null,
       unit_type:   unitType,
       category,
       description: desc || null,

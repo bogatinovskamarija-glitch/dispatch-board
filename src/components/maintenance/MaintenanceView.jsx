@@ -344,7 +344,7 @@ function ShopsTab({ shops, onAddShop, onRemoveShop }) {
 
 // ── Main View ──────────────────────────────────────────────────────────────
 export default function MaintenanceView({ onClose }) {
-  const [periodType, setPeriodType] = useState('year')
+  const [periodType, setPeriodType] = useState('all')
   const [year,       setYear]       = useState(String(new Date().getFullYear()))
   const [month,      setMonth]      = useState(new Date().getMonth() + 1)
   const [quarter,    setQuarter]    = useState(Math.ceil((new Date().getMonth() + 1) / 3))

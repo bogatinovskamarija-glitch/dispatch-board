@@ -49,7 +49,10 @@ export default function ImportCSVModal({ onImport, onClose }) {
     }
   }
 
-  const validRecords = preview?.records?.filter(r => r.date && r.unit_number) || []
+  // Only drop rows that are truly empty — missing unit AND amount AND description
+  const validRecords = preview?.records?.filter(r =>
+    r.unit_number || r.amount != null || r.description
+  ) || []
   const invalidCount = (preview?.records?.length || 0) - validRecords.length
 
   return (
