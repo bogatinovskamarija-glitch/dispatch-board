@@ -96,9 +96,11 @@ export default function SafetyView({ onClose }) {
 
   // ── Parse HOS from Motive user objects ────────────────────────────────────
   const rows = useMemo(() => drivers.map(u => {
-    const hos = u.current_driver_status ?? u.hos_status ?? {}
-    const fullName = [u.first_name, u.last_name].filter(Boolean).join(' ') || u.username || `Driver ${u.id}`
-    const updatedAt = hos.updated_at ?? u.updated_at ?? null
+    // Motive v1: current HOS is in current_driver_status or duty_status object
+    const hos = u.current_driver_status ?? u.duty_status ?? {}
+    const fullName = [u.first_name, u.last_name].filter(Boolean).join(' ') ||
+                     u.name || u.username || `Driver ${u.id}`
+    const updatedAt = hos.updated_at ?? hos.recorded_at ?? u.updated_at ?? null
     const staleHours = updatedAt ? (Date.now() - new Date(updatedAt)) / 3600000 : null
 
     return {
@@ -106,14 +108,16 @@ export default function SafetyView({ onClose }) {
       name:        fullName,
       nameLower:   fullName.toLowerCase(),
       company:     u._company,
-      status:      hos.duty_status ?? hos.current_duty_status ?? 'off_duty',
-      driveLeft:   hos.drive_remaining_sec  ?? hos.shift_drive_remaining ?? null,
-      shiftLeft:   hos.shift_remaining_sec  ?? hos.shift_remaining       ?? null,
-      cycleLeft:   hos.cycle_remaining_sec  ?? hos.cycle_remaining       ?? null,
+      // Motive v1 duty_status values: off_duty, sleeper_berth, driving, on_duty_not_driving
+      status:      hos.duty_status ?? hos.status ?? 'off_duty',
+      driveLeft:   hos.drive_remaining_sec  ?? hos.driving_remaining_sec  ?? null,
+      shiftLeft:   hos.shift_remaining_sec  ?? hos.on_duty_remaining_sec  ?? null,
+      cycleLeft:   hos.cycle_remaining_sec  ?? hos.recap_hours            != null
+                     ? (hos.recap_hours * 3600) : null,
       inViolation: hos.is_in_violation ?? false,
       updatedAt,
       staleHours,
-      eldSerial:   u.eld_device?.serial_number ?? null,
+      eldSerial:   u.eld_device?.serial_number ?? u.current_vehicle?.number ?? null,
     }
   }), [drivers])
 

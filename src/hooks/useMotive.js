@@ -34,9 +34,12 @@ export function useMotiveDrivers(company) {
       const results = await Promise.all(
         companies.map(async (co) => {
           const data = await motiveGet(co, '/users', { role: 'driver', per_page: 100 })
-          // Motive v1 returns { users: [...] }
+          // Motive v1 returns { users: [ { user: {...} }, ... ] }
           const users = data?.users ?? []
-          return users.map(u => ({ ...u, _company: co }))
+          return users.map(u => {
+            const user = u.user ?? u   // unwrap nested { user: {...} } if present
+            return { ...user, _company: co }
+          })
         })
       )
 
@@ -76,13 +79,18 @@ export function useMotiveViolations(company) {
 
       const results = await Promise.all(
         companies.map(async (co) => {
-          const data = await motiveGet(co, '/driver_violations', {
-            start_time: fmt(from),
-            end_time:   fmt(to),
-            per_page:   100,
-          })
-          const viols = data?.driver_violations ?? []
-          return viols.map(v => ({ ...v, _company: co }))
+          try {
+            const data = await motiveGet(co, '/hos_violations', {
+              start_date: fmt(from),
+              end_date:   fmt(to),
+              per_page:   100,
+            })
+            // Motive v1: { hos_violations: [ { hos_violation: {...} }, ... ] }
+            const viols = data?.hos_violations ?? data?.violations ?? []
+            return viols.map(v => ({ ...(v.hos_violation ?? v), _company: co }))
+          } catch {
+            return []   // violations are bonus data — don't fail the whole page
+          }
         })
       )
 
