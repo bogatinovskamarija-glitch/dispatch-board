@@ -13,6 +13,7 @@ import FleetModal from './components/FleetModal'
 import ExportModal from './components/ExportModal'
 import AccountingView    from './components/AccountingView'
 import MaintenanceView  from './components/maintenance/MaintenanceView'
+import AccountingLock, { isAccountingUnlocked } from './components/accounting/AccountingLock'
 
 const today = new Date()
 today.setHours(0, 0, 0, 0)
@@ -27,6 +28,7 @@ export default function App() {
   const [fleetOpen, setFleetOpen]       = useState(false)
   const [exportOpen, setExportOpen]     = useState(false)
   const [accountingOpen,   setAccounting]   = useState(false)
+  const [accountingLock,   setAccountingLock] = useState(false)
   const [maintenanceOpen,  setMaintenance]  = useState(false)
   const [statusFilter, setFilter]   = useState([])
 
@@ -97,7 +99,10 @@ export default function App() {
           <button className="btn btn-ghost" onClick={() => setMaintenance(true)}>
             Maintenance
           </button>
-          <button className="btn btn-ghost" onClick={() => setAccounting(true)}>
+          <button className="btn btn-ghost" onClick={() => {
+            if (isAccountingUnlocked()) setAccounting(true)
+            else setAccountingLock(true)
+          }}>
             Accounting
           </button>
           <button className="btn btn-ghost" onClick={() => setExportOpen(true)}>
@@ -202,6 +207,13 @@ export default function App() {
           onUpdate={updateFleetEntry}
           onRemove={removeFleetEntry}
           onClose={() => setFleetOpen(false)}
+        />
+      )}
+
+      {accountingLock && (
+        <AccountingLock
+          onUnlock={() => { setAccountingLock(false); setAccounting(true) }}
+          onClose={() => setAccountingLock(false)}
         />
       )}
     </>
