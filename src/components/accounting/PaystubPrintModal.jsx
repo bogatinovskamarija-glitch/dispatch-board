@@ -25,7 +25,7 @@ export default function PaystubPrintModal({
   driver, profile, startDate, endDate,
   loads, loadPay, additions, deductions,
   commissionPct, fuelText, company,
-  onMarkPaid, isHistory, onClose,
+  onMarkPaid, isHistory, isEdit, onEdit, onClose,
 }) {
   const [saving, setSaving] = useState(false)
   const co     = CO[company] || CO.carat
@@ -222,12 +222,15 @@ ${cssLinks}
         <div className="modal-footer no-print">
           <button className="btn btn-ghost" onClick={onClose}>Close</button>
           <button className="btn btn-ghost" onClick={handlePrint}>🖨 Print / Save PDF</button>
+          {isHistory && onEdit && (
+            <button className="btn btn-ghost" onClick={onEdit}>✏ Edit Paystub</button>
+          )}
           {!isHistory && onMarkPaid && (
             <button className="btn btn-primary" onClick={handleMarkPaid} disabled={saving}>
-              {saving ? 'Saving…' : '✓ Mark as Paid'}
+              {saving ? 'Saving…' : isEdit ? '✓ Save Changes' : '✓ Mark as Paid'}
             </button>
           )}
-          {isHistory && (
+          {isHistory && !onEdit && (
             <span style={{ fontSize: 12, color: '#9CA3AF', alignSelf: 'center' }}>Historical paystub — already paid</span>
           )}
         </div>

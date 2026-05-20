@@ -160,6 +160,15 @@ export async function fetchPaystubLoads(paystubId) {
   return data ?? []
 }
 
+// ── Update an existing paystub record ────────────────────────────────────
+export async function updatePaystub(id, paystubData) {
+  const { error } = await supabase
+    .from('paystubs')
+    .update(paystubData)
+    .eq('id', id)
+  if (error) throw new Error(error.message)
+}
+
 // ── Save paystub + mark loads as paid ─────────────────────────────────────
 export async function createPaystub(paystubData, loadIds) {
   const { data: paystub, error: psErr } = await supabase

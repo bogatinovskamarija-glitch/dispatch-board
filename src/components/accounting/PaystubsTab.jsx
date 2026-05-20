@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { fetchDriverLoads, createPaystub, usePaystubHistory, fetchPaystubLoads } from '../../hooks/useAccounting'
+import { fetchDriverLoads, createPaystub, updatePaystub, usePaystubHistory, fetchPaystubLoads } from '../../hooks/useAccounting'
 import { useDriverProfiles } from '../../hooks/useDriverProfiles'
 import DriversPanel from './DriversPanel'
 import PaystubPrintModal from './PaystubPrintModal'
@@ -60,6 +60,41 @@ export default function PaystubsTab({ drivers, company }) {
       const loads = await fetchPaystubLoads(ps.id)
       setHistoryModal({ paystub: ps, loads })
     } catch (e) { alert(e.message) }
+  }
+
+  // Edit mode — pre-populate the generate form with a historical paystub
+  const [editingPaystubId, setEditingPaystubId] = useState(null)
+
+  function openEditMode(ps, psLoads) {
+    setDriverName(ps.driver_name)
+    setStartDate(ps.start_date)
+    setEndDate(ps.end_date)
+    setLoads(psLoads)
+    setLoadPay(ps.load_pay || {})
+    setAdditions((ps.additions || []).length ? ps.additions : [{ ...BLANK_LINE }])
+    setDeductions((ps.deductions || []).length ? ps.deductions : [{ ...BLANK_LINE }])
+    setCommissionPct(ps.commission_pct ?? 15)
+    // Restore fuel total from saved deductions
+    const fuelDed = (ps.deductions || []).find(d => d.isFuel)
+    setFuelTotal(fuelDed?.amount ? String(fuelDed.amount) : '')
+    setFuelText(ps.fuel_text || '')
+    setLoaded(true)
+    setEditingPaystubId(ps.id)
+    setHistoryModal(null)
+    setPsTab('generate')
+  }
+
+  function cancelEdit() {
+    setEditingPaystubId(null)
+    setLoads([])
+    setLoaded(false)
+    setLoadPay({})
+    setAdditions([{ ...BLANK_LINE }])
+    setDeductions([{ ...BLANK_LINE }])
+    setFuelTotal('')
+    setFuelText('')
+    setDriverName('')
+    setPsTab('history')
   }
 
   // ── Paystub generator state ──────────────────────────────────────────────
@@ -179,7 +214,7 @@ export default function PaystubsTab({ drivers, company }) {
   const selectedDriver = drivers.find(d => d.name === driverName) || {}
   const driverCompany  = loads[0]?.company || profile?.company || 'carat'
 
-  // ── Mark paystub as paid — saves to DB and marks loads ───────────────────
+  // ── Mark paystub as paid (or save edits) ────────────────────────────────
   async function handleMarkPaid() {
     const paystubData = {
       driver_name:    driverName,
@@ -194,10 +229,15 @@ export default function PaystubsTab({ drivers, company }) {
       load_pay:       loadPay,
       fuel_text:      (isOO && fuelText) ? fuelText : null,
     }
-    await createPaystub(paystubData, loads.map(l => l.id))
+    if (editingPaystubId) {
+      await updatePaystub(editingPaystubId, paystubData)
+      setEditingPaystubId(null)
+    } else {
+      await createPaystub(paystubData, loads.map(l => l.id))
+    }
     await refreshHistory()
     setShowPrint(false)
-    // Reset paystub form
+    // Reset form
     setLoads([])
     setLoaded(false)
     setLoadPay({})
@@ -260,6 +300,14 @@ export default function PaystubsTab({ drivers, company }) {
       )}
 
       {psTab === 'generate' && <>
+
+      {/* ── Edit mode banner ── */}
+      {editingPaystubId && (
+        <div className="paystub-edit-banner">
+          <span>✏ Editing historical paystub for <strong>{driverName}</strong> — {startDate} to {endDate}</span>
+          <button className="btn btn-ghost btn-xs" onClick={cancelEdit}>✕ Cancel Edit</button>
+        </div>
+      )}
 
       {/* ── Driver Profiles Panel ── */}
       <DriversPanel
@@ -528,6 +576,7 @@ export default function PaystubsTab({ drivers, company }) {
           commissionPct={isOO ? commissionPct : null}
           fuelText={isOO && fuelText ? fuelText : null}
           company={driverCompany}
+          isEdit={!!editingPaystubId}
           onMarkPaid={handleMarkPaid}
           onClose={() => setShowPrint(false)}
         />
@@ -550,6 +599,7 @@ export default function PaystubsTab({ drivers, company }) {
           fuelText={historyModal.paystub.fuel_text}
           company={historyModal.paystub.company || 'carat'}
           isHistory
+          onEdit={() => openEditMode(historyModal.paystub, historyModal.loads)}
           onClose={() => setHistoryModal(null)}
         />
       )}

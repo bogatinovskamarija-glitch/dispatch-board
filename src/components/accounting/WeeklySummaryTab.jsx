@@ -128,10 +128,24 @@ export default function WeeklySummaryTab({ company }) {
 
   // ── Top-line metrics ──────────────────────────────────────────────────────
   const totalRevenue   = loads.reduce((s, l) => s + (Number(l.price) || 0), 0)
+  const billedLoads    = loads.filter(l => l.invoiced_at)
+  const billedRevenue  = billedLoads.reduce((s, l) => s + (Number(l.price) || 0), 0)
   const pendingLoads   = loads.filter(l => !l.invoiced_at)
   const pendingRevenue = pendingLoads.reduce((s, l) => s + (Number(l.price) || 0), 0)
   const totalPayroll   = driverRows.reduce((s, r) => s + (r.payroll ?? 0), 0)
   const knownPayroll   = driverRows.some(r => r.payroll != null)
+
+  // ── Top brokers ────────────────────────────────────────────────────────────
+  const brokerStats = useMemo(() => {
+    const map = {}
+    for (const l of loads) {
+      const name = l.broker || '(No Broker)'
+      if (!map[name]) map[name] = { name, count: 0, revenue: 0 }
+      map[name].count++
+      map[name].revenue += Number(l.price) || 0
+    }
+    return Object.values(map).sort((a, b) => b.revenue - a.revenue)
+  }, [loads])
 
   return (
     <div className="summary-wrap">
@@ -159,34 +173,64 @@ export default function WeeklySummaryTab({ company }) {
               <div className="summary-card-label">Total Loads</div>
               <div className="summary-card-value">{fmtNum(loads.length)}</div>
               <div className="summary-card-sub">
-                {loads.filter(l => l.invoiced_at).length} invoiced · {pendingLoads.length} pending
+                {billedLoads.length} invoiced · {pendingLoads.length} pending
               </div>
             </div>
             <div className="summary-card green">
-              <div className="summary-card-label">Gross Revenue</div>
+              <div className="summary-card-label">Gross Billed</div>
               <div className="summary-card-value">{fmt(totalRevenue)}</div>
               <div className="summary-card-sub">all loads this week</div>
             </div>
+            <div className="summary-card" style={{ borderLeft: '4px solid #6366F1' }}>
+              <div className="summary-card-label">Invoiced</div>
+              <div className="summary-card-value" style={{ color: '#6366F1' }}>{fmt(billedRevenue)}</div>
+              <div className="summary-card-sub">{billedLoads.length} load{billedLoads.length !== 1 ? 's' : ''} sent to broker</div>
+            </div>
             <div className="summary-card red">
-              <div className="summary-card-label">Pending Invoice</div>
+              <div className="summary-card-label">Not Yet Invoiced</div>
               <div className="summary-card-value">{fmt(pendingRevenue)}</div>
-              <div className="summary-card-sub">{pendingLoads.length} load{pendingLoads.length !== 1 ? 's' : ''} not billed</div>
+              <div className="summary-card-sub">{pendingLoads.length} load{pendingLoads.length !== 1 ? 's' : ''} not billed yet</div>
             </div>
             {knownPayroll && (
               <div className="summary-card blue">
-                <div className="summary-card-label">Est. Total Payroll</div>
+                <div className="summary-card-label">Est. Driver Payroll</div>
                 <div className="summary-card-value">{fmt(totalPayroll)}</div>
                 <div className="summary-card-sub">based on driver profiles</div>
               </div>
             )}
             {knownPayroll && (
               <div className="summary-card" style={{ borderLeft: '4px solid #F59E0B' }}>
-                <div className="summary-card-label">Est. Net (Gross – Payroll)</div>
+                <div className="summary-card-label">Gross – Payroll</div>
                 <div className="summary-card-value" style={{ color: '#F59E0B' }}>{fmt(totalRevenue - totalPayroll)}</div>
-                <div className="summary-card-sub">before other expenses</div>
+                <div className="summary-card-sub">{((totalPayroll / totalRevenue) * 100 || 0).toFixed(0)}% payroll ratio</div>
               </div>
             )}
           </div>
+
+          {/* ── Top Brokers ── */}
+          {brokerStats.length > 0 && (
+            <div style={{ marginBottom: 28 }}>
+              <div className="summary-section-title">Top Brokers This Week</div>
+              <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, padding: '16px 20px' }}>
+                {brokerStats.slice(0, 5).map((b, i) => {
+                  const pct = totalRevenue > 0 ? (b.revenue / totalRevenue * 100) : 0
+                  const colors = ['#6366F1','#059669','#2563EB','#D97706','#DC2626']
+                  return (
+                    <div key={b.name} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: i < Math.min(brokerStats.length, 5) - 1 ? 12 : 0 }}>
+                      <div style={{ width: 22, color: '#9CA3AF', fontSize: 11, fontWeight: 700, textAlign: 'right' }}>#{i+1}</div>
+                      <div style={{ width: 170, fontWeight: 600, fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: '#111827' }}>{b.name}</div>
+                      <div style={{ flex: 1, height: 8, background: '#F3F4F6', borderRadius: 4, overflow: 'hidden' }}>
+                        <div style={{ height: '100%', width: `${pct}%`, background: colors[i] || '#6B7280', borderRadius: 4 }} />
+                      </div>
+                      <div style={{ width: 90, textAlign: 'right', fontWeight: 700, color: colors[i] || '#6B7280', fontSize: 13 }}>{fmt(b.revenue)}</div>
+                      <div style={{ width: 55, textAlign: 'right', color: '#9CA3AF', fontSize: 11 }}>{b.count} load{b.count !== 1 ? 's' : ''}</div>
+                      <div style={{ width: 38, textAlign: 'right', color: '#9CA3AF', fontSize: 11 }}>{pct.toFixed(0)}%</div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
 
           {/* ── Payroll by driver ── */}
           {driverRows.length > 0 && (
