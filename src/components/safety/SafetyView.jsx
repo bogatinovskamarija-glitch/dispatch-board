@@ -103,17 +103,32 @@ export default function SafetyView({ onClose }) {
     const updatedAt = hos.updated_at ?? hos.recorded_at ?? u.updated_at ?? null
     const staleHours = updatedAt ? (Date.now() - new Date(updatedAt)) / 3600000 : null
 
+    // Motive v1 HOS remaining fields (try every known variant)
+    const driveLeft  = hos.drive_remaining_sec
+                    ?? hos.driving_remaining_sec
+                    ?? hos.drive_remaining
+                    ?? (hos.driving_remaining_hours  != null ? hos.driving_remaining_hours  * 3600 : null)
+                    ?? null
+    const shiftLeft  = hos.shift_remaining_sec
+                    ?? hos.on_duty_remaining_sec
+                    ?? hos.shift_remaining
+                    ?? (hos.on_duty_remaining_hours  != null ? hos.on_duty_remaining_hours  * 3600 : null)
+                    ?? null
+    const cycleLeft  = hos.cycle_remaining_sec
+                    ?? hos.recap_remaining_sec
+                    ?? (hos.recap_hours              != null ? hos.recap_hours              * 3600 : null)
+                    ?? (hos.cycle_remaining_hours    != null ? hos.cycle_remaining_hours    * 3600 : null)
+                    ?? null
+
     return {
       id:          u.id,
       name:        fullName,
       nameLower:   fullName.toLowerCase(),
       company:     u._company,
-      // Motive v1 duty_status values: off_duty, sleeper_berth, driving, on_duty_not_driving
       status:      hos.duty_status ?? hos.status ?? 'off_duty',
-      driveLeft:   hos.drive_remaining_sec  ?? hos.driving_remaining_sec  ?? null,
-      shiftLeft:   hos.shift_remaining_sec  ?? hos.on_duty_remaining_sec  ?? null,
-      cycleLeft:   hos.cycle_remaining_sec  ?? hos.recap_hours            != null
-                     ? (hos.recap_hours * 3600) : null,
+      driveLeft,
+      shiftLeft,
+      cycleLeft,
       inViolation: hos.is_in_violation ?? false,
       updatedAt,
       staleHours,

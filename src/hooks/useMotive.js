@@ -33,13 +33,16 @@ export function useMotiveDrivers(company) {
 
       const results = await Promise.all(
         companies.map(async (co) => {
-          const data = await motiveGet(co, '/users', { role: 'driver', per_page: 100 })
+          const data = await motiveGet(co, '/users', { role: 'driver', status: 'active', per_page: 100 })
           // Motive v1 returns { users: [ { user: {...} }, ... ] }
           const users = data?.users ?? []
-          return users.map(u => {
-            const user = u.user ?? u   // unwrap nested { user: {...} } if present
-            return { ...user, _company: co }
-          })
+          return users
+            .map(u => u.user ?? u)   // unwrap nested { user: {...} } if present
+            .filter(u =>
+              // Belt-and-suspenders: also filter client-side in case API ignores status param
+              !u.status || u.status === 'active'
+            )
+            .map(u => ({ ...u, _company: co }))
         })
       )
 
