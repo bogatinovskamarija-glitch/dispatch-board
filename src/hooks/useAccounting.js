@@ -115,11 +115,10 @@ export async function updateInvoice(invoiceId, data) {
 
 // ── Driver loads for paystub (only unpaid loads) ───────────────────────────
 export async function fetchDriverLoads(driverName, startDate, endDate) {
-  // Note: column is 'driver', not 'driver_name'
   const { data, error } = await supabase
     .from('loads')
     .select('*')
-    .eq('driver', driverName)
+    .eq('driver_name', driverName)
     .is('paid_at', null)           // exclude already-paid loads
     .order('pickup_date', { ascending: true })
   if (error) throw new Error(error.message)

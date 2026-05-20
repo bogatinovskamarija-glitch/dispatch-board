@@ -782,6 +782,131 @@ textarea { resize: vertical; min-height: 60px; }
 .summary-company-row:last-child { border-bottom: none; font-weight: 700; }
 
 /* ─────────────────────────────────────────────
+   MAINTENANCE MODULE
+───────────────────────────────────────────── */
+.maint-filters {
+  background: #fff; border-bottom: 1px solid #E5E7EB;
+  padding: 12px 24px; display: flex; flex-direction: column; gap: 10px;
+}
+.maint-period-picker { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.maint-period-btns   { display: flex; gap: 4px; }
+.maint-period-btn {
+  border: 1px solid #E5E7EB; background: #F9FAFB; color: #6B7280;
+  padding: 4px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; font-family: inherit;
+}
+.maint-period-btn.active { background: #111827; color: #fff; border-color: #111827; }
+.maint-quarter-btns { display: flex; gap: 4px; }
+.maint-period-select {
+  border: 1px solid #E5E7EB; background: #F9FAFB; color: #374151; padding: 4px 8px;
+  border-radius: 6px; font-size: 12px; font-family: inherit; cursor: pointer;
+}
+.maint-filter-divider { height: 1px; background: #F3F4F6; }
+.maint-filter-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.maint-filter-select {
+  border: 1px solid #E5E7EB; background: #fff; color: #374151; padding: 5px 8px;
+  border-radius: 6px; font-size: 12px; font-family: inherit; cursor: pointer;
+}
+.maint-filter-input {
+  border: 1px solid #E5E7EB; background: #fff; color: #374151; padding: 5px 10px;
+  border-radius: 6px; font-size: 12px; font-family: inherit; width: 90px;
+}
+.maint-filter-input:focus, .maint-filter-select:focus, .maint-period-select:focus {
+  outline: none; border-color: #6B7280;
+}
+
+/* Records Table */
+.maint-table-wrap { overflow-x: auto; }
+.maint-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.maint-table th {
+  background: #F8F9FA; color: #6B7280; text-transform: uppercase; font-size: 10px;
+  letter-spacing: .5px; font-weight: 600; padding: 8px 12px; text-align: left;
+  border-bottom: 1px solid #E5E7EB; white-space: nowrap;
+}
+.maint-table td { padding: 7px 12px; border-bottom: 1px solid #F3F4F6; vertical-align: middle; }
+.maint-table tr:hover td { background: #FAFAFA; }
+.maint-date    { color: #6B7280; white-space: nowrap; font-size: 11px; }
+.maint-unit    { font-weight: 600; }
+.maint-desc    { max-width: 260px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #374151; }
+.maint-shop    { color: #6B7280; font-size: 11px; }
+.maint-invoice { color: #9CA3AF; font-size: 11px; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.maint-amount  { text-align: right; font-weight: 600; white-space: nowrap; }
+.maint-actions { white-space: nowrap; }
+.maint-loading, .maint-empty {
+  text-align: center; padding: 48px; color: #9CA3AF; font-size: 13px;
+}
+
+/* Category badge */
+.maint-cat-badge {
+  display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 10px;
+  font-weight: 600; white-space: nowrap;
+}
+/* Company badge small */
+.co-badge {
+  display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 10px;
+  font-weight: 700; white-space: nowrap;
+}
+.co-carat      { background: #EFF6FF; color: #1D4ED8; }
+.co-pro_freight { background: #FFF7ED; color: #C2410C; }
+
+/* Spending tab */
+.maint-spending { padding: 0; }
+.maint-stat-row { display: flex; gap: 16px; flex-wrap: wrap; padding: 20px 0 0; }
+.maint-stat-card {
+  background: #fff; border: 1px solid #E5E7EB; border-radius: 10px;
+  padding: 16px 20px; flex: 1; min-width: 140px;
+}
+.maint-stat-label { font-size: 11px; color: #9CA3AF; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px; }
+.maint-stat-value { font-size: 20px; font-weight: 700; }
+.maint-stat-sub   { font-size: 11px; color: #9CA3AF; margin-top: 2px; }
+
+.maint-charts-row { display: flex; gap: 24px; flex-wrap: wrap; margin-top: 24px; align-items: flex-start; }
+.maint-chart-wrap { flex: 1; min-width: 300px; }
+.maint-chart-title { font-size: 12px; font-weight: 600; color: #374151; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 12px; }
+.maint-cat-table-wrap { flex: 0 0 320px; }
+.maint-summary-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 4px; }
+.maint-summary-table th {
+  background: #F8F9FA; color: #6B7280; font-size: 10px; text-transform: uppercase;
+  letter-spacing: .5px; font-weight: 600; padding: 6px 10px; border-bottom: 1px solid #E5E7EB; text-align: left;
+}
+.maint-summary-table td { padding: 6px 10px; border-bottom: 1px solid #F3F4F6; }
+
+/* Shops tab */
+.maint-shops { padding: 20px 0; max-width: 480px; }
+.maint-shop-add { display: flex; gap: 8px; margin-bottom: 20px; }
+.maint-shop-add input {
+  flex: 1; border: 1px solid #E5E7EB; border-radius: 7px; padding: 7px 12px; font-size: 13px; font-family: inherit;
+}
+.maint-shop-add input:focus { outline: none; border-color: #6B7280; }
+
+/* Shop picker */
+.shop-picker { display: flex; flex-direction: column; gap: 6px; }
+.shop-picker select {
+  border: 1px solid #E5E7EB; border-radius: 7px; padding: 7px 10px;
+  font-size: 13px; font-family: inherit; background: #fff; cursor: pointer;
+}
+.shop-picker-add { display: flex; gap: 6px; align-items: center; }
+.shop-picker-add input {
+  flex: 1; border: 1px solid #E5E7EB; border-radius: 7px; padding: 6px 10px;
+  font-size: 12px; font-family: inherit;
+}
+
+/* Import modal */
+.import-setup { display: flex; flex-direction: column; gap: 16px; margin-bottom: 20px; }
+.import-preview-stats { display: flex; gap: 16px; align-items: center; margin-bottom: 10px; }
+.import-stat-good { color: #10B981; font-weight: 600; font-size: 13px; }
+.import-stat-skip { color: #F59E0B; font-size: 12px; }
+.import-table-wrap { max-height: 360px; overflow-y: auto; border: 1px solid #E5E7EB; border-radius: 8px; }
+.import-preview-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.import-preview-table th {
+  background: #F8F9FA; color: #6B7280; font-size: 10px; text-transform: uppercase;
+  padding: 6px 10px; border-bottom: 1px solid #E5E7EB; text-align: left; position: sticky; top: 0;
+}
+.import-preview-table td { padding: 5px 10px; border-bottom: 1px solid #F3F4F6; }
+.import-desc { max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.import-done { padding: 40px 0; display: flex; flex-direction: column; gap: 12px; }
+.form-hint { font-size: 11px; color: #9CA3AF; margin-top: 4px; }
+
+/* ─────────────────────────────────────────────
    PRINT MEDIA — only .print-doc is visible
 ───────────────────────────────────────────── */
 @media print {

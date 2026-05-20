@@ -11,7 +11,8 @@ import DriverSidebar from './components/DriverSidebar'
 import EquipmentSidebar from './components/EquipmentSidebar'
 import FleetModal from './components/FleetModal'
 import ExportModal from './components/ExportModal'
-import AccountingView from './components/AccountingView'
+import AccountingView    from './components/AccountingView'
+import MaintenanceView  from './components/maintenance/MaintenanceView'
 
 const today = new Date()
 today.setHours(0, 0, 0, 0)
@@ -25,7 +26,8 @@ export default function App() {
   const [equipSidebar, setEquip]    = useState(null)
   const [fleetOpen, setFleetOpen]       = useState(false)
   const [exportOpen, setExportOpen]     = useState(false)
-  const [accountingOpen, setAccounting] = useState(false)
+  const [accountingOpen,   setAccounting]   = useState(false)
+  const [maintenanceOpen,  setMaintenance]  = useState(false)
   const [statusFilter, setFilter]   = useState([])
 
   const weekStart = startOfWeek(currentDay)
@@ -64,6 +66,10 @@ export default function App() {
     )
   }
 
+  if (maintenanceOpen) {
+    return <MaintenanceView onClose={() => setMaintenance(false)} />
+  }
+
   return (
     <>
       <div className="topbar">
@@ -88,6 +94,9 @@ export default function App() {
         </div>
 
         <div className="topbar-right">
+          <button className="btn btn-ghost" onClick={() => setMaintenance(true)}>
+            Maintenance
+          </button>
           <button className="btn btn-ghost" onClick={() => setAccounting(true)}>
             Accounting
           </button>
