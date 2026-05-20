@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import InvoicesTab from './accounting/InvoicesTab'
 import PaystubsTab from './accounting/PaystubsTab'
+import WeeklySummaryTab from './accounting/WeeklySummaryTab'
 
 export default function AccountingView({ onClose, drivers }) {
   const [tab,     setTab]     = useState('invoices')
@@ -28,6 +29,9 @@ export default function AccountingView({ onClose, drivers }) {
             <button className={tab === 'paystubs' ? 'active' : ''} onClick={() => setTab('paystubs')}>
               Paystubs
             </button>
+            <button className={tab === 'summary' ? 'active' : ''} onClick={() => setTab('summary')}>
+              Weekly Summary
+            </button>
           </div>
         </div>
 
@@ -47,10 +51,9 @@ export default function AccountingView({ onClose, drivers }) {
       </div>
 
       <div className="acct-body">
-        {tab === 'invoices'
-          ? <InvoicesTab company={company} />
-          : <PaystubsTab company={company} drivers={drivers} />
-        }
+        {tab === 'invoices'  && <InvoicesTab company={company} />}
+        {tab === 'paystubs'  && <PaystubsTab company={company} drivers={drivers} />}
+        {tab === 'summary'   && <WeeklySummaryTab company={company} />}
       </div>
     </div>
   )

@@ -9,6 +9,7 @@ function defaultDeductions(profileType) {
   if (profileType === 'owner_operator') {
     return [
       { label: 'Commission',         amount: '', balance: '', isCommission: true },
+      { label: 'Fuel',               amount: '', balance: '', isFuel: true },
       { label: 'Trailer Rent',        amount: '', balance: '' },
       { label: 'Tractor Payment',     amount: '', balance: '' },
       { label: 'Wire Transaction',    amount: '', balance: '' },
@@ -65,6 +66,11 @@ export default function PaystubsTab({ drivers, company }) {
 
   // Commission % (for owner operators — shown above deductions)
   const [commissionPct, setCommissionPct] = useState(15)
+
+  // Fuel transactions (owner operators only)
+  const [fuelTotal,       setFuelTotal]       = useState('')
+  const [fuelText,        setFuelText]        = useState('')
+  const [fuelOpen,        setFuelOpen]        = useState(true)
 
   // ── Get active profile for selected driver ───────────────────────────────
   const profile = useMemo(() =>
@@ -146,9 +152,11 @@ export default function PaystubsTab({ drivers, company }) {
   // Commission auto-calc for OO — applies to commissionable deduction row
   const commissionAmt = isOO ? (loadTotal * (Number(commissionPct) || 0) / 100) : 0
 
-  // Fill commission amount into deductions for display/total calc
+  // Fill commission + fuel amounts into deductions for display/total calc
   const effectiveDeds = deductions.map(d =>
-    d.isCommission ? { ...d, amount: commissionAmt.toFixed(2) } : d
+    d.isCommission ? { ...d, amount: commissionAmt.toFixed(2) } :
+    d.isFuel && fuelTotal !== '' ? { ...d, amount: fuelTotal } :
+    d
   )
   const dedTotal  = effectiveDeds.reduce((s, d) => s + (Number(d.amount) || 0), 0)
   const grandTotal = loadTotal + addTotal - dedTotal
@@ -363,6 +371,42 @@ export default function PaystubsTab({ drivers, company }) {
             <span>Balance / Notes</span>
           </div>
 
+          {/* ── Fuel Transactions (OO only) ── */}
+          {isOO && (
+            <div className="fuel-section">
+              <div className="fuel-section-header" onClick={() => setFuelOpen(o => !o)}>
+                <span>⛽ Fuel Transactions</span>
+                <span style={{ fontSize: 12, color: '#6B7280' }}>{fuelOpen ? '▾ Collapse' : '▸ Expand'}</span>
+              </div>
+              {fuelOpen && (
+                <div className="fuel-section-body">
+                  <div className="fuel-total-row">
+                    <label>Total Fuel This Week ($)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={fuelTotal}
+                      onChange={e => setFuelTotal(e.target.value)}
+                      className="pay-amount-input"
+                    />
+                    <span style={{ fontSize: 12, color: '#6B7280' }}>← auto-fills the Fuel deduction</span>
+                  </div>
+                  <label style={{ fontSize: 12, fontWeight: 500, display: 'block', marginBottom: 4 }}>
+                    Paste Fuel Transactions (prints on paystub as reference)
+                  </label>
+                  <textarea
+                    className="fuel-transactions-textarea"
+                    placeholder={'Paste fuel card transactions here…\ne.g.:\n05/15 Pilot #1234 Columbus OH  $312.45\n05/17 Love\'s #5678 Indianapolis IN  $289.10'}
+                    value={fuelText}
+                    onChange={e => setFuelText(e.target.value)}
+                  />
+                  <div className="fuel-hint">Tip: copy from your fuel card report and paste directly here.</div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* ── Grand Total ── */}
           <div className="paystub-grand-total">
             <span>Grand Total</span>
@@ -388,6 +432,7 @@ export default function PaystubsTab({ drivers, company }) {
           additions={additions.filter(a => a.label || a.amount)}
           deductions={effectiveDeds.filter(d => d.label || d.amount)}
           commissionPct={isOO ? commissionPct : null}
+          fuelText={isOO && fuelText ? fuelText : null}
           company={driverCompany}
           onClose={() => setShowPrint(false)}
         />

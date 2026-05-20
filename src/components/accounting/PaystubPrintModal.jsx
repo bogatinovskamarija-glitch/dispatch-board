@@ -22,7 +22,7 @@ const fmt = n => '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits
 export default function PaystubPrintModal({
   driver, profile, startDate, endDate,
   loads, loadPay, additions, deductions,
-  commissionPct, company, onClose,
+  commissionPct, fuelText, company, onClose,
 }) {
   const co     = CO[company] || CO.carat
   const today  = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
@@ -160,6 +160,14 @@ export default function PaystubPrintModal({
               <span>Grand Total</span>
               <span>{fmt(grandTotal)} USD</span>
             </div>
+
+            {/* Fuel Transactions Reference */}
+            {fuelText && (
+              <div className="paystub-fuel-section">
+                <div className="paystub-fuel-title">⛽ Fuel Transactions — Reference</div>
+                <div className="paystub-fuel-text">{fuelText}</div>
+              </div>
+            )}
 
           </div>
         </div>
