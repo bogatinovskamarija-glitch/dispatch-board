@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 
-// Returns the Thursday–Wednesday week containing 'fromDate' (ISO string)
+// Returns the Thursday–Wednesday week that contains the given ISO date (defaults to today)
 export function getThursdayWeek(fromDate) {
   const d = fromDate ? new Date(fromDate + 'T12:00:00') : new Date()
-  const day = d.getDay() // 0=Sun,1=Mon,...,4=Thu,5=Fri,6=Sat
-  // Days since last Thursday (Thu=4)
+  const day = d.getDay() // 0=Sun, 1=Mon, ..., 4=Thu
   const sinceThursday = (day - 4 + 7) % 7
   const thu = new Date(d)
   thu.setDate(d.getDate() - sinceThursday)
@@ -15,10 +14,9 @@ export function getThursdayWeek(fromDate) {
   return { start: iso(thu), end: iso(wed) }
 }
 
-export function useWeeklySummary(startDate, endDate) {
-  const [loads,    setLoads]    = useState([])
-  const [invoices, setInvoices] = useState([])
-  const [loading,  setLoading]  = useState(true)
+export function useWeeklySummary(startDate, endDate, company) {
+  const [loads,   setLoads]   = useState([])
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     if (!startDate || !endDate) return
@@ -26,31 +24,27 @@ export function useWeeklySummary(startDate, endDate) {
     setLoading(true)
 
     async function fetch() {
-      const [loadsRes, invoicesRes] = await Promise.all([
-        supabase
-          .from('loads')
-          .select('id, load_number, company, price, date, pickup_date, delivery_date, pickup_location, delivery_location, driver, invoiced_at, broker')
-          .gte('date', startDate)
-          .lte('date', endDate)
-          .order('date', { ascending: true }),
-        supabase
-          .from('invoices')
-          .select('id, invoice_number, company, total, created_at, bill_to_name')
-          .gte('created_at', startDate)
-          .lte('created_at', endDate + 'T23:59:59.999Z')
-          .order('created_at', { ascending: true }),
-      ])
+      // Same overlap logic as useWeekLoads:
+      // load started on or before weekEnd AND (no delivery date OR delivery date >= weekStart)
+      let q = supabase
+        .from('loads')
+        .select('id, load_number, company, price, date, pickup_date, delivery_date, pickup_location, delivery_location, driver, truck_number, invoiced_at, broker, total_miles, empty_miles')
+        .lte('date', endDate)
+        .or(`delivery_date.is.null,delivery_date.gte.${startDate}`)
+        .order('date', { ascending: true })
 
+      if (company && company !== 'all') q = q.eq('company', company)
+
+      const { data } = await q
       if (!cancelled) {
-        setLoads(loadsRes.data ?? [])
-        setInvoices(invoicesRes.data ?? [])
+        setLoads(data ?? [])
         setLoading(false)
       }
     }
 
     fetch()
     return () => { cancelled = true }
-  }, [startDate, endDate])
+  }, [startDate, endDate, company])
 
-  return { loads, invoices, loading }
+  return { loads, loading }
 }
