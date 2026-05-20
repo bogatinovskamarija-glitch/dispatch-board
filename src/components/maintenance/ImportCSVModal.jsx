@@ -8,16 +8,18 @@ const CAT_LABELS = {
 
 export default function ImportCSVModal({ onImport, onClose }) {
   const [company,   setCompany]   = useState('carat')
-  const [preview,   setPreview]   = useState(null)   // { records, skipped }
+  const [preview,   setPreview]   = useState(null)
   const [fileName,  setFileName]  = useState('')
   const [importing, setImporting] = useState(false)
   const [done,      setDone]      = useState(false)
+  const [showTable, setShowTable] = useState(false)
   const fileRef = useRef()
 
   function handleFile(e) {
     const file = e.target.files[0]
     if (!file) return
     setFileName(file.name)
+    setShowTable(false)
     const reader = new FileReader()
     reader.onload = ev => {
       try {
@@ -34,14 +36,15 @@ export default function ImportCSVModal({ onImport, onClose }) {
     setCompany(e.target.value)
     setPreview(null)
     setFileName('')
+    setShowTable(false)
     if (fileRef.current) fileRef.current.value = ''
   }
 
   async function handleImport() {
-    if (!preview?.records?.length) return
+    if (!validRecords.length) return
     setImporting(true)
     try {
-      await onImport(preview.records)
+      await onImport(validRecords)
       setDone(true)
     } catch (err) {
       alert('Import error: ' + err.message)
@@ -49,12 +52,22 @@ export default function ImportCSVModal({ onImport, onClose }) {
     }
   }
 
-  // Only drop rows that are truly empty — missing unit AND amount AND description
+  // Only drop rows that are truly empty
   const validRecords = preview?.records?.filter(r =>
     r.unit_number || r.amount != null || r.description
   ) || []
   const invalidCount = (preview?.records?.length || 0) - validRecords.length
   const previewTotal = validRecords.reduce((sum, r) => sum + (r.amount || 0), 0)
+
+  // Year-by-year breakdown
+  const yearBreakdown = validRecords.reduce((acc, r) => {
+    const yr = r.date ? r.date.slice(0, 4) : 'No date'
+    if (!acc[yr]) acc[yr] = { count: 0, total: 0 }
+    acc[yr].count++
+    acc[yr].total += r.amount || 0
+    return acc
+  }, {})
+  const yearRows = Object.entries(yearBreakdown).sort(([a], [b]) => a.localeCompare(b))
 
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
@@ -102,49 +115,77 @@ export default function ImportCSVModal({ onImport, onClose }) {
 
               {preview && (
                 <div className="import-preview">
+                  {/* Summary stats */}
                   <div className="import-preview-stats">
                     <span className="import-stat-good">✓ {validRecords.length} records ready</span>
                     <span className="import-stat-total">
                       Total: ${previewTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                     {preview.skipped + invalidCount > 0 && (
-                      <span className="import-stat-skip">⚠ {preview.skipped + invalidCount} rows skipped (headers, totals, invalid dates)</span>
+                      <span className="import-stat-skip">⚠ {preview.skipped + invalidCount} rows skipped</span>
                     )}
                   </div>
 
-                  <div className="import-table-wrap">
-                    <table className="import-preview-table">
-                      <thead>
-                        <tr>
-                          <th>Date</th>
-                          <th>Unit</th>
-                          <th>Type</th>
-                          <th>Category</th>
-                          <th>Description</th>
-                          <th>Amount</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {validRecords.slice(0, 50).map((r, i) => (
-                          <tr key={i}>
-                            <td>{r.date || <span className="text-muted">—</span>}</td>
-                            <td>{r.unit_number}</td>
-                            <td style={{ textTransform: 'capitalize' }}>{r.unit_type}</td>
-                            <td>{CAT_LABELS[r.category] || r.category}</td>
-                            <td className="import-desc">{r.description}</td>
-                            <td>{r.amount != null ? '$' + Number(r.amount).toLocaleString('en-US', { minimumFractionDigits: 2 }) : '—'}</td>
-                          </tr>
-                        ))}
-                        {validRecords.length > 50 && (
-                          <tr>
-                            <td colSpan={6} style={{ textAlign: 'center', color: '#9CA3AF', fontStyle: 'italic' }}>
-                              … and {validRecords.length - 50} more records
-                            </td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
+                  {/* Year-by-year breakdown — key diagnostic */}
+                  <div className="import-year-breakdown">
+                    <div className="import-year-title">Breakdown by year (verify these match your spreadsheet):</div>
+                    <div className="import-year-grid">
+                      {yearRows.map(([yr, { count, total }]) => (
+                        <div key={yr} className="import-year-row">
+                          <span className="import-year-label">{yr}</span>
+                          <span className="import-year-count">{count} records</span>
+                          <span className="import-year-amt">
+                            ${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
+
+                  {/* Record preview table (toggle) */}
+                  <button
+                    className="btn btn-ghost"
+                    style={{ marginBottom: 8, fontSize: 12 }}
+                    onClick={() => setShowTable(v => !v)}
+                  >
+                    {showTable ? '▲ Hide record preview' : '▼ Show record preview (first 50)'}
+                  </button>
+
+                  {showTable && (
+                    <div className="import-table-wrap">
+                      <table className="import-preview-table">
+                        <thead>
+                          <tr>
+                            <th>Date</th>
+                            <th>Unit</th>
+                            <th>Type</th>
+                            <th>Category</th>
+                            <th>Description</th>
+                            <th>Amount</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {validRecords.slice(0, 50).map((r, i) => (
+                            <tr key={i}>
+                              <td>{r.date || <span className="text-muted">—</span>}</td>
+                              <td>{r.unit_number}</td>
+                              <td style={{ textTransform: 'capitalize' }}>{r.unit_type}</td>
+                              <td>{CAT_LABELS[r.category] || r.category}</td>
+                              <td className="import-desc">{r.description}</td>
+                              <td>{r.amount != null ? '$' + Number(r.amount).toLocaleString('en-US', { minimumFractionDigits: 2 }) : '—'}</td>
+                            </tr>
+                          ))}
+                          {validRecords.length > 50 && (
+                            <tr>
+                              <td colSpan={6} style={{ textAlign: 'center', color: '#9CA3AF', fontStyle: 'italic' }}>
+                                … and {validRecords.length - 50} more records
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
               )}
             </>
