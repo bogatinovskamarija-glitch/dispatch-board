@@ -33,22 +33,33 @@ serve(async (req: Request) => {
       )
     }
 
-    // Build Motive URL — api_key as query param (Motive v1 style)
+    // Build Motive URL
     const url = new URL(`${MOTIVE_BASE}${path}`)
-    url.searchParams.set('api_key', apiKey)
     url.searchParams.set('per_page', String(params.per_page ?? 100))
     for (const [k, v] of Object.entries(params)) {
       if (k !== 'per_page') url.searchParams.set(k, String(v))
     }
 
     const motiveRes = await fetch(url.toString(), {
-      headers: { 'Accept': 'application/json' },
+      headers: {
+        'X-Api-Key': apiKey,
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
     })
 
     const body = await motiveRes.text()
 
+    // Pass through non-2xx with full body so the client can show the real error
+    if (!motiveRes.ok) {
+      return new Response(
+        JSON.stringify({ error: `Motive ${motiveRes.status}: ${body}` }),
+        { status: 200, headers: { ...CORS, 'Content-Type': 'application/json' } }
+      )
+    }
+
     return new Response(body, {
-      status:  motiveRes.status,
+      status:  200,
       headers: { ...CORS, 'Content-Type': 'application/json' },
     })
 
