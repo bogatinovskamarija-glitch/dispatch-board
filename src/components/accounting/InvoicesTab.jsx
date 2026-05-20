@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { usePendingInvoices, useInvoiceHistory, createInvoice, fetchInvoiceLoads } from '../../hooks/useAccounting'
 import InvoicePrintModal from './InvoicePrintModal'
 
@@ -11,6 +11,26 @@ export default function InvoicesTab({ company }) {
   const [selected,    setSelected]    = useState(new Set())
   const [showHistory, setShowHistory] = useState(false)
   const [printData,   setPrintData]   = useState(null)  // { loads, invoice? }
+
+  // ── History filters ────────────────────────────────────────────────────────
+  const [filterText,    setFilterText]    = useState('')
+  const [filterCompany, setFilterCompany] = useState('all')
+
+  const filteredInvoices = useMemo(() => {
+    let list = invoices
+    if (filterCompany !== 'all') {
+      list = list.filter(inv => inv.company === filterCompany)
+    }
+    if (filterText.trim()) {
+      const q = filterText.trim().toLowerCase()
+      list = list.filter(inv =>
+        (inv.invoice_number || '').toLowerCase().includes(q) ||
+        (inv.bill_to_name   || '').toLowerCase().includes(q) ||
+        (inv.company        || '').toLowerCase().includes(q)
+      )
+    }
+    return list
+  }, [invoices, filterText, filterCompany])
 
   function toggleRow(id) {
     setSelected(prev => {
@@ -120,34 +140,71 @@ export default function InvoicesTab({ company }) {
       {showHistory && (
         histLoad
           ? <div className="acct-empty">Loading…</div>
-          : invoices.length === 0
-            ? <div className="acct-empty">No invoices generated yet.</div>
-            : (
-              <table className="acct-table">
-                <thead>
-                  <tr>
-                    <th>Invoice #</th>
-                    <th>Date</th>
-                    <th>Broker</th>
-                    <th>Company</th>
-                    <th>Total</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {invoices.map(inv => (
-                    <tr key={inv.id} style={{ cursor: 'pointer' }} onClick={() => openHistoryInvoice(inv)}>
-                      <td><strong>{inv.invoice_number}</strong></td>
-                      <td>{inv.created_at ? new Date(inv.created_at).toLocaleDateString() : '—'}</td>
-                      <td>{inv.bill_to_name || '—'}</td>
-                      <td>{inv.company === 'carat' ? 'Carat' : 'Pro Freight'}</td>
-                      <td className="acct-price">{inv.total ? fmt(inv.total) : '—'}</td>
-                      <td><span className="acct-click-hint">View / Re-export →</span></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )
+          : (
+            <>
+              {/* Filter bar */}
+              <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="Search invoice #, broker…"
+                  value={filterText}
+                  onChange={e => setFilterText(e.target.value)}
+                  style={{ width: 240, fontSize: 13 }}
+                />
+                {company === 'all' && (
+                  <select
+                    className="form-input"
+                    value={filterCompany}
+                    onChange={e => setFilterCompany(e.target.value)}
+                    style={{ width: 150, fontSize: 13 }}
+                  >
+                    <option value="all">All Companies</option>
+                    <option value="carat">Carat</option>
+                    <option value="pro_freight">Pro Freight</option>
+                  </select>
+                )}
+                {(filterText || filterCompany !== 'all') && (
+                  <button className="btn btn-ghost btn-xs" onClick={() => { setFilterText(''); setFilterCompany('all') }}>
+                    ✕ Clear
+                  </button>
+                )}
+                <span style={{ fontSize: 12, color: '#9CA3AF', marginLeft: 'auto' }}>
+                  {filteredInvoices.length} of {invoices.length} invoice{invoices.length !== 1 ? 's' : ''}
+                </span>
+              </div>
+
+              {filteredInvoices.length === 0
+                ? <div className="acct-empty">{invoices.length === 0 ? 'No invoices generated yet.' : 'No invoices match your filters.'}</div>
+                : (
+                  <table className="acct-table">
+                    <thead>
+                      <tr>
+                        <th>Invoice #</th>
+                        <th>Date</th>
+                        <th>Broker</th>
+                        <th>Company</th>
+                        <th>Total</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredInvoices.map(inv => (
+                        <tr key={inv.id} style={{ cursor: 'pointer' }} onClick={() => openHistoryInvoice(inv)}>
+                          <td><strong>{inv.invoice_number}</strong></td>
+                          <td>{inv.created_at ? new Date(inv.created_at).toLocaleDateString() : '—'}</td>
+                          <td>{inv.bill_to_name || '—'}</td>
+                          <td>{inv.company === 'carat' ? 'Carat' : inv.company === 'pro_freight' ? 'Pro Freight' : inv.company || '—'}</td>
+                          <td className="acct-price">{inv.total ? fmt(inv.total) : '—'}</td>
+                          <td><span className="acct-click-hint">View / Re-export →</span></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )
+              }
+            </>
+          )
       )}
 
       {printData && (

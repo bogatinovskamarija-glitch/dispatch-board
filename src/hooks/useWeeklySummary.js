@@ -24,14 +24,13 @@ export function useWeeklySummary(startDate, endDate, company) {
     setLoading(true)
 
     async function fetch() {
-      // Same overlap logic as useWeekLoads:
-      // load started on or before weekEnd AND (no delivery date OR delivery date >= weekStart)
+      // Match loads whose pickup_date (or fallback date) falls within the week.
+      // Uses: (pickup_date in range) OR (pickup_date is null AND date in range)
       let q = supabase
         .from('loads')
         .select('id, load_number, company, price, date, pickup_date, delivery_date, pickup_location, delivery_location, driver, truck_number, invoiced_at, broker, total_miles, empty_miles')
-        .lte('date', endDate)
-        .or(`delivery_date.is.null,delivery_date.gte.${startDate}`)
-        .order('date', { ascending: true })
+        .or(`and(pickup_date.gte.${startDate},pickup_date.lte.${endDate}),and(pickup_date.is.null,date.gte.${startDate},date.lte.${endDate})`)
+        .order('pickup_date', { ascending: true })
 
       if (company && company !== 'all') q = q.eq('company', company)
 
