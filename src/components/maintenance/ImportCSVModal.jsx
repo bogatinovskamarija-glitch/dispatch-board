@@ -13,6 +13,7 @@ export default function ImportCSVModal({ onImport, onClose }) {
   const [importing, setImporting] = useState(false)
   const [done,      setDone]      = useState(false)
   const [showTable, setShowTable] = useState(false)
+  const [showNullOnly, setShowNullOnly] = useState(false)
   const fileRef = useRef()
 
   function handleFile(e) {
@@ -176,13 +177,16 @@ export default function ImportCSVModal({ onImport, onClose }) {
                   </div>
 
                   {/* Record preview table (toggle) */}
-                  <button
-                    className="btn btn-ghost"
-                    style={{ marginBottom: 8, fontSize: 12 }}
-                    onClick={() => setShowTable(v => !v)}
-                  >
-                    {showTable ? '▲ Hide record preview' : '▼ Show record preview (first 50)'}
-                  </button>
+                  <div style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
+                    <button className="btn btn-ghost" style={{ fontSize: 12 }} onClick={() => { setShowTable(v => !v); setShowNullOnly(false) }}>
+                      {showTable && !showNullOnly ? '▲ Hide preview' : '▼ Show record preview (first 50)'}
+                    </button>
+                    {nullAmtCount > 0 && (
+                      <button className="btn btn-ghost" style={{ fontSize: 12, color: '#F59E0B' }} onClick={() => { setShowTable(true); setShowNullOnly(v => !v) }}>
+                        {showNullOnly ? '▲ Hide' : '▼ Show'} {nullAmtCount} records missing amount
+                      </button>
+                    )}
+                  </div>
 
                   {showTable && (
                     <div className="import-table-wrap">
@@ -198,17 +202,19 @@ export default function ImportCSVModal({ onImport, onClose }) {
                           </tr>
                         </thead>
                         <tbody>
-                          {validRecords.slice(0, 50).map((r, i) => (
-                            <tr key={i}>
+                          {(showNullOnly ? validRecords.filter(r => r.amount == null) : validRecords.slice(0, 50)).map((r, i) => (
+                            <tr key={i} style={r.amount == null ? { background: '#FEF3C7' } : {}}>
                               <td>{r.date || <span className="text-muted">—</span>}</td>
                               <td>{r.unit_number}</td>
                               <td style={{ textTransform: 'capitalize' }}>{r.unit_type}</td>
                               <td>{CAT_LABELS[r.category] || r.category}</td>
                               <td className="import-desc">{r.description}</td>
-                              <td>{r.amount != null ? '$' + Number(r.amount).toLocaleString('en-US', { minimumFractionDigits: 2 }) : '—'}</td>
+                              <td style={r.amount == null ? { color: '#EF4444', fontWeight: 600 } : {}}>
+                                {r.amount != null ? '$' + Number(r.amount).toLocaleString('en-US', { minimumFractionDigits: 2 }) : 'MISSING'}
+                              </td>
                             </tr>
                           ))}
-                          {validRecords.length > 50 && (
+                          {!showNullOnly && validRecords.length > 50 && (
                             <tr>
                               <td colSpan={6} style={{ textAlign: 'center', color: '#9CA3AF', fontStyle: 'italic' }}>
                                 … and {validRecords.length - 50} more records
