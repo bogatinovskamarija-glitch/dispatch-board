@@ -94,43 +94,34 @@ export default function SafetyView({ onClose }) {
 
   function refreshAll() { refreshDrivers(); refreshViol(); fetchActiveLoads(company).then(setActiveLoads) }
 
-  // ── Parse HOS from Motive user objects ────────────────────────────────────
+  // ── Parse HOS from Motive /available_time user objects ──────────────────────
   const rows = useMemo(() => drivers.map(u => {
-    // HOS data comes from the merged _hos field (today's /hos_logs entry)
-    // Fall back to current_driver_status on the user object if present
-    const hos = u._hos ?? u.current_driver_status ?? u.duty_status ?? {}
-
     const fullName = [u.first_name, u.last_name].filter(Boolean).join(' ') ||
                      u.name || u.username || `Driver ${u.id}`
 
-    const updatedAt = hos.start_time ?? hos.updated_at ?? hos.recorded_at ?? u.updated_at ?? null
+    // available_time fields are already in seconds
+    const avail     = u.available_time ?? {}
+    const driveLeft = avail.drive  ?? null   // seconds of drive time remaining
+    const shiftLeft = avail.shift  ?? null   // seconds of on-duty shift remaining
+    const cycleLeft = avail.cycle  ?? null   // seconds of 70-hr cycle remaining
+
+    // Last ELD event time for staleness detection
+    const updatedAt  = u.last_hos_status?.time ?? null
     const staleHours = updatedAt ? (Date.now() - new Date(updatedAt)) / 3600000 : null
 
-    // Motive v1 /hos_logs fields for remaining time
-    const toSec = (val) => val == null ? null : val > 1000 ? val : val * 3600  // handle seconds OR hours
-    const driveLeft = toSec(
-      hos.drive_remaining     ?? hos.drive_remaining_sec ??
-      hos.driving_remaining   ?? hos.shift_drive_remaining ?? null
-    )
-    const shiftLeft = toSec(
-      hos.shift_remaining     ?? hos.shift_remaining_sec ??
-      hos.on_duty_remaining   ?? null
-    )
-    const cycleLeft = toSec(
-      hos.cycle_remaining     ?? hos.cycle_remaining_sec ??
-      hos.recap_hours         ?? null
-    )
+    // A driver is "near limit" if < 2 hrs drive left but not at exactly max (11 h)
+    const inViolation = driveLeft != null && driveLeft <= 0
 
     return {
       id:          u.id,
       name:        fullName,
       nameLower:   fullName.toLowerCase(),
       company:     u._company,
-      status:      hos.duty_status ?? hos.status ?? 'off_duty',
+      status:      u.duty_status ?? 'off_duty',
       driveLeft,
       shiftLeft,
       cycleLeft,
-      inViolation: hos.is_in_violation ?? false,
+      inViolation,
       updatedAt,
       staleHours,
       eldSerial:   u.eld_device?.serial_number ?? u.current_vehicle?.number ?? null,
