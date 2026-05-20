@@ -14,6 +14,7 @@ import ExportModal from './components/ExportModal'
 import AccountingView    from './components/AccountingView'
 import MaintenanceView  from './components/maintenance/MaintenanceView'
 import AccountingLock, { isAccountingUnlocked } from './components/accounting/AccountingLock'
+import SafetyView       from './components/safety/SafetyView'
 
 const today = new Date()
 today.setHours(0, 0, 0, 0)
@@ -30,6 +31,7 @@ export default function App() {
   const [accountingOpen,   setAccounting]   = useState(false)
   const [accountingLock,   setAccountingLock] = useState(false)
   const [maintenanceOpen,  setMaintenance]  = useState(false)
+  const [safetyOpen,       setSafety]       = useState(false)
   const [statusFilter, setFilter]   = useState([])
 
   const weekStart = startOfWeek(currentDay)
@@ -72,6 +74,10 @@ export default function App() {
     return <MaintenanceView onClose={() => setMaintenance(false)} />
   }
 
+  if (safetyOpen) {
+    return <SafetyView onClose={() => setSafety(false)} />
+  }
+
   return (
     <>
       <div className="topbar">
@@ -96,6 +102,9 @@ export default function App() {
         </div>
 
         <div className="topbar-right">
+          <button className="btn btn-ghost" onClick={() => setSafety(true)}>
+            Safety
+          </button>
           <button className="btn btn-ghost" onClick={() => setMaintenance(true)}>
             Maintenance
           </button>
