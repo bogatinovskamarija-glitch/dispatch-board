@@ -31,18 +31,36 @@ export function useMotiveDrivers(company) {
         ? ['carat', 'pro_freight']
         : [company]
 
+      const today = new Date().toISOString().split('T')[0]
+
       const results = await Promise.all(
         companies.map(async (co) => {
-          const data = await motiveGet(co, '/users', { role: 'driver', status: 'active', per_page: 100 })
-          // Motive v1 returns { users: [ { user: {...} }, ... ] }
-          const users = data?.users ?? []
-          return users
-            .map(u => u.user ?? u)   // unwrap nested { user: {...} } if present
-            .filter(u =>
-              // Belt-and-suspenders: also filter client-side in case API ignores status param
-              !u.status || u.status === 'active'
-            )
-            .map(u => ({ ...u, _company: co }))
+          // 1. Fetch active drivers
+          const userData = await motiveGet(co, '/users', { role: 'driver', status: 'active', per_page: 100 })
+          const users = (userData?.users ?? [])
+            .map(u => u.user ?? u)
+            .filter(u => !u.status || u.status === 'active')
+
+          // 2. Fetch today's HOS logs to get remaining hours
+          let hosMap = {}
+          try {
+            const hosData = await motiveGet(co, '/hos_logs', { date: today, per_page: 100 })
+            const logs = hosData?.hos_logs ?? []
+            for (const entry of logs) {
+              const log = entry.hos_log ?? entry
+              const driverId = log.driver_id ?? log.driver?.id
+              if (driverId) hosMap[driverId] = log
+            }
+          } catch {
+            // HOS logs failing shouldn't block showing drivers
+          }
+
+          // 3. Merge HOS data into driver objects
+          return users.map(u => ({
+            ...u,
+            _company: co,
+            _hos: hosMap[u.id] ?? null,
+          }))
         })
       )
 

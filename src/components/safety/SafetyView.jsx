@@ -96,29 +96,30 @@ export default function SafetyView({ onClose }) {
 
   // ── Parse HOS from Motive user objects ────────────────────────────────────
   const rows = useMemo(() => drivers.map(u => {
-    // Motive v1: current HOS is in current_driver_status or duty_status object
-    const hos = u.current_driver_status ?? u.duty_status ?? {}
+    // HOS data comes from the merged _hos field (today's /hos_logs entry)
+    // Fall back to current_driver_status on the user object if present
+    const hos = u._hos ?? u.current_driver_status ?? u.duty_status ?? {}
+
     const fullName = [u.first_name, u.last_name].filter(Boolean).join(' ') ||
                      u.name || u.username || `Driver ${u.id}`
-    const updatedAt = hos.updated_at ?? hos.recorded_at ?? u.updated_at ?? null
+
+    const updatedAt = hos.start_time ?? hos.updated_at ?? hos.recorded_at ?? u.updated_at ?? null
     const staleHours = updatedAt ? (Date.now() - new Date(updatedAt)) / 3600000 : null
 
-    // Motive v1 HOS remaining fields (try every known variant)
-    const driveLeft  = hos.drive_remaining_sec
-                    ?? hos.driving_remaining_sec
-                    ?? hos.drive_remaining
-                    ?? (hos.driving_remaining_hours  != null ? hos.driving_remaining_hours  * 3600 : null)
-                    ?? null
-    const shiftLeft  = hos.shift_remaining_sec
-                    ?? hos.on_duty_remaining_sec
-                    ?? hos.shift_remaining
-                    ?? (hos.on_duty_remaining_hours  != null ? hos.on_duty_remaining_hours  * 3600 : null)
-                    ?? null
-    const cycleLeft  = hos.cycle_remaining_sec
-                    ?? hos.recap_remaining_sec
-                    ?? (hos.recap_hours              != null ? hos.recap_hours              * 3600 : null)
-                    ?? (hos.cycle_remaining_hours    != null ? hos.cycle_remaining_hours    * 3600 : null)
-                    ?? null
+    // Motive v1 /hos_logs fields for remaining time
+    const toSec = (val) => val == null ? null : val > 1000 ? val : val * 3600  // handle seconds OR hours
+    const driveLeft = toSec(
+      hos.drive_remaining     ?? hos.drive_remaining_sec ??
+      hos.driving_remaining   ?? hos.shift_drive_remaining ?? null
+    )
+    const shiftLeft = toSec(
+      hos.shift_remaining     ?? hos.shift_remaining_sec ??
+      hos.on_duty_remaining   ?? null
+    )
+    const cycleLeft = toSec(
+      hos.cycle_remaining     ?? hos.cycle_remaining_sec ??
+      hos.recap_hours         ?? null
+    )
 
     return {
       id:          u.id,
