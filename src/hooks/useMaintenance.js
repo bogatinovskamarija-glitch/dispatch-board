@@ -234,6 +234,7 @@ export function parseMaintenanceCSV(text, company) {
   const records = []
   let skipped = 0
   let lastYear = null  // carry-forward: Google Sheets often only fills year on first row of each year
+  const diagSamples = []  // first 8 raw rows for diagnostics
 
   for (const cols of rows) {
     const yearVal = (cols[0] || '').trim()
@@ -258,6 +259,9 @@ export function parseMaintenanceCSV(text, company) {
     // Skip header row and Google Sheets filter row
     const yearLower = yearVal.toLowerCase()
     if (yearLower === 'year' || yearLower.startsWith('filter')) { skipped++; continue }
+
+    // Collect first 8 data rows for diagnostics (after header)
+    if (diagSamples.length < 8) diagSamples.push(cols.slice(0, 12))
 
     // Update carry-forward year when we see a valid year
     const parsedYear = parseInt(yearVal, 10)
@@ -298,5 +302,6 @@ export function parseMaintenanceCSV(text, company) {
     })
   }
 
-  return { records, skipped }
+  const nullAmountCount = records.filter(r => r.amount == null).length
+  return { records, skipped, nullAmountCount, diagSamples }
 }

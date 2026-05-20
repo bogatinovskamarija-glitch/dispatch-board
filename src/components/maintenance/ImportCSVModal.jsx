@@ -58,6 +58,7 @@ export default function ImportCSVModal({ onImport, onClose }) {
   ) || []
   const invalidCount = (preview?.records?.length || 0) - validRecords.length
   const previewTotal = validRecords.reduce((sum, r) => sum + (r.amount || 0), 0)
+  const nullAmtCount = preview?.nullAmountCount ?? 0
 
   // Year-by-year breakdown
   const yearBreakdown = validRecords.reduce((acc, r) => {
@@ -121,10 +122,42 @@ export default function ImportCSVModal({ onImport, onClose }) {
                     <span className="import-stat-total">
                       Total: ${previewTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
+                    {nullAmtCount > 0 && (
+                      <span className="import-stat-skip">⚠ {nullAmtCount} records have no amount</span>
+                    )}
                     {preview.skipped + invalidCount > 0 && (
                       <span className="import-stat-skip">⚠ {preview.skipped + invalidCount} rows skipped</span>
                     )}
                   </div>
+
+                  {/* Raw column diagnostic — first 8 rows */}
+                  {preview.diagSamples?.length > 0 && (
+                    <div className="import-year-breakdown" style={{ marginBottom: 8 }}>
+                      <div className="import-year-title">Raw column values (first 8 rows — col[5]=cat, col[6]=desc, col[7]=amount):</div>
+                      <div style={{ overflowX: 'auto' }}>
+                        <table style={{ fontSize: 11, borderCollapse: 'collapse', width: '100%' }}>
+                          <thead>
+                            <tr>
+                              {['[0]Year','[1]Mon','[2]Date','[3]Unit','[4]Type','[5]Cat','[6]Desc','[7]Amt','[8]','[9]','[10]','[11]'].map(h => (
+                                <th key={h} style={{ background: '#E5E7EB', padding: '3px 6px', textAlign: 'left', whiteSpace: 'nowrap', fontSize: 10 }}>{h}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {preview.diagSamples.map((row, i) => (
+                              <tr key={i} style={{ background: i % 2 ? '#F9FAFB' : '#fff' }}>
+                                {Array.from({ length: 12 }, (_, ci) => (
+                                  <td key={ci} style={{ padding: '3px 6px', borderBottom: '1px solid #F3F4F6', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    {row[ci] ?? ''}
+                                  </td>
+                                ))}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Year-by-year breakdown — key diagnostic */}
                   <div className="import-year-breakdown">
