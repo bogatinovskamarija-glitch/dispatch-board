@@ -895,6 +895,7 @@ textarea { resize: vertical; min-height: 60px; }
 .import-setup { display: flex; flex-direction: column; gap: 16px; margin-bottom: 20px; }
 .import-preview-stats { display: flex; gap: 16px; align-items: center; margin-bottom: 10px; }
 .import-stat-good { color: #10B981; font-weight: 600; font-size: 13px; }
+.import-stat-total { color: #6366F1; font-weight: 700; font-size: 14px; }
 .import-stat-skip { color: #F59E0B; font-size: 12px; }
 .import-table-wrap { max-height: 360px; overflow-y: auto; border: 1px solid #E5E7EB; border-radius: 8px; }
 .import-preview-table { width: 100%; border-collapse: collapse; font-size: 12px; }

@@ -54,6 +54,7 @@ export default function ImportCSVModal({ onImport, onClose }) {
     r.unit_number || r.amount != null || r.description
   ) || []
   const invalidCount = (preview?.records?.length || 0) - validRecords.length
+  const previewTotal = validRecords.reduce((sum, r) => sum + (r.amount || 0), 0)
 
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
@@ -103,6 +104,9 @@ export default function ImportCSVModal({ onImport, onClose }) {
                 <div className="import-preview">
                   <div className="import-preview-stats">
                     <span className="import-stat-good">✓ {validRecords.length} records ready</span>
+                    <span className="import-stat-total">
+                      Total: ${previewTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
                     {preview.skipped + invalidCount > 0 && (
                       <span className="import-stat-skip">⚠ {preview.skipped + invalidCount} rows skipped (headers, totals, invalid dates)</span>
                     )}

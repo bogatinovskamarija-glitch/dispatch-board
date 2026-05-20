@@ -233,6 +233,7 @@ export function parseMaintenanceCSV(text, company) {
   const rows = parseCSV(text)
   const records = []
   let skipped = 0
+  let lastYear = null  // carry-forward: Google Sheets often only fills year on first row of each year
 
   for (const cols of rows) {
     const yearVal = (cols[0] || '').trim()
@@ -242,22 +243,37 @@ export function parseMaintenanceCSV(text, company) {
     const catRaw  = (cols[5] || '').trim()
     const desc    = (cols[6] || '').trim()
     const amtRaw  = (cols[7] || '').trim()
-    const mileage = (cols[8] || '').trim()
-    const pmCode  = (cols[9] || '').trim()
-    const invoice = (cols[10] || '').trim()
+    // col[8] may be blank spacer column in some exports — try both positions for mileage
+    const col8    = (cols[8] || '').trim()
+    const col9    = (cols[9] || '').trim()
+    const col10   = (cols[10] || '').trim()
+    const col11   = (cols[11] || '').trim()
+    // Auto-detect if there's a blank spacer column at position 8:
+    // If col8 is blank and col9 looks like mileage (numeric) or col10 looks like invoice, use offset
+    const hasSpacerCol = col8 === '' && (col9.match(/^\d+$/) || col10.match(/^[A-Z]-\d+$/i))
+    const mileage = hasSpacerCol ? col9  : col8
+    const pmCode  = hasSpacerCol ? col10 : col9
+    const invoice = hasSpacerCol ? col11 : col10
 
     // Skip header row and Google Sheets filter row
     const yearLower = yearVal.toLowerCase()
     if (yearLower === 'year' || yearLower.startsWith('filter')) { skipped++; continue }
 
-    // Skip year-total rows: have a year but no unit number and no date
+    // Update carry-forward year when we see a valid year
+    const parsedYear = parseInt(yearVal, 10)
+    if (parsedYear >= 2010 && parsedYear <= 2030) {
+      lastYear = parsedYear
+    }
+
+    // Use explicit year or carry-forward from previous rows
+    const yearNum = (parsedYear >= 2010 && parsedYear <= 2030) ? parsedYear : lastYear
+    if (!yearNum) { skipped++; continue }  // no year context at all
+
+    // Skip year-total rows: year present but no unit number and no date
     // (These are summary rows like "2024,,,,,,,  $333,204.74,,,")
-    const yearNum = parseInt(yearVal, 10)
-    if (!yearNum || yearNum < 2010 || yearNum > 2030) { skipped++; continue }
+    if (!unitNum && !dateStr) { skipped++; continue }
 
-    if (!unitNum && !dateStr) { skipped++; continue }  // year-total row
-
-    // Need at least an amount or a description to be worth importing
+    // Need at least an amount or a description or a unit to be worth importing
     const amount = parseAmount(amtRaw)
     if (amount == null && !desc && !unitNum) { skipped++; continue }
 
