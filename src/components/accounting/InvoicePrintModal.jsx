@@ -74,6 +74,32 @@ export default function InvoicePrintModal({ loads, existingInvoice, company: com
     setExtras(ex => ex.filter((_, idx) => idx !== i))
   }
 
+  function handlePrint() {
+    const el = document.getElementById('print-area')
+    if (!el) { window.print(); return }
+    const cssLinks = Array.from(document.querySelectorAll('link[rel="stylesheet"]'))
+      .map(l => `<link rel="stylesheet" href="${l.href}">`)
+      .join('\n')
+    const win = window.open('', '_blank')
+    if (!win) { window.print(); return }
+    win.document.write(`<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<base href="${window.location.origin}">
+${cssLinks}
+<style>
+  @page { margin: 0.5in; size: letter portrait; }
+  body { margin: 0; padding: 0; background: #fff; }
+  .no-print { display: none !important; }
+</style>
+</head>
+<body>${el.innerHTML}</body>
+</html>`)
+    win.document.close()
+    setTimeout(() => { win.focus(); win.print(); setTimeout(() => win.close(), 500) }, 700)
+  }
+
   async function handleMarkInvoiced() {
     setSaving(true)
     try {
@@ -274,7 +300,7 @@ export default function InvoicePrintModal({ loads, existingInvoice, company: com
 
         <div className="modal-footer no-print">
           <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
-          <button className="btn btn-ghost" onClick={() => window.print()}>🖨 Print / Save PDF</button>
+          <button className="btn btn-ghost" onClick={handlePrint}>🖨 Print / Save PDF</button>
           <button className="btn btn-primary" onClick={handleMarkInvoiced} disabled={saving}>
             {saving ? 'Saving…' : isExisting ? '✓ Update & Save' : '✓ Mark as Invoiced'}
           </button>

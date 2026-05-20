@@ -41,6 +41,42 @@ export default function PaystubPrintModal({
     catch (e) { alert('Error: ' + e.message); setSaving(false) }
   }
 
+  function handlePrint() {
+    const el = document.getElementById('print-area')
+    if (!el) { window.print(); return }
+
+    // Collect all stylesheet <link> tags (they have absolute hrefs already)
+    const cssLinks = Array.from(document.querySelectorAll('link[rel="stylesheet"]'))
+      .map(l => `<link rel="stylesheet" href="${l.href}">`)
+      .join('\n')
+
+    const win = window.open('', '_blank')
+    if (!win) { window.print(); return }  // fallback if popup blocked
+
+    win.document.write(`<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<base href="${window.location.origin}">
+${cssLinks}
+<style>
+  @page { margin: 0.5in; size: letter portrait; }
+  body { margin: 0; padding: 0; background: #fff; }
+  .no-print { display: none !important; }
+</style>
+</head>
+<body>${el.innerHTML}</body>
+</html>`)
+    win.document.close()
+
+    // Give CSS time to load, then print
+    setTimeout(() => {
+      win.focus()
+      win.print()
+      setTimeout(() => win.close(), 500)
+    }, 700)
+  }
+
   const loadTotal  = loads.reduce((s, l) => s + (Number(loadPay[l.id]?.amount) || 0), 0)
   const addTotal   = additions.reduce((s, a) => s + (Number(a.amount) || 0), 0)
   const dedTotal   = deductions.reduce((s, d) => s + (Number(d.amount) || 0), 0)
@@ -185,7 +221,7 @@ export default function PaystubPrintModal({
 
         <div className="modal-footer no-print">
           <button className="btn btn-ghost" onClick={onClose}>Close</button>
-          <button className="btn btn-ghost" onClick={() => window.print()}>🖨 Print / Save PDF</button>
+          <button className="btn btn-ghost" onClick={handlePrint}>🖨 Print / Save PDF</button>
           {!isHistory && onMarkPaid && (
             <button className="btn btn-primary" onClick={handleMarkPaid} disabled={saving}>
               {saving ? 'Saving…' : '✓ Mark as Paid'}
