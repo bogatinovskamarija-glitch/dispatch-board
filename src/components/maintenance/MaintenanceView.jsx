@@ -25,7 +25,6 @@ const CAT_COLORS = {
   steering_tires: '#F97316',
 }
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
-
 const fmt$ = n => '$' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })
 
 // ── Stat Card ──────────────────────────────────────────────────────────────
@@ -39,7 +38,7 @@ function StatCard({ label, value, sub }) {
   )
 }
 
-// ── SVG Bar Chart by Category ──────────────────────────────────────────────
+// ── SVG Bar Chart ──────────────────────────────────────────────────────────
 function CategoryChart({ records }) {
   const byCategory = useMemo(() => {
     const map = {}
@@ -55,14 +54,14 @@ function CategoryChart({ records }) {
 
   if (!byCategory.length) return null
   const max = byCategory[0].total
-  const BAR_H = 20, GAP = 10, LEFT = 110, RIGHT = 60, W = 520
+  const BAR_H = 22, GAP = 10, LEFT = 120, W = 440
 
   return (
     <div className="maint-chart-wrap">
       <div className="maint-chart-title">Spending by Category</div>
       <svg
         width="100%"
-        viewBox={`0 0 ${LEFT + W + RIGHT} ${byCategory.length * (BAR_H + GAP) + 10}`}
+        viewBox={`0 0 ${LEFT + W + 80} ${byCategory.length * (BAR_H + GAP) + 10}`}
         style={{ display: 'block' }}
       >
         {byCategory.map(({ cat, total }, i) => {
@@ -85,8 +84,8 @@ function CategoryChart({ records }) {
   )
 }
 
-// ── Period Picker ──────────────────────────────────────────────────────────
-function PeriodPicker({ periodType, setPeriodType, year, setYear, month, setMonth, quarter, setQuarter }) {
+// ── Period Picker row ──────────────────────────────────────────────────────
+function PeriodRow({ periodType, setPeriodType, year, setYear, month, setMonth, quarter, setQuarter }) {
   const years = []
   for (let y = 2022; y <= new Date().getFullYear() + 1; y++) years.push(y)
 
@@ -111,7 +110,7 @@ function PeriodPicker({ periodType, setPeriodType, year, setYear, month, setMont
       )}
 
       {periodType === 'quarter' && (
-        <div className="maint-quarter-btns">
+        <div className="maint-period-btns">
           {[1,2,3,4].map(q => (
             <button
               key={q}
@@ -135,7 +134,7 @@ function PeriodPicker({ periodType, setPeriodType, year, setYear, month, setMont
 function RecordsTable({ records, loading, onEdit, onDelete }) {
   const total = records.reduce((s, r) => s + (Number(r.amount) || 0), 0)
 
-  if (loading) return <div className="maint-loading">Loading…</div>
+  if (loading) return <div className="maint-empty">Loading…</div>
   if (!records.length) return <div className="maint-empty">No records found for the selected filters.</div>
 
   return (
@@ -167,7 +166,10 @@ function RecordsTable({ records, loading, onEdit, onDelete }) {
               <td className="maint-unit">{r.unit_number}</td>
               <td style={{ textTransform: 'capitalize', color: '#6B7280', fontSize: 12 }}>{r.unit_type}</td>
               <td>
-                <span className="maint-cat-badge" style={{ background: (CAT_COLORS[r.category] || '#6B7280') + '22', color: CAT_COLORS[r.category] || '#6B7280' }}>
+                <span className="maint-cat-badge" style={{
+                  background: (CAT_COLORS[r.category] || '#6B7280') + '22',
+                  color: CAT_COLORS[r.category] || '#6B7280'
+                }}>
                   {CAT_LABELS[r.category] || r.category}
                 </span>
               </td>
@@ -200,13 +202,12 @@ function RecordsTable({ records, loading, onEdit, onDelete }) {
 
 // ── Spending Summary ───────────────────────────────────────────────────────
 function SpendingTab({ records }) {
-  const total    = records.reduce((s, r) => s + (Number(r.amount) || 0), 0)
-  const tractors = records.filter(r => r.unit_type?.toLowerCase() === 'tractor')
-  const trailers = records.filter(r => r.unit_type?.toLowerCase() === 'trailer')
+  const total        = records.reduce((s, r) => s + (Number(r.amount) || 0), 0)
+  const tractors     = records.filter(r => r.unit_type?.toLowerCase() === 'tractor')
+  const trailers     = records.filter(r => r.unit_type?.toLowerCase() === 'trailer')
   const tractorTotal = tractors.reduce((s, r) => s + (Number(r.amount) || 0), 0)
   const trailerTotal = trailers.reduce((s, r) => s + (Number(r.amount) || 0), 0)
 
-  // Top units by spend
   const byUnit = useMemo(() => {
     const map = {}
     records.forEach(r => {
@@ -218,7 +219,6 @@ function SpendingTab({ records }) {
     return Object.values(map).sort((a, b) => b.total - a.total).slice(0, 20)
   }, [records])
 
-  // Category totals
   const byCat = useMemo(() => {
     const map = {}
     records.forEach(r => {
@@ -235,10 +235,10 @@ function SpendingTab({ records }) {
   return (
     <div className="maint-spending">
       <div className="maint-stat-row">
-        <StatCard label="Total Spend"      value={fmt$(total)}         sub={`${records.length} records`} />
-        <StatCard label="Tractors"         value={fmt$(tractorTotal)}  sub={`${tractors.length} records`} />
-        <StatCard label="Trailers"         value={fmt$(trailerTotal)}  sub={`${trailers.length} records`} />
-        <StatCard label="Avg per Record"   value={fmt$(total / (records.length || 1))} />
+        <StatCard label="Total Spend"    value={fmt$(total)}        sub={`${records.length} records`} />
+        <StatCard label="Tractors"       value={fmt$(tractorTotal)} sub={`${tractors.length} records`} />
+        <StatCard label="Trailers"       value={fmt$(trailerTotal)} sub={`${trailers.length} records`} />
+        <StatCard label="Avg per Record" value={fmt$(total / (records.length || 1))} />
       </div>
 
       <div className="maint-charts-row">
@@ -254,7 +254,10 @@ function SpendingTab({ records }) {
               {byCat.map(({ cat, total: t }) => (
                 <tr key={cat}>
                   <td>
-                    <span className="maint-cat-badge" style={{ background: (CAT_COLORS[cat] || '#6B7280') + '22', color: CAT_COLORS[cat] || '#6B7280' }}>
+                    <span className="maint-cat-badge" style={{
+                      background: (CAT_COLORS[cat] || '#6B7280') + '22',
+                      color: CAT_COLORS[cat] || '#6B7280'
+                    }}>
                       {CAT_LABELS[cat] || cat}
                     </span>
                   </td>
@@ -268,7 +271,7 @@ function SpendingTab({ records }) {
         </div>
       </div>
 
-      <div className="maint-chart-title" style={{ marginTop: 24 }}>Top Units by Spend</div>
+      <div className="maint-chart-title" style={{ marginTop: 28 }}>Top Units by Spend</div>
       <table className="maint-summary-table">
         <thead>
           <tr><th>Unit #</th><th>Type</th><th>Records</th><th>Total Spend</th></tr>
@@ -288,7 +291,7 @@ function SpendingTab({ records }) {
   )
 }
 
-// ── Shops Manager ──────────────────────────────────────────────────────────
+// ── Shops Tab ──────────────────────────────────────────────────────────────
 function ShopsTab({ shops, onAddShop, onRemoveShop }) {
   const [newName, setNewName] = useState('')
   const [saving, setSaving]  = useState(false)
@@ -297,7 +300,7 @@ function ShopsTab({ shops, onAddShop, onRemoveShop }) {
     e.preventDefault()
     if (!newName.trim()) return
     setSaving(true)
-    try { await onAddShop(newName.trim()) ; setNewName('') }
+    try { await onAddShop(newName.trim()); setNewName('') }
     catch (e) { alert(e.message) }
     finally { setSaving(false) }
   }
@@ -316,12 +319,10 @@ function ShopsTab({ shops, onAddShop, onRemoveShop }) {
       </form>
 
       {!shops.length ? (
-        <div className="maint-empty">No shops yet — add vendors above and select them when entering records.</div>
+        <div className="maint-empty">No shops yet. Add vendor names above and select them when entering records.</div>
       ) : (
-        <table className="maint-summary-table">
-          <thead>
-            <tr><th>Shop Name</th><th></th></tr>
-          </thead>
+        <table className="maint-summary-table" style={{ maxWidth: 480 }}>
+          <thead><tr><th>Shop Name</th><th></th></tr></thead>
           <tbody>
             {shops.map(s => (
               <tr key={s.id}>
@@ -343,25 +344,21 @@ function ShopsTab({ shops, onAddShop, onRemoveShop }) {
 
 // ── Main View ──────────────────────────────────────────────────────────────
 export default function MaintenanceView({ onClose }) {
-  // Period filter state
   const [periodType, setPeriodType] = useState('year')
   const [year,       setYear]       = useState(String(new Date().getFullYear()))
   const [month,      setMonth]      = useState(new Date().getMonth() + 1)
   const [quarter,    setQuarter]    = useState(Math.ceil((new Date().getMonth() + 1) / 3))
-
-  // UI state
-  const [company,    setCompany]   = useState('all')
-  const [unitType,   setUnitType]  = useState('all')
-  const [category,   setCategory]  = useState('all')
+  const [company,    setCompany]    = useState('all')
+  const [unitType,   setUnitType]   = useState('all')
+  const [category,   setCategory]   = useState('all')
   const [unitSearch, setUnitSearch] = useState('')
   const [textSearch, setTextSearch] = useState('')
-  const [tab,        setTab]       = useState('records')  // 'records' | 'spending' | 'shops'
-  const [editRec,    setEditRec]   = useState(null)
-  const [addOpen,    setAddOpen]   = useState(false)
+  const [tab,        setTab]        = useState('records')
+  const [editRec,    setEditRec]    = useState(null)
+  const [addOpen,    setAddOpen]    = useState(false)
   const [importOpen, setImportOpen] = useState(false)
 
   const { dateFrom, dateTo } = getDateRange(periodType, year, month, quarter)
-
   const filters = {
     company:     company !== 'all' ? company : null,
     unit_type:   unitType !== 'all' ? unitType : null,
@@ -383,80 +380,68 @@ export default function MaintenanceView({ onClose }) {
   }
 
   async function handleDelete(r) {
-    if (!window.confirm(`Delete maintenance record for unit ${r.unit_number} on ${r.date}?`)) return
+    if (!window.confirm(`Delete record for unit ${r.unit_number} on ${r.date}?`)) return
     await removeRecord(r.id)
   }
 
-  async function handleImport(rows) {
-    await bulkInsert(rows)
-  }
-
-  const periodLabel = (() => {
-    if (periodType === 'all')     return 'All Time'
-    if (periodType === 'year')    return year
-    if (periodType === 'quarter') return `Q${quarter} ${year}`
-    if (periodType === 'month')   return `${MONTHS[month - 1]} ${year}`
-    return ''
-  })()
-
   return (
-    <div className="accounting-view">
-      {/* ── Top bar ── */}
-      <div className="accounting-topbar">
-        <div>
-          <div className="accounting-title">Maintenance</div>
-          <div className="accounting-subtitle">Equipment Records · {periodLabel}</div>
+    <div className="acct-wrap">
+
+      {/* ── Top bar — same pattern as AccountingView ── */}
+      <div className="topbar">
+        <div className="topbar-left">
+          <button className="btn btn-ghost" onClick={onClose} style={{ marginRight: 8 }}>
+            ← Board
+          </button>
+          <div>
+            <div className="app-title">Maintenance</div>
+            <div className="app-subtitle">Equipment Records</div>
+          </div>
         </div>
 
-        <div className="accounting-tabs">
-          {[['records','Records'],['spending','Spending'],['shops','Shops']].map(([v,l]) => (
-            <button
-              key={v}
-              className={`accounting-tab${tab === v ? ' active' : ''}`}
-              onClick={() => setTab(v)}
-            >{l}</button>
-          ))}
+        <div className="topbar-center">
+          <div className="view-toggle">
+            {[['records','Records'],['spending','Spending'],['shops','Shops']].map(([v,l]) => (
+              <button key={v} className={tab === v ? 'active' : ''} onClick={() => setTab(v)}>{l}</button>
+            ))}
+          </div>
         </div>
 
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <div className="topbar-right">
           <button className="btn btn-ghost" onClick={() => setImportOpen(true)}>↑ Import CSV</button>
           <button className="btn btn-primary" onClick={() => { setEditRec(null); setAddOpen(true) }}>+ Add Record</button>
-          <button className="btn btn-ghost" onClick={onClose} style={{ marginLeft: 8 }}>✕ Close</button>
         </div>
       </div>
 
       {/* ── Filters bar ── */}
       <div className="maint-filters">
-        <PeriodPicker
-          periodType={periodType} setPeriodType={setPeriodType}
-          year={year}         setYear={setYear}
-          month={month}       setMonth={setMonth}
-          quarter={quarter}   setQuarter={setQuarter}
-        />
-
-        <div className="maint-filter-divider" />
-
         <div className="maint-filter-row">
+          <PeriodRow
+            periodType={periodType} setPeriodType={setPeriodType}
+            year={year}       setYear={setYear}
+            month={month}     setMonth={setMonth}
+            quarter={quarter} setQuarter={setQuarter}
+          />
+
+          <div style={{ width: 1, height: 24, background: '#E5E7EB', margin: '0 4px' }} />
+
           {/* Company tabs */}
-          <div className="company-tabs" style={{ gap: 4 }}>
+          <div className="company-tabs">
             {[['all','All'],['carat','Carat'],['pro_freight','Pro Freight']].map(([v,l]) => (
-              <button
-                key={v}
-                className={`company-tab${company === v ? ' active' : ''}`}
-                onClick={() => setCompany(v)}
-                style={{ padding: '4px 12px', fontSize: 13 }}
-              >{l}</button>
+              <button key={v} className={`company-tab${company === v ? ' active' : ''}`} onClick={() => setCompany(v)}>
+                {l}
+              </button>
             ))}
           </div>
 
-          {/* Unit type */}
+          <div style={{ width: 1, height: 24, background: '#E5E7EB', margin: '0 4px' }} />
+
           <select value={unitType} onChange={e => setUnitType(e.target.value)} className="maint-filter-select">
             <option value="all">All Units</option>
             <option value="tractor">Tractors</option>
             <option value="trailer">Trailers</option>
           </select>
 
-          {/* Category */}
           <select value={category} onChange={e => setCategory(e.target.value)} className="maint-filter-select">
             <option value="all">All Categories</option>
             {Object.entries(CAT_LABELS).map(([v,l]) => (
@@ -464,7 +449,6 @@ export default function MaintenanceView({ onClose }) {
             ))}
           </select>
 
-          {/* Unit # search */}
           <input
             className="maint-filter-input"
             placeholder="Unit #"
@@ -472,7 +456,6 @@ export default function MaintenanceView({ onClose }) {
             onChange={e => setUnitSearch(e.target.value)}
           />
 
-          {/* Text search */}
           <input
             className="maint-filter-input"
             placeholder="Search description…"
@@ -484,8 +467,8 @@ export default function MaintenanceView({ onClose }) {
       </div>
 
       {/* ── Tab content ── */}
-      <div className="accounting-content">
-        {tab === 'records' && (
+      <div className="acct-body">
+        {tab === 'records'  && (
           <RecordsTable
             records={records}
             loading={loading}
@@ -494,13 +477,7 @@ export default function MaintenanceView({ onClose }) {
           />
         )}
         {tab === 'spending' && <SpendingTab records={records} />}
-        {tab === 'shops'    && (
-          <ShopsTab
-            shops={shops}
-            onAddShop={addShop}
-            onRemoveShop={removeShop}
-          />
-        )}
+        {tab === 'shops'    && <ShopsTab shops={shops} onAddShop={addShop} onRemoveShop={removeShop} />}
       </div>
 
       {/* ── Modals ── */}
@@ -516,7 +493,7 @@ export default function MaintenanceView({ onClose }) {
 
       {importOpen && (
         <ImportCSVModal
-          onImport={handleImport}
+          onImport={async rows => { await bulkInsert(rows) }}
           onClose={() => setImportOpen(false)}
         />
       )}

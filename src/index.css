@@ -786,7 +786,7 @@ textarea { resize: vertical; min-height: 60px; }
 ───────────────────────────────────────────── */
 .maint-filters {
   background: #fff; border-bottom: 1px solid #E5E7EB;
-  padding: 12px 24px; display: flex; flex-direction: column; gap: 10px;
+  padding: 10px 24px; display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
 }
 .maint-period-picker { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .maint-period-btns   { display: flex; gap: 4px; }
