@@ -8,28 +8,43 @@ export function useMaintenance(filters = {}) {
 
   async function fetchRecords() {
     setLoading(true)
-    let q = supabase
-      .from('maintenance_records')
-      .select('*')
-      .order('date', { ascending: false })
 
-    if (filters.company && filters.company !== 'all')
-      q = q.eq('company', filters.company)
-    if (filters.unit_type && filters.unit_type !== 'all')
-      q = q.ilike('unit_type', filters.unit_type)
-    if (filters.category && filters.category !== 'all')
-      q = q.eq('category', filters.category)
-    if (filters.unit_number)
-      q = q.ilike('unit_number', `%${filters.unit_number}%`)
-    if (filters.search)
-      q = q.ilike('description', `%${filters.search}%`)
-    if (filters.dateFrom)
-      q = q.gte('date', filters.dateFrom)
-    if (filters.dateTo)
-      q = q.lte('date', filters.dateTo)
+    // Build the base query with all filters applied
+    function buildQuery() {
+      let q = supabase
+        .from('maintenance_records')
+        .select('*')
+        .order('date', { ascending: false })
 
-    const { data, error } = await q.limit(2000)
-    if (!error) setRecords(data || [])
+      if (filters.company && filters.company !== 'all')
+        q = q.eq('company', filters.company)
+      if (filters.unit_type && filters.unit_type !== 'all')
+        q = q.ilike('unit_type', filters.unit_type)
+      if (filters.category && filters.category !== 'all')
+        q = q.eq('category', filters.category)
+      if (filters.unit_number)
+        q = q.ilike('unit_number', `%${filters.unit_number}%`)
+      if (filters.search)
+        q = q.ilike('description', `%${filters.search}%`)
+      if (filters.dateFrom)
+        q = q.gte('date', filters.dateFrom)
+      if (filters.dateTo)
+        q = q.lte('date', filters.dateTo)
+
+      return q
+    }
+
+    // Paginate to overcome Supabase's 1000-row default limit
+    const PAGE = 1000
+    let all = [], from = 0
+    while (true) {
+      const { data, error } = await buildQuery().range(from, from + PAGE - 1)
+      if (error) break
+      if (data && data.length > 0) all = all.concat(data)
+      if (!data || data.length < PAGE) break
+      from += PAGE
+    }
+    setRecords(all)
     setLoading(false)
   }
 
