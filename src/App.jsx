@@ -13,7 +13,10 @@ import FleetModal from './components/FleetModal'
 import ExportModal from './components/ExportModal'
 import AccountingView    from './components/AccountingView'
 import MaintenanceView  from './components/maintenance/MaintenanceView'
-import AccountingLock, { isAccountingUnlocked } from './components/accounting/AccountingLock'
+import AccountingLock, { isAccountingUnlocked, isUnlocked, lock } from './components/accounting/AccountingLock'
+
+const MAINT_SESSION_KEY = 'maint_unlocked'
+const MAINT_PASSWORD    = import.meta.env.VITE_MAINTENANCE_PASSWORD || 'carat2026'
 import SafetyView       from './components/safety/SafetyView'
 
 const today = new Date()
@@ -31,6 +34,7 @@ export default function App() {
   const [accountingOpen,   setAccounting]   = useState(false)
   const [accountingLock,   setAccountingLock] = useState(false)
   const [maintenanceOpen,  setMaintenance]  = useState(false)
+  const [maintenanceLock,  setMaintenanceLock] = useState(false)
   const [safetyOpen,       setSafety]       = useState(false)
   const [statusFilter, setFilter]   = useState([])
 
@@ -105,7 +109,10 @@ export default function App() {
           <button className="btn btn-ghost" onClick={() => setSafety(true)}>
             Safety
           </button>
-          <button className="btn btn-ghost" onClick={() => setMaintenance(true)}>
+          <button className="btn btn-ghost" onClick={() => {
+            if (isUnlocked(MAINT_SESSION_KEY)) setMaintenance(true)
+            else setMaintenanceLock(true)
+          }}>
             Maintenance
           </button>
           <button className="btn btn-ghost" onClick={() => {
@@ -221,8 +228,29 @@ export default function App() {
 
       {accountingLock && (
         <AccountingLock
-          onUnlock={() => { setAccountingLock(false); setAccounting(true) }}
+          title="Accounting Access"
+          subtitle="Enter the accounting password to continue."
+          password={import.meta.env.VITE_ACCOUNTING_PASSWORD || 'carat2026'}
+          onUnlock={() => {
+            sessionStorage.setItem('acct_unlocked', '1')
+            setAccountingLock(false)
+            setAccounting(true)
+          }}
           onClose={() => setAccountingLock(false)}
+        />
+      )}
+
+      {maintenanceLock && (
+        <AccountingLock
+          title="Maintenance Access"
+          subtitle="Enter the maintenance password to continue."
+          password={MAINT_PASSWORD}
+          onUnlock={() => {
+            sessionStorage.setItem(MAINT_SESSION_KEY, '1')
+            setMaintenanceLock(false)
+            setMaintenance(true)
+          }}
+          onClose={() => setMaintenanceLock(false)}
         />
       )}
     </>

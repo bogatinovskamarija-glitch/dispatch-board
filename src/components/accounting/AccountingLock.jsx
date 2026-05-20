@@ -1,29 +1,31 @@
 import { useState, useEffect, useRef } from 'react'
 
-const SESSION_KEY = 'acct_unlocked'
-const PASSWORD    = import.meta.env.VITE_ACCOUNTING_PASSWORD || 'carat2026'
+// ── Generic session-based password gate ──────────────────────────────────────
+// Each "door" gets its own sessionStorage key so locks are independent.
 
-// Returns true if already unlocked this session
-export function isAccountingUnlocked() {
-  return sessionStorage.getItem(SESSION_KEY) === '1'
+export function isUnlocked(sessionKey) {
+  return sessionStorage.getItem(sessionKey) === '1'
 }
 
-export function lockAccounting() {
-  sessionStorage.removeItem(SESSION_KEY)
+export function lock(sessionKey) {
+  sessionStorage.removeItem(sessionKey)
 }
 
-export default function AccountingLock({ onUnlock, onClose }) {
-  const [value,  setValue]  = useState('')
-  const [error,  setError]  = useState(false)
-  const [shake,  setShake]  = useState(false)
+// Convenience helpers kept for backward-compat with existing Accounting usage
+export function isAccountingUnlocked() { return isUnlocked('acct_unlocked') }
+export function lockAccounting()        { lock('acct_unlocked') }
+
+export default function PasswordGate({ onUnlock, onClose, title, subtitle, password }) {
+  const [value, setValue] = useState('')
+  const [error, setError] = useState(false)
+  const [shake, setShake] = useState(false)
   const inputRef = useRef(null)
 
   useEffect(() => { inputRef.current?.focus() }, [])
 
   function handleSubmit(e) {
     e.preventDefault()
-    if (value === PASSWORD) {
-      sessionStorage.setItem(SESSION_KEY, '1')
+    if (value === password) {
       onUnlock()
     } else {
       setError(true)
@@ -40,10 +42,10 @@ export default function AccountingLock({ onUnlock, onClose }) {
         <div style={{ textAlign: 'center', padding: '32px 32px 8px' }}>
           <div style={{ fontSize: 48, marginBottom: 12 }}>🔒</div>
           <div style={{ fontSize: 20, fontWeight: 700, color: '#111827', marginBottom: 6 }}>
-            Accounting Access
+            {title}
           </div>
           <div style={{ fontSize: 13, color: '#6B7280', marginBottom: 24 }}>
-            Enter the accounting password to continue.
+            {subtitle}
           </div>
 
           <form onSubmit={handleSubmit}>
