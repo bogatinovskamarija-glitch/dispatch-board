@@ -1,3 +1,5 @@
+import { useState } from 'react'
+
 const CO = {
   carat: {
     name:    'CARAT EXPEDITED INC',
@@ -22,13 +24,22 @@ const fmt = n => '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits
 export default function PaystubPrintModal({
   driver, profile, startDate, endDate,
   loads, loadPay, additions, deductions,
-  commissionPct, fuelText, company, onClose,
+  commissionPct, fuelText, company,
+  onMarkPaid, isHistory, onClose,
 }) {
+  const [saving, setSaving] = useState(false)
   const co     = CO[company] || CO.carat
   const today  = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
 
   const isOO      = profile?.profile_type === 'owner_operator'
   const isPerMile = profile?.pay_type === 'per_mile' && !isOO
+
+  async function handleMarkPaid() {
+    if (!onMarkPaid) return
+    setSaving(true)
+    try { await onMarkPaid() }
+    catch (e) { alert('Error: ' + e.message); setSaving(false) }
+  }
 
   const loadTotal  = loads.reduce((s, l) => s + (Number(loadPay[l.id]?.amount) || 0), 0)
   const addTotal   = additions.reduce((s, a) => s + (Number(a.amount) || 0), 0)
@@ -174,9 +185,15 @@ export default function PaystubPrintModal({
 
         <div className="modal-footer no-print">
           <button className="btn btn-ghost" onClick={onClose}>Close</button>
-          <button className="btn btn-primary" onClick={() => window.print()}>
-            🖨 Print / Save PDF
-          </button>
+          <button className="btn btn-ghost" onClick={() => window.print()}>🖨 Print / Save PDF</button>
+          {!isHistory && onMarkPaid && (
+            <button className="btn btn-primary" onClick={handleMarkPaid} disabled={saving}>
+              {saving ? 'Saving…' : '✓ Mark as Paid'}
+            </button>
+          )}
+          {isHistory && (
+            <span style={{ fontSize: 12, color: '#9CA3AF', alignSelf: 'center' }}>Historical paystub — already paid</span>
+          )}
         </div>
       </div>
     </div>

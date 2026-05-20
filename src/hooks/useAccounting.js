@@ -58,7 +58,6 @@ export async function fetchInvoiceLoads(invoiceId) {
 
 // ── Get + increment invoice number ────────────────────────────────────────
 export async function getNextInvoiceNumber() {
-  // Atomic increment via RPC — fall back to timestamp-based if RPC missing
   const { data, error } = await supabase
     .from('invoice_counter')
     .select('next_number')
@@ -82,7 +81,6 @@ export async function getNextInvoiceNumber() {
 export async function createInvoice(invoiceData, loadIds) {
   const invNum = await getNextInvoiceNumber()
 
-  // Insert invoice record
   const { data: invoice, error: invErr } = await supabase
     .from('invoices')
     .insert([{ ...invoiceData, invoice_number: invNum }])
@@ -90,7 +88,6 @@ export async function createInvoice(invoiceData, loadIds) {
     .single()
   if (invErr) throw new Error(invErr.message)
 
-  // Mark loads as invoiced
   const { error: loadErr } = await supabase
     .from('loads')
     .update({
@@ -116,16 +113,70 @@ export async function updateInvoice(invoiceId, data) {
   return inv
 }
 
-// ── Driver loads for paystub ───────────────────────────────────────────────
+// ── Driver loads for paystub (only unpaid loads) ───────────────────────────
 export async function fetchDriverLoads(driverName, startDate, endDate) {
+  // Note: column is 'driver', not 'driver_name'
   const { data, error } = await supabase
     .from('loads')
     .select('*')
-    .eq('driver_name', driverName)
+    .eq('driver', driverName)
+    .is('paid_at', null)           // exclude already-paid loads
     .order('pickup_date', { ascending: true })
   if (error) throw new Error(error.message)
   return (data ?? []).filter(l => {
     const d = l.pickup_date || l.date
     return d >= startDate && d <= endDate
   })
+}
+
+// ── Paystub history ────────────────────────────────────────────────────────
+export function usePaystubHistory(company = 'all') {
+  const [paystubs, setPaystubs] = useState([])
+  const [loading,  setLoading]  = useState(true)
+
+  const refresh = useCallback(async () => {
+    setLoading(true)
+    let q = supabase
+      .from('paystubs')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(300)
+    if (company !== 'all') q = q.eq('company', company)
+    const { data } = await q
+    setPaystubs(data ?? [])
+    setLoading(false)
+  }, [company])
+
+  useEffect(() => { refresh() }, [refresh])
+  return { paystubs, loading, refresh }
+}
+
+// ── Loads belonging to a saved paystub ────────────────────────────────────
+export async function fetchPaystubLoads(paystubId) {
+  const { data, error } = await supabase
+    .from('loads')
+    .select('*')
+    .eq('paystub_id', paystubId)
+  if (error) throw new Error(error.message)
+  return data ?? []
+}
+
+// ── Save paystub + mark loads as paid ─────────────────────────────────────
+export async function createPaystub(paystubData, loadIds) {
+  const { data: paystub, error: psErr } = await supabase
+    .from('paystubs')
+    .insert([paystubData])
+    .select()
+    .single()
+  if (psErr) throw new Error(psErr.message)
+
+  if (loadIds.length > 0) {
+    const { error: loadErr } = await supabase
+      .from('loads')
+      .update({ paid_at: new Date().toISOString(), paystub_id: paystub.id })
+      .in('id', loadIds)
+    if (loadErr) throw new Error(loadErr.message)
+  }
+
+  return paystub
 }

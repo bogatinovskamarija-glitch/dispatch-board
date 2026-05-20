@@ -1,8 +1,11 @@
 import { useState, useMemo } from 'react'
-import { fetchDriverLoads } from '../../hooks/useAccounting'
+import { fetchDriverLoads, createPaystub, usePaystubHistory, fetchPaystubLoads } from '../../hooks/useAccounting'
 import { useDriverProfiles } from '../../hooks/useDriverProfiles'
 import DriversPanel from './DriversPanel'
 import PaystubPrintModal from './PaystubPrintModal'
+
+const fmtDate = s => s ? new Date(s).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'
+const fmt     = n => '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2 })
 
 // ── Default deductions by profile type ────────────────────────────────────
 function defaultDeductions(profileType) {
@@ -46,6 +49,19 @@ const fmt = n => '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits
 export default function PaystubsTab({ drivers, company }) {
   const week = currentWeek()
   const { profiles, loading: profLoading, saveProfile, removeProfile } = useDriverProfiles()
+  const { paystubs, loading: histLoading, refresh: refreshHistory } = usePaystubHistory(company)
+
+  // ── Tab: 'generate' | 'history' ─────────────────────────────────────────
+  const [psTab, setPsTab] = useState('generate')
+
+  // History — open a past paystub for reprint
+  const [historyModal, setHistoryModal] = useState(null)   // { paystub, loads }
+  async function openHistoryPaystub(ps) {
+    try {
+      const loads = await fetchPaystubLoads(ps.id)
+      setHistoryModal({ paystub: ps, loads })
+    } catch (e) { alert(e.message) }
+  }
 
   // ── Paystub generator state ──────────────────────────────────────────────
   const [driverName, setDriverName] = useState('')
@@ -164,8 +180,87 @@ export default function PaystubsTab({ drivers, company }) {
   const selectedDriver = drivers.find(d => d.name === driverName) || {}
   const driverCompany  = loads[0]?.company || profile?.company || 'carat'
 
+  // ── Mark paystub as paid — saves to DB and marks loads ───────────────────
+  async function handleMarkPaid() {
+    const paystubData = {
+      driver_name:    driverName,
+      company:        driverCompany,
+      start_date:     startDate,
+      end_date:       endDate,
+      load_total:     loadTotal,
+      grand_total:    grandTotal,
+      commission_pct: isOO ? Number(commissionPct) : null,
+      additions:      additions.filter(a => a.label || a.amount),
+      deductions:     effectiveDeds.filter(d => d.label || d.amount),
+      load_pay:       loadPay,
+      fuel_text:      (isOO && fuelText) ? fuelText : null,
+    }
+    await createPaystub(paystubData, loads.map(l => l.id))
+    await refreshHistory()
+    setShowPrint(false)
+    // Reset paystub form
+    setLoads([])
+    setLoaded(false)
+    setLoadPay({})
+    setAdditions([{ ...BLANK_LINE }])
+    setDeductions([{ ...BLANK_LINE }])
+    setFuelTotal('')
+    setFuelText('')
+    setPsTab('history')
+  }
+
   return (
     <div className="acct-tab-content">
+
+      {/* ── Sub-tab toggle ── */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+        <button
+          className={`btn ${psTab === 'generate' ? 'btn-primary' : 'btn-ghost'}`}
+          onClick={() => setPsTab('generate')}
+        >Generate Paystub</button>
+        <button
+          className={`btn ${psTab === 'history' ? 'btn-primary' : 'btn-ghost'}`}
+          onClick={() => setPsTab('history')}
+        >History ({paystubs.length})</button>
+      </div>
+
+      {/* ── History tab ── */}
+      {psTab === 'history' && (
+        <>
+          {histLoading ? (
+            <div style={{ color: '#9CA3AF' }}>Loading…</div>
+          ) : paystubs.length === 0 ? (
+            <div className="acct-empty">No paystubs generated yet. Generate and mark a paystub as paid to see it here.</div>
+          ) : (
+            <table className="acct-table">
+              <thead>
+                <tr>
+                  <th>Driver</th>
+                  <th>Period</th>
+                  <th>Company</th>
+                  <th>Created</th>
+                  <th style={{ textAlign: 'right' }}>Grand Total</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {paystubs.map(ps => (
+                  <tr key={ps.id} style={{ cursor: 'pointer' }} onClick={() => openHistoryPaystub(ps)}>
+                    <td><strong>{ps.driver_name}</strong></td>
+                    <td>{ps.start_date} – {ps.end_date}</td>
+                    <td>{ps.company === 'carat' ? 'Carat' : 'Pro Freight'}</td>
+                    <td>{fmtDate(ps.created_at)}</td>
+                    <td style={{ textAlign: 'right', fontWeight: 700 }}>{fmt(ps.grand_total)}</td>
+                    <td className="acct-click-hint">View / Reprint</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </>
+      )}
+
+      {psTab === 'generate' && <>
 
       {/* ── Driver Profiles Panel ── */}
       <DriversPanel
@@ -434,7 +529,29 @@ export default function PaystubsTab({ drivers, company }) {
           commissionPct={isOO ? commissionPct : null}
           fuelText={isOO && fuelText ? fuelText : null}
           company={driverCompany}
+          onMarkPaid={handleMarkPaid}
           onClose={() => setShowPrint(false)}
+        />
+      )}
+
+      </> /* end psTab === 'generate' */}
+
+      {/* ── History paystub reprint modal ── */}
+      {historyModal && (
+        <PaystubPrintModal
+          driver={{ name: historyModal.paystub.driver_name }}
+          profile={profiles.find(p => p.driver_name === historyModal.paystub.driver_name)}
+          startDate={historyModal.paystub.start_date}
+          endDate={historyModal.paystub.end_date}
+          loads={historyModal.loads}
+          loadPay={historyModal.paystub.load_pay || {}}
+          additions={historyModal.paystub.additions || []}
+          deductions={historyModal.paystub.deductions || []}
+          commissionPct={historyModal.paystub.commission_pct}
+          fuelText={historyModal.paystub.fuel_text}
+          company={historyModal.paystub.company || 'carat'}
+          isHistory
+          onClose={() => setHistoryModal(null)}
         />
       )}
     </div>
