@@ -6,7 +6,12 @@ async function motiveGet(company, path, params = {}) {
   const { data, error } = await supabase.functions.invoke('motive-proxy', {
     body: { company, path, params },
   })
-  if (error) throw new Error(error.message)
+  // FunctionsHttpError = function returned non-2xx (deployment/runtime issue)
+  if (error) {
+    // Try to get more detail from the response body
+    const detail = error.context?.body ? await error.context.text?.() : null
+    throw new Error(detail || error.message)
+  }
   if (data?.error) throw new Error(data.error)
   return data
 }
