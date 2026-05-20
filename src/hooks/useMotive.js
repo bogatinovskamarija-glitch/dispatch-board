@@ -33,14 +33,49 @@ export function useMotiveDrivers(company) {
 
       const results = await Promise.all(
         companies.map(async (co) => {
-          // /available_time returns drivers + current HOS remaining times in one call
-          // Fields: duty_status, available_time.{drive,shift,cycle}, last_hos_status.time
-          const data = await motiveGet(co, '/available_time', { per_page: 100 })
-          const users = (data?.users ?? [])
+          // 1. Get active drivers (small list, fits in one page)
+          const userData = await motiveGet(co, '/users', { role: 'driver', status: 'active', per_page: 100 })
+          const activeDrivers = (userData?.users ?? [])
             .map(u => u.user ?? u)
-            .filter(u => u.status === 'active')   // only active drivers
+            .filter(u => !u.status || u.status === 'active')
 
-          return users.map(u => ({ ...u, _company: co }))
+          if (activeDrivers.length === 0) return []
+
+          // 2. Fetch HOS data from /available_time — max per_page is 100, so paginate
+          //    We need all pages to cover every active driver (they sort alphabetically)
+          const page1 = await motiveGet(co, '/available_time', { per_page: 100, page_no: 1 })
+          const total  = page1?.pagination?.total ?? 0
+          const pages  = Math.ceil(total / 100)
+
+          let hosUsers = (page1?.users ?? []).map(u => u.user ?? u)
+
+          if (pages > 1) {
+            const extraPages = await Promise.all(
+              Array.from({ length: pages - 1 }, (_, i) =>
+                motiveGet(co, '/available_time', { per_page: 100, page_no: i + 2 })
+                  .catch(() => null)
+              )
+            )
+            for (const p of extraPages) {
+              if (p?.users) hosUsers = hosUsers.concat(p.users.map(u => u.user ?? u))
+            }
+          }
+
+          // 3. Build HOS map by driver ID
+          const hosMap = {}
+          for (const u of hosUsers) hosMap[u.id] = u
+
+          // 4. Merge: active driver list + HOS data
+          return activeDrivers.map(u => {
+            const hos = hosMap[u.id] ?? {}
+            return {
+              ...u,
+              available_time:   hos.available_time   ?? null,
+              duty_status:      hos.duty_status       ?? u.duty_status ?? 'off_duty',
+              last_hos_status:  hos.last_hos_status   ?? null,
+              _company: co,
+            }
+          })
         })
       )
 
