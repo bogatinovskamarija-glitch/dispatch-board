@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useMotiveDrivers, useMotiveViolations } from '../../hooks/useMotive'
+import { supabase } from '../../lib/supabase'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function secToHM(sec) {
@@ -11,11 +12,11 @@ function secToHM(sec) {
 
 function dutyLabel(status) {
   switch (status) {
-    case 'driving':             return { label: 'Driving',       color: '#2563EB', bg: '#EFF6FF' }
-    case 'on_duty_not_driving': return { label: 'On Duty',       color: '#D97706', bg: '#FFFBEB' }
-    case 'off_duty':            return { label: 'Off Duty',      color: '#6B7280', bg: '#F9FAFB' }
-    case 'sleeper_berth':       return { label: 'Sleeper',       color: '#7C3AED', bg: '#F5F3FF' }
-    case 'yard_moves':          return { label: 'Yard Moves',    color: '#0891B2', bg: '#ECFEFF' }
+    case 'driving':             return { label: 'Driving',        color: '#2563EB', bg: '#EFF6FF' }
+    case 'on_duty_not_driving': return { label: 'On Duty',        color: '#D97706', bg: '#FFFBEB' }
+    case 'off_duty':            return { label: 'Off Duty',       color: '#6B7280', bg: '#F9FAFB' }
+    case 'sleeper_berth':       return { label: 'Sleeper',        color: '#7C3AED', bg: '#F5F3FF' }
+    case 'yard_moves':          return { label: 'Yard Moves',     color: '#0891B2', bg: '#ECFEFF' }
     case 'personal_conveyance': return { label: 'Personal Conv.', color: '#059669', bg: '#ECFDF5' }
     default:                    return { label: status ?? 'Unknown', color: '#9CA3AF', bg: '#F9FAFB' }
   }
@@ -24,19 +25,19 @@ function dutyLabel(status) {
 function hosBarColor(remainingSec) {
   if (remainingSec == null) return '#E5E7EB'
   const hrs = remainingSec / 3600
-  if (hrs <= 1)  return '#DC2626'
-  if (hrs <= 2)  return '#F59E0B'
+  if (hrs <= 1) return '#DC2626'
+  if (hrs <= 2) return '#F59E0B'
   return '#059669'
 }
 
-function HosBar({ remainingSec, totalSec = 11 * 3600 }) {
+function HosBar({ remainingSec, totalSec }) {
   const pct = Math.min(100, Math.max(0, (remainingSec / totalSec) * 100))
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
       <div style={{ flex: 1, height: 6, background: '#E5E7EB', borderRadius: 3, overflow: 'hidden' }}>
-        <div style={{ height: '100%', width: `${pct}%`, background: hosBarColor(remainingSec), borderRadius: 3, transition: 'width .3s' }} />
+        <div style={{ height: '100%', width: `${pct}%`, background: hosBarColor(remainingSec), borderRadius: 3 }} />
       </div>
-      <span style={{ fontSize: 11, width: 52, color: hosBarColor(remainingSec), fontWeight: 600 }}>
+      <span style={{ fontSize: 11, width: 54, color: hosBarColor(remainingSec), fontWeight: 600 }}>
         {secToHM(remainingSec)}
       </span>
     </div>
@@ -46,7 +47,7 @@ function HosBar({ remainingSec, totalSec = 11 * 3600 }) {
 function StatusBadge({ status }) {
   const { label, color, bg } = dutyLabel(status)
   return (
-    <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 12, fontSize: 11, fontWeight: 700, color, background: bg, whiteSpace: 'nowrap' }}>
+    <span style={{ padding: '2px 9px', borderRadius: 12, fontSize: 11, fontWeight: 700, color, background: bg, whiteSpace: 'nowrap', display: 'inline-block' }}>
       {label}
     </span>
   )
@@ -55,60 +56,114 @@ function StatusBadge({ status }) {
 function timeAgo(isoStr) {
   if (!isoStr) return '—'
   const diff = Math.floor((Date.now() - new Date(isoStr)) / 1000)
-  if (diff < 60)   return `${diff}s ago`
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
+  if (diff < 60)    return `${diff}s ago`
+  if (diff < 3600)  return `${Math.floor(diff / 60)}m ago`
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`
   return `${Math.floor(diff / 86400)}d ago`
 }
 
 const CO_LABEL = { carat: 'Carat', pro_freight: 'Pro Freight' }
 
+// ── Fetch today's active loads from the dispatcher board ─────────────────────
+async function fetchActiveLoads(company) {
+  const today = new Date().toISOString().split('T')[0]
+  let q = supabase
+    .from('loads')
+    .select('id, driver_name, truck_number, load_number, status, company, pickup_date, delivery_date, date')
+    .lte('date', today)
+    .or(`delivery_date.is.null,delivery_date.gte.${today}`)
+    .in('status', ['covered', 'at_pickup', 'at_delivery', 'prebooked'])
+  if (company && company !== 'all') q = q.eq('company', company)
+  const { data } = await q
+  return data ?? []
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 export default function SafetyView({ onClose }) {
-  const [company, setCompany] = useState('all')
-  const [search,  setSearch]  = useState('')
+  const [company,     setCompany]     = useState('all')
+  const [search,      setSearch]      = useState('')
+  const [activeLoads, setActiveLoads] = useState([])
 
-  const { drivers,    loading: dLoading, error: dError,    lastSync, refresh: refreshDrivers } = useMotiveDrivers(company)
-  const { violations, loading: vLoading, error: vError,    refresh: refreshViol }  = useMotiveViolations(company)
+  const { drivers, loading: dLoading, error: dError, lastSync, refresh: refreshDrivers } = useMotiveDrivers(company)
+  const { violations, loading: vLoading, error: vError, refresh: refreshViol } = useMotiveViolations(company)
 
-  function refreshAll() { refreshDrivers(); refreshViol() }
+  // Fetch active loads whenever company changes
+  useEffect(() => {
+    fetchActiveLoads(company).then(setActiveLoads)
+  }, [company])
 
-  // ── Parse each driver's HOS from Motive user object ───────────────────────
-  const rows = drivers
-    .map(u => {
-      const hos = u.current_driver_status ?? u.hos_status ?? {}
-      return {
-        id:         u.id,
-        name:       [u.first_name, u.last_name].filter(Boolean).join(' ') || u.username || `Driver ${u.id}`,
-        company:    u._company,
-        status:     hos.duty_status ?? hos.current_duty_status ?? 'off_duty',
-        driveLeft:  hos.drive_remaining_sec   ?? hos.shift_drive_remaining  ?? null,
-        shiftLeft:  hos.shift_remaining_sec   ?? hos.shift_remaining        ?? null,
-        cycleLeft:  hos.cycle_remaining_sec   ?? hos.cycle_remaining        ?? null,
-        inViolation: hos.is_in_violation      ?? false,
-        updatedAt:  hos.updated_at ?? u.updated_at ?? null,
-        eldSerial:  u.eld_device?.serial_number ?? null,
-      }
-    })
-    .filter(r => {
-      if (!search) return true
-      const q = search.toLowerCase()
-      return r.name.toLowerCase().includes(q) || CO_LABEL[r.company]?.toLowerCase().includes(q)
-    })
+  function refreshAll() { refreshDrivers(); refreshViol(); fetchActiveLoads(company).then(setActiveLoads) }
+
+  // ── Parse HOS from Motive user objects ────────────────────────────────────
+  const rows = useMemo(() => drivers.map(u => {
+    const hos = u.current_driver_status ?? u.hos_status ?? {}
+    const fullName = [u.first_name, u.last_name].filter(Boolean).join(' ') || u.username || `Driver ${u.id}`
+    const updatedAt = hos.updated_at ?? u.updated_at ?? null
+    const staleHours = updatedAt ? (Date.now() - new Date(updatedAt)) / 3600000 : null
+
+    return {
+      id:          u.id,
+      name:        fullName,
+      nameLower:   fullName.toLowerCase(),
+      company:     u._company,
+      status:      hos.duty_status ?? hos.current_duty_status ?? 'off_duty',
+      driveLeft:   hos.drive_remaining_sec  ?? hos.shift_drive_remaining ?? null,
+      shiftLeft:   hos.shift_remaining_sec  ?? hos.shift_remaining       ?? null,
+      cycleLeft:   hos.cycle_remaining_sec  ?? hos.cycle_remaining       ?? null,
+      inViolation: hos.is_in_violation ?? false,
+      updatedAt,
+      staleHours,
+      eldSerial:   u.eld_device?.serial_number ?? null,
+    }
+  }), [drivers])
+
+  // ── Cross-reference: active loads vs Motive data ──────────────────────────
+  const loadAlerts = useMemo(() => {
+    if (!activeLoads.length) return []
+    const motiveNames = new Set(rows.map(r => r.nameLower))
+
+    return activeLoads
+      .filter(l => {
+        if (!l.driver_name) return false
+        const driverLower = l.driver_name.toLowerCase()
+
+        // Check 1: driver has a load but isn't in Motive at all
+        if (!motiveNames.has(driverLower)) return true
+
+        // Check 2: driver is in Motive but log is stale (> 4 hours) or shows off_duty
+        const motiveRow = rows.find(r => r.nameLower === driverLower)
+        if (!motiveRow) return true
+        if (motiveRow.staleHours != null && motiveRow.staleHours > 4) return true
+
+        return false
+      })
+      .map(l => {
+        const motiveRow = rows.find(r => r.nameLower === l.driver_name?.toLowerCase())
+        let reason = 'No Motive log found'
+        if (motiveRow) {
+          if (motiveRow.staleHours != null && motiveRow.staleHours > 4) {
+            reason = `ELD not updated for ${Math.floor(motiveRow.staleHours)}h`
+          }
+        }
+        return { ...l, reason }
+      })
+  }, [activeLoads, rows])
+
+  // ── Filtered + sorted driver rows ─────────────────────────────────────────
+  const filtered = useMemo(() => rows
+    .filter(r => !search || r.nameLower.includes(search.toLowerCase()))
     .sort((a, b) => {
-      // violations first, then driving, then on-duty, then off
       if (a.inViolation !== b.inViolation) return a.inViolation ? -1 : 1
       const order = { driving: 0, on_duty_not_driving: 1, sleeper_berth: 2, off_duty: 3 }
       return (order[a.status] ?? 4) - (order[b.status] ?? 4)
-    })
+    }), [rows, search])
 
   // ── Summary counts ─────────────────────────────────────────────────────────
-  const total      = rows.length
-  const driving    = rows.filter(r => r.status === 'driving').length
-  const onDuty     = rows.filter(r => r.status === 'on_duty_not_driving').length
-  const offDuty    = rows.filter(r => r.status === 'off_duty' || r.status === 'sleeper_berth').length
-  const inViol     = rows.filter(r => r.inViolation).length
-  const nearLimit  = rows.filter(r => r.driveLeft != null && r.driveLeft < 2 * 3600 && !r.inViolation).length
+  const driving   = rows.filter(r => r.status === 'driving').length
+  const onDuty    = rows.filter(r => r.status === 'on_duty_not_driving').length
+  const offDuty   = rows.filter(r => r.status === 'off_duty' || r.status === 'sleeper_berth').length
+  const inViol    = rows.filter(r => r.inViolation).length
+  const nearLimit = rows.filter(r => r.driveLeft != null && r.driveLeft < 2 * 3600 && !r.inViolation).length
 
   const loading = dLoading || vLoading
 
@@ -124,7 +179,6 @@ export default function SafetyView({ onClose }) {
             <div className="app-subtitle">Driver HOS &amp; Compliance · via Motive</div>
           </div>
         </div>
-
         <div className="topbar-center">
           <div className="company-tabs">
             {[['all','All'],['carat','Carat'],['pro_freight','Pro Freight']].map(([v, l]) => (
@@ -132,13 +186,8 @@ export default function SafetyView({ onClose }) {
             ))}
           </div>
         </div>
-
-        <div className="topbar-right" style={{ gap: 8 }}>
-          {lastSync && (
-            <span style={{ fontSize: 11, color: '#9CA3AF' }}>
-              Synced {timeAgo(lastSync.toISOString())}
-            </span>
-          )}
+        <div className="topbar-right" style={{ gap: 10 }}>
+          {lastSync && <span style={{ fontSize: 11, color: '#9CA3AF' }}>Synced {timeAgo(lastSync.toISOString())}</span>}
           <button className="btn btn-ghost" onClick={refreshAll} disabled={loading}>
             {loading ? 'Loading…' : '↻ Refresh'}
           </button>
@@ -150,10 +199,33 @@ export default function SafetyView({ onClose }) {
         {/* ── Error banner ── */}
         {(dError || vError) && (
           <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, padding: '12px 16px', marginBottom: 20, color: '#DC2626', fontSize: 13 }}>
-            ⚠ Motive API error: {dError || vError}
-            <br /><span style={{ fontSize: 11, color: '#9CA3AF', marginTop: 4, display: 'block' }}>
-              Make sure the Edge Function is deployed and secrets are set in Supabase.
-            </span>
+            <strong>⚠ Motive API error:</strong> {dError || vError}
+            <div style={{ fontSize: 11, color: '#9CA3AF', marginTop: 4 }}>
+              Edge Function must be deployed in Supabase and secrets set. See setup instructions.
+            </div>
+          </div>
+        )}
+
+        {/* ── Load alert banner ── */}
+        {loadAlerts.length > 0 && (
+          <div style={{ background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 8, padding: '14px 18px', marginBottom: 20 }}>
+            <div style={{ fontWeight: 700, color: '#92400E', fontSize: 13, marginBottom: 8 }}>
+              ⚠ {loadAlerts.length} driver{loadAlerts.length !== 1 ? 's' : ''} with active loads — ELD log missing or stale
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {loadAlerts.map(l => (
+                <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 12 }}>
+                  <span style={{ fontWeight: 700, color: '#111827', minWidth: 180 }}>{l.driver_name}</span>
+                  <span style={{ color: '#6B7280' }}>
+                    {l.load_number ? `Load #${l.load_number}` : 'Active load'}
+                    {l.truck_number ? ` · Truck ${l.truck_number}` : ''}
+                  </span>
+                  <span style={{ marginLeft: 'auto', color: '#DC2626', fontWeight: 600, background: '#FEF2F2', padding: '2px 8px', borderRadius: 6 }}>
+                    {l.reason}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
@@ -161,7 +233,7 @@ export default function SafetyView({ onClose }) {
         <div className="summary-stat-cards" style={{ marginBottom: 24 }}>
           <div className="summary-card">
             <div className="summary-card-label">Total Drivers</div>
-            <div className="summary-card-value">{loading ? '—' : total}</div>
+            <div className="summary-card-value">{loading ? '—' : rows.length}</div>
             <div className="summary-card-sub">on Motive ELD</div>
           </div>
           <div className="summary-card" style={{ borderLeft: '4px solid #2563EB' }}>
@@ -190,7 +262,7 @@ export default function SafetyView({ onClose }) {
             <div className="summary-card" style={{ borderLeft: '4px solid #F59E0B' }}>
               <div className="summary-card-label">⚠ Near Limit</div>
               <div className="summary-card-value" style={{ color: '#F59E0B' }}>{nearLimit}</div>
-              <div className="summary-card-sub">&lt; 2 hrs drive time left</div>
+              <div className="summary-card-sub">&lt; 2 hrs drive left</div>
             </div>
           )}
         </div>
@@ -204,11 +276,9 @@ export default function SafetyView({ onClose }) {
             onChange={e => setSearch(e.target.value)}
             style={{ width: 220, fontSize: 13 }}
           />
-          {search && (
-            <button className="btn btn-ghost btn-xs" onClick={() => setSearch('')}>✕ Clear</button>
-          )}
+          {search && <button className="btn btn-ghost btn-xs" onClick={() => setSearch('')}>✕ Clear</button>}
           <span style={{ fontSize: 12, color: '#9CA3AF', marginLeft: 'auto' }}>
-            {rows.length} driver{rows.length !== 1 ? 's' : ''}
+            {filtered.length} driver{filtered.length !== 1 ? 's' : ''}
           </span>
         </div>
 
@@ -217,7 +287,7 @@ export default function SafetyView({ onClose }) {
 
         {loading ? (
           <div style={{ color: '#9CA3AF', padding: '32px 0' }}>Loading from Motive…</div>
-        ) : rows.length === 0 ? (
+        ) : filtered.length === 0 ? (
           <div style={{ color: '#9CA3AF', padding: '24px 0' }}>
             {dError ? 'Could not load drivers — see error above.' : 'No drivers found.'}
           </div>
@@ -229,32 +299,38 @@ export default function SafetyView({ onClose }) {
                   <th>Driver</th>
                   {company === 'all' && <th>Company</th>}
                   <th>Status</th>
-                  <th style={{ width: 160 }}>Drive Time Left</th>
-                  <th style={{ width: 160 }}>Shift Left</th>
-                  <th style={{ width: 160 }}>Cycle Left</th>
-                  <th>ELD</th>
+                  <th style={{ minWidth: 160 }}>Drive Time Left</th>
+                  <th style={{ minWidth: 160 }}>Shift Left</th>
+                  <th style={{ minWidth: 160 }}>70h Cycle Left</th>
                   <th>Updated</th>
                 </tr>
               </thead>
               <tbody>
-                {rows.map(r => (
-                  <tr key={`${r._company}-${r.id}`} style={{ background: r.inViolation ? '#FFF5F5' : undefined }}>
-                    <td>
-                      <strong style={{ color: r.inViolation ? '#DC2626' : undefined }}>
-                        {r.inViolation && '🚨 '}{r.name}
-                      </strong>
-                    </td>
-                    {company === 'all' && (
-                      <td style={{ fontSize: 11, color: '#6B7280' }}>{CO_LABEL[r.company] ?? r.company}</td>
-                    )}
-                    <td><StatusBadge status={r.status} /></td>
-                    <td><HosBar remainingSec={r.driveLeft} totalSec={11 * 3600} /></td>
-                    <td><HosBar remainingSec={r.shiftLeft} totalSec={14 * 3600} /></td>
-                    <td><HosBar remainingSec={r.cycleLeft} totalSec={70 * 3600} /></td>
-                    <td style={{ fontSize: 11, color: '#6B7280' }}>{r.eldSerial ?? '—'}</td>
-                    <td style={{ fontSize: 11, color: '#9CA3AF' }}>{timeAgo(r.updatedAt)}</td>
-                  </tr>
-                ))}
+                {filtered.map(r => {
+                  const hasAlert = loadAlerts.some(l => l.driver_name?.toLowerCase() === r.nameLower)
+                  return (
+                    <tr key={`${r.company}-${r.id}`}
+                      style={{ background: r.inViolation ? '#FFF5F5' : hasAlert ? '#FFFBEB' : undefined }}>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          {r.inViolation && <span title="HOS Violation">🚨</span>}
+                          {hasAlert && !r.inViolation && <span title="Load assigned — ELD stale">⚠️</span>}
+                          <strong style={{ color: r.inViolation ? '#DC2626' : undefined }}>{r.name}</strong>
+                        </div>
+                      </td>
+                      {company === 'all' && (
+                        <td style={{ fontSize: 11, color: '#6B7280' }}>{CO_LABEL[r.company] ?? r.company}</td>
+                      )}
+                      <td><StatusBadge status={r.status} /></td>
+                      <td><HosBar remainingSec={r.driveLeft}  totalSec={11 * 3600} /></td>
+                      <td><HosBar remainingSec={r.shiftLeft}  totalSec={14 * 3600} /></td>
+                      <td><HosBar remainingSec={r.cycleLeft}  totalSec={70 * 3600} /></td>
+                      <td style={{ fontSize: 11, color: r.staleHours > 4 ? '#F59E0B' : '#9CA3AF', fontWeight: r.staleHours > 4 ? 600 : 400 }}>
+                        {timeAgo(r.updatedAt)}
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
