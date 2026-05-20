@@ -44,7 +44,6 @@ function currentWeek() {
 }
 
 const BLANK_LINE = { label: '', amount: '', balance: '' }
-const fmt = n => '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2 })
 
 export default function PaystubsTab({ drivers, company }) {
   const week = currentWeek()
