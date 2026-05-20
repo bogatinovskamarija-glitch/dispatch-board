@@ -103,7 +103,7 @@ export default function WeeklySummaryTab({ company }) {
   const driverRows = useMemo(() => {
     const map = {}
     for (const load of loads) {
-      const name = load.driver || '(No Driver)'
+      const name = load.driver_name || '(No Driver)'
       if (!map[name]) map[name] = { name, loads: [], gross: 0, payroll: 0, hasProfile: false, missingPay: false }
       map[name].loads.push(load)
       map[name].gross += Number(load.price) || 0
@@ -311,7 +311,7 @@ export default function WeeklySummaryTab({ company }) {
                   <tr key={l.id}>
                     <td>{l.load_number || '—'}</td>
                     <td>{l.pickup_date || l.date || '—'}</td>
-                    <td>{l.driver || '—'}</td>
+                    <td>{l.driver_name || '—'}</td>
                     <td>{l.truck_number || '—'}</td>
                     <td className="acct-route">
                       {l.pickup_location && l.delivery_location
