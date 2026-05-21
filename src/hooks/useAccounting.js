@@ -161,21 +161,37 @@ export function useYTDSummary(company = 'all', year = new Date().getFullYear()) 
           net:          0,
           addsByLabel:  {},
           dedsByLabel:  {},
+          paystubs:     [],   // individual statements
         }
       }
       const d = map[ps.driver_name]
       d.paystubCount++
       d.gross += Number(ps.load_total)  || 0
       d.net   += Number(ps.grand_total) || 0
+
+      // Per-statement add/ded totals for the statement list
+      let psAddTotal = 0
+      let psDedTotal = 0
       ;(ps.additions || []).forEach(a => {
         if (!a.label || !a.amount) return
         d.addsByLabel[a.label] = (d.addsByLabel[a.label] || 0) + Number(a.amount)
         d.addTotal += Number(a.amount)
+        psAddTotal += Number(a.amount)
       })
       ;(ps.deductions || []).forEach(ded => {
         if (!ded.label || !ded.amount) return
         d.dedsByLabel[ded.label] = (d.dedsByLabel[ded.label] || 0) + Number(ded.amount)
         d.dedTotal += Number(ded.amount)
+        psDedTotal += Number(ded.amount)
+      })
+
+      d.paystubs.push({
+        start_date: ps.start_date,
+        end_date:   ps.end_date,
+        gross:      Number(ps.load_total)  || 0,
+        addTotal:   psAddTotal,
+        dedTotal:   psDedTotal,
+        net:        Number(ps.grand_total) || 0,
       })
     }
 

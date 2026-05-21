@@ -387,7 +387,7 @@ export default function PaystubsTab({ drivers, company }) {
       {/* ── YTD Summary tab ── */}
       {psTab === 'ytd' && (
         <div>
-          {/* Year selector */}
+          {/* Year selector + export */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18 }}>
             <span style={{ fontWeight: 600, fontSize: 14 }}>Year:</span>
             {yearOptions.map(y => (
@@ -397,7 +397,36 @@ export default function PaystubsTab({ drivers, company }) {
                 onClick={() => setYtdYear(y)}
               >{y}</button>
             ))}
-            <button className="btn btn-ghost btn-xs" onClick={ytdRefresh} style={{ marginLeft: 'auto' }}>↻ Refresh</button>
+            <button className="btn btn-ghost btn-xs" onClick={ytdRefresh} style={{ marginLeft: 8 }}>↻ Refresh</button>
+            {ytdRows.length > 0 && (
+              <button
+                className="btn btn-ghost btn-xs"
+                style={{ marginLeft: 'auto' }}
+                onClick={() => {
+                  const header = ['Driver', 'Company', 'Period Start', 'Period End', 'Gross Pay', 'Additions', 'Deductions', 'Net Pay']
+                  const lines  = [header.join(',')]
+                  for (const r of ytdRows) {
+                    for (const ps of r.paystubs) {
+                      lines.push([
+                        `"${r.driver_name}"`,
+                        r.company === 'carat' ? 'Carat' : 'Pro Freight',
+                        ps.start_date,
+                        ps.end_date,
+                        ps.gross.toFixed(2),
+                        ps.addTotal.toFixed(2),
+                        ps.dedTotal.toFixed(2),
+                        ps.net.toFixed(2),
+                      ].join(','))
+                    }
+                  }
+                  const blob = new Blob([lines.join('\n')], { type: 'text/csv' })
+                  const url  = URL.createObjectURL(blob)
+                  const a    = document.createElement('a')
+                  a.href = url; a.download = `ytd-${ytdYear}.csv`; a.click()
+                  URL.revokeObjectURL(url)
+                }}
+              >⬇ Export CSV</button>
+            )}
           </div>
 
           {ytdLoading ? (
@@ -461,32 +490,61 @@ export default function PaystubsTab({ drivers, company }) {
                         <tr key={`${r.driver_name}-detail`} className="ytd-detail-row">
                           <td></td>
                           <td colSpan={7}>
-                            <div className="ytd-detail-grid">
-                              {addEntries.length > 0 && (
-                                <div className="ytd-detail-section">
-                                  <div className="ytd-detail-title" style={{ color: '#059669' }}>Additions</div>
-                                  {addEntries.map(([label, amt]) => (
-                                    <div key={label} className="ytd-detail-line">
-                                      <span>{label}</span>
-                                      <span style={{ color: '#059669' }}>+{fmt(amt)}</span>
-                                    </div>
+                            <div style={{ padding: '10px 16px 16px 24px' }}>
+
+                              {/* Individual statements */}
+                              <div className="ytd-detail-title" style={{ color: '#374151', marginBottom: 6 }}>Statements</div>
+                              <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse', marginBottom: 16 }}>
+                                <thead>
+                                  <tr style={{ color: '#9CA3AF', textAlign: 'right' }}>
+                                    <th style={{ textAlign: 'left', fontWeight: 500, paddingBottom: 4 }}>Period</th>
+                                    <th style={{ fontWeight: 500, paddingBottom: 4 }}>Gross</th>
+                                    <th style={{ fontWeight: 500, paddingBottom: 4 }}>Additions</th>
+                                    <th style={{ fontWeight: 500, paddingBottom: 4 }}>Deductions</th>
+                                    <th style={{ fontWeight: 500, paddingBottom: 4 }}>Net Pay</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {r.paystubs.map((ps, pi) => (
+                                    <tr key={pi} style={{ borderTop: '1px solid #F3F4F6' }}>
+                                      <td style={{ padding: '4px 0', color: '#374151' }}>{ps.start_date} – {ps.end_date}</td>
+                                      <td style={{ textAlign: 'right', padding: '4px 0' }}>{fmt(ps.gross)}</td>
+                                      <td style={{ textAlign: 'right', padding: '4px 0', color: '#059669' }}>{ps.addTotal > 0 ? `+${fmt(ps.addTotal)}` : '—'}</td>
+                                      <td style={{ textAlign: 'right', padding: '4px 0', color: '#DC2626' }}>{ps.dedTotal > 0 ? `-${fmt(ps.dedTotal)}` : '—'}</td>
+                                      <td style={{ textAlign: 'right', padding: '4px 0', fontWeight: 600 }}>{fmt(ps.net)}</td>
+                                    </tr>
                                   ))}
+                                </tbody>
+                              </table>
+
+                              {/* Category breakdown */}
+                              {(addEntries.length > 0 || dedEntries.length > 0) && (
+                                <div className="ytd-detail-grid" style={{ paddingLeft: 0 }}>
+                                  {addEntries.length > 0 && (
+                                    <div className="ytd-detail-section">
+                                      <div className="ytd-detail-title" style={{ color: '#059669' }}>Additions (YTD)</div>
+                                      {addEntries.map(([label, amt]) => (
+                                        <div key={label} className="ytd-detail-line">
+                                          <span>{label}</span>
+                                          <span style={{ color: '#059669' }}>+{fmt(amt)}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                  {dedEntries.length > 0 && (
+                                    <div className="ytd-detail-section">
+                                      <div className="ytd-detail-title" style={{ color: '#DC2626' }}>Deductions (YTD)</div>
+                                      {dedEntries.map(([label, amt]) => (
+                                        <div key={label} className="ytd-detail-line">
+                                          <span>{label}</span>
+                                          <span style={{ color: '#DC2626' }}>-{fmt(amt)}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
                                 </div>
                               )}
-                              {dedEntries.length > 0 && (
-                                <div className="ytd-detail-section">
-                                  <div className="ytd-detail-title" style={{ color: '#DC2626' }}>Deductions</div>
-                                  {dedEntries.map(([label, amt]) => (
-                                    <div key={label} className="ytd-detail-line">
-                                      <span>{label}</span>
-                                      <span style={{ color: '#DC2626' }}>-{fmt(amt)}</span>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                              {addEntries.length === 0 && dedEntries.length === 0 && (
-                                <span style={{ color: '#9CA3AF', fontSize: 12 }}>No additions or deductions recorded.</span>
-                              )}
+
                             </div>
                           </td>
                         </tr>
