@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react'
 
 const STATUSES = [
-  { value: 'covered',   label: 'Covered',    dot: '#16A34A' },
-  { value: 'empty',     label: 'Empty',      dot: '#CA8A04' },
-  { value: 'home',      label: 'At Home',    dot: '#DB2777' },
-  { value: 'broken',    label: 'Broken',     dot: '#DC2626' },
-  { value: 'no_driver', label: 'No Driver',  dot: '#9CA3AF' },
-  { value: 'prebooked',   label: 'Pre-Booked',  dot: '#4F46E5' },
-  { value: 'at_pickup',   label: 'At Pick Up',  dot: '#0284C7' },
-  { value: 'at_delivery', label: 'At Delivery', dot: '#EA580C' },
+  { value: 'covered',     label: 'Covered',      dot: '#16A34A' },
+  { value: 'empty',       label: 'Empty',        dot: '#CA8A04' },
+  { value: 'home',        label: 'At Home',      dot: '#DB2777' },
+  { value: 'broken',      label: 'Broken',       dot: '#DC2626' },
+  { value: 'no_driver',   label: 'No Driver',    dot: '#9CA3AF' },
+  { value: 'prebooked',   label: 'Pre-Booked',   dot: '#4F46E5' },
+  { value: 'at_pickup',   label: 'At Pick Up',   dot: '#0284C7' },
+  { value: 'at_delivery', label: 'At Delivery',  dot: '#EA580C' },
+  { value: 'tonu',        label: 'TONU',         dot: '#7C3AED' },
 ]
 
 const BLANK_STOP = { type: 'pickup', location: '', date: '', appt: '' }
@@ -304,6 +305,12 @@ export default function LoadModal({ load, date, drivers, trucks, trailers, onSav
             {/* LOAD DETAILS */}
             <div className="form-section">
               <div className="form-section-title">Load Details</div>
+              {form.status === 'tonu' && (
+                <div className="tonu-notice">
+                  ⚠ TONU — Broker owes a cancellation fee. Enter the TONU amount below to include this load in invoicing.
+                  Driver will <strong>not</strong> be included in paystub calculations.
+                </div>
+              )}
               <div className="form-grid">
                 <div className="form-group">
                   <label>Load Number</label>
@@ -313,17 +320,27 @@ export default function LoadModal({ load, date, drivers, trucks, trailers, onSav
                   <label>Broker</label>
                   <input type="text" placeholder="JERUE" value={form.broker} onChange={e => set('broker', e.target.value)} />
                 </div>
+                {form.status !== 'tonu' && (
+                  <>
+                    <div className="form-group">
+                      <label>Total Miles</label>
+                      <input type="number" placeholder="1377" value={form.total_miles} onChange={e => set('total_miles', e.target.value)} />
+                    </div>
+                    <div className="form-group">
+                      <label>Empty Miles</label>
+                      <input type="number" placeholder="0" value={form.empty_miles} onChange={e => set('empty_miles', e.target.value)} />
+                    </div>
+                  </>
+                )}
                 <div className="form-group">
-                  <label>Total Miles</label>
-                  <input type="number" placeholder="1377" value={form.total_miles} onChange={e => set('total_miles', e.target.value)} />
-                </div>
-                <div className="form-group">
-                  <label>Empty Miles</label>
-                  <input type="number" placeholder="0" value={form.empty_miles} onChange={e => set('empty_miles', e.target.value)} />
-                </div>
-                <div className="form-group">
-                  <label>Price ($)</label>
-                  <input type="number" placeholder="4000" value={form.price} onChange={e => set('price', e.target.value)} />
+                  <label>{form.status === 'tonu' ? 'TONU Amount ($)' : 'Price ($)'}</label>
+                  <input
+                    type="number"
+                    placeholder={form.status === 'tonu' ? '150.00' : '4000'}
+                    value={form.price}
+                    onChange={e => set('price', e.target.value)}
+                    style={form.status === 'tonu' ? { borderColor: '#7C3AED' } : {}}
+                  />
                 </div>
               </div>
             </div>

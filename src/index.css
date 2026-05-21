@@ -101,6 +101,19 @@ body {
 .badge-at_pickup .dot   { background: #0284C7; }
 .badge-at_delivery { background: #FFF7ED; color: #9A3412; }
 .badge-at_delivery .dot { background: #EA580C; }
+.badge-tonu        { background: #FAF5FF; color: #6D28D9; font-weight: 700; }
+.badge-tonu .dot   { background: #7C3AED; }
+
+/* ── TONU notice in load modal ── */
+.tonu-notice {
+  background: #FAF5FF; border: 1px solid #C4B5FD; border-radius: 8px;
+  padding: 10px 14px; font-size: 12px; color: #5B21B6; margin-bottom: 12px; line-height: 1.5;
+}
+/* TONU badge in invoice table */
+.tonu-badge {
+  display: inline-block; background: #FAF5FF; color: #6D28D9; border: 1px solid #C4B5FD;
+  border-radius: 4px; font-size: 11px; font-weight: 700; padding: 1px 7px;
+}
 
 /* ── STATS ROW ── */
 .stats-row { padding: 0 24px 12px; display: flex; gap: 10px; flex-wrap: wrap; }
@@ -375,6 +388,7 @@ textarea { resize: vertical; min-height: 60px; }
 .status-opt[data-s="prebooked"].active   { background: #EEF2FF; border-color: #4F46E5; color: #3730A3; }
 .status-opt[data-s="at_pickup"].active   { background: #E0F2FE; border-color: #0284C7; color: #075985; }
 .status-opt[data-s="at_delivery"].active { background: #FFF7ED; border-color: #EA580C; color: #9A3412; }
+.status-opt[data-s="tonu"].active        { background: #FAF5FF; border-color: #7C3AED; color: #5B21B6; }
 
 /* ── SIDEBAR ── */
 .sidebar-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.2); z-index: 900; }

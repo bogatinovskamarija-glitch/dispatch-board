@@ -121,6 +121,7 @@ export async function fetchDriverLoads(driverName, startDate, endDate, dateField
     .select('*')
     .eq('driver_name', driverName)
     .is('paid_at', null)           // exclude already-paid loads
+    .neq('status', 'tonu')         // TONU loads are not paid to drivers
     .order(dateField, { ascending: true })
   if (error) throw new Error(error.message)
   return (data ?? []).filter(l => {

@@ -11,6 +11,7 @@ const STATUS_COLORS = {
   prebooked:   { bg: '#EEF2FF', border: '#4F46E5', text: '#4338CA' },
   at_pickup:   { bg: '#E0F2FE', border: '#0284C7', text: '#075985' },
   at_delivery: { bg: '#FFF7ED', border: '#EA580C', text: '#9A3412' },
+  tonu:        { bg: '#FAF5FF', border: '#7C3AED', text: '#6D28D9' },
 }
 
 const fmt$ = n => n ? '$' + Number(n).toLocaleString('en-US') : null

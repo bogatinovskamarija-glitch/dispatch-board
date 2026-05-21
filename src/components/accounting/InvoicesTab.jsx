@@ -113,6 +113,7 @@ export default function InvoicesTab({ company }) {
                   </th>
                   <th>Broker</th>
                   <th>Load #</th>
+                  <th>Type</th>
                   <th>Truck</th>
                   <th>Pickup</th>
                   <th>Delivery</th>
@@ -128,6 +129,11 @@ export default function InvoicesTab({ company }) {
                     </td>
                     <td><strong>{l.broker || '—'}</strong></td>
                     <td>{l.load_number || '—'}</td>
+                    <td>
+                      {l.status === 'tonu'
+                        ? <span className="tonu-badge">TONU</span>
+                        : <span style={{ color: '#9CA3AF', fontSize: 12 }}>Load</span>}
+                    </td>
                     <td>{l.truck_number || '—'}</td>
                     <td>{l.pickup_date  || l.date || '—'}</td>
                     <td>{l.delivery_date || '—'}</td>
