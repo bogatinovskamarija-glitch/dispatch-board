@@ -293,10 +293,11 @@ tbody tr:hover { background: #FAFAFA; }
   border: 1.5px dashed #D1D5DB;
   background: #FAFAFA;
 }
-.gantt-route { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
-.gantt-meta  { font-size: 10px; color: #6B7280; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 1px; }
-.gantt-price { font-size: 10px; font-weight: 600; color: #15803D; margin-top: 1px; }
-.gantt-dpm   { font-size: 10px; color: #9CA3AF; }
+.gantt-route  { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
+.gantt-meta   { font-size: 10px; color: #6B7280; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 1px; }
+.gantt-bottom { display: flex; align-items: center; gap: 5px; margin-top: 2px; flex-wrap: nowrap; overflow: hidden; }
+.gantt-price  { font-size: 10px; font-weight: 700; color: #15803D; white-space: nowrap; }
+.gantt-dpm    { font-size: 10px; color: #9CA3AF; white-space: nowrap; }
 
 /* ── FLEET GHOST ROWS ── */
 .row-fleet-ghost td { background: #FAFAFA; }

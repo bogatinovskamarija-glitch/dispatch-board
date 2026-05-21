@@ -221,14 +221,16 @@ export default function WeekView({ loads, loading, weekStart, today, onLoadClick
                 title={`${l.status ?? ''}  ${route}`}
               >
                 <div className="gantt-route" style={{ color: colors.text }}>{route}</div>
-                {halfCols >= 3 && l.broker && (
-                  <div className="gantt-meta">{l.broker}{l.load_number ? ` · ${l.load_number}` : ''}</div>
+                {halfCols >= 3 && (l.broker || l.load_number) && (
+                  <div className="gantt-meta">
+                    {[l.broker, l.load_number].filter(Boolean).join(' · ')}
+                  </div>
                 )}
-                {l.price && (
-                  <div className="gantt-price">{fmt$(l.price)}</div>
-                )}
-                {halfCols >= 4 && dpm(l.price, l.total_miles) && (
-                  <div className="gantt-dpm">{dpm(l.price, l.total_miles)}</div>
+                {(l.price || dpm(l.price, l.total_miles)) && (
+                  <div className="gantt-bottom">
+                    {l.price && <span className="gantt-price">{fmt$(l.price)}</span>}
+                    {dpm(l.price, l.total_miles) && <span className="gantt-dpm">{dpm(l.price, l.total_miles)}</span>}
+                  </div>
                 )}
               </div>
             )
