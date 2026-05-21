@@ -115,14 +115,20 @@ export async function updateInvoice(invoiceId, data) {
 
 // ── Driver loads for paystub (only unpaid loads) ───────────────────────────
 // dateField: 'pickup_date' | 'delivery_date' — which date to filter the range by
-export async function fetchDriverLoads(driverName, startDate, endDate, dateField = 'pickup_date') {
-  const { data, error } = await supabase
+// profileType: 'owner_operator' | 'company' — OO still gets paid for TONU loads; company drivers do not
+export async function fetchDriverLoads(driverName, startDate, endDate, dateField = 'pickup_date', profileType = 'company') {
+  let q = supabase
     .from('loads')
     .select('*')
     .eq('driver_name', driverName)
     .is('paid_at', null)           // exclude already-paid loads
-    .neq('status', 'tonu')         // TONU loads are not paid to drivers
     .order(dateField, { ascending: true })
+
+  if (profileType !== 'owner_operator') {
+    q = q.neq('status', 'tonu')   // company drivers are not paid for TONU loads
+  }
+
+  const { data, error } = await q
   if (error) throw new Error(error.message)
   return (data ?? []).filter(l => {
     const d = l[dateField] || l.date

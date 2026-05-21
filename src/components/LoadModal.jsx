@@ -339,7 +339,7 @@ export default function LoadModal({ load, date, drivers, trucks, trailers, onSav
                     placeholder={form.status === 'tonu' ? '150.00' : '4000'}
                     value={form.price}
                     onChange={e => set('price', e.target.value)}
-                    style={form.status === 'tonu' ? { borderColor: '#7C3AED' } : {}}
+                    style={form.status === 'tonu' ? { borderColor: '#475569' } : {}}
                   />
                 </div>
               </div>

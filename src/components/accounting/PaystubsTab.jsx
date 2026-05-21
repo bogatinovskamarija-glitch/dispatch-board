@@ -161,7 +161,7 @@ export default function PaystubsTab({ drivers, company }) {
     setError(null)
     setLoaded(false)
     try {
-      const data = await fetchDriverLoads(driverName, startDate, endDate, dateField)
+      const data = await fetchDriverLoads(driverName, startDate, endDate, dateField, profile?.profile_type)
       setLoads(data)
       // Initialize pay per load
       const init = {}
