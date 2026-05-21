@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useMaintenance, useMaintenanceShops, getDateRange } from '../../hooks/useMaintenance'
+import { addDays, format } from '../../lib/dateUtils'
 import AddMaintenanceModal from './AddMaintenanceModal'
 import ImportCSVModal     from './ImportCSVModal'
 
@@ -342,6 +343,131 @@ function ShopsTab({ shops, onAddShop, onRemoveShop }) {
   )
 }
 
+// ── Weekly Tab ─────────────────────────────────────────────────────────────
+function WeeklyTab({ records }) {
+  const byWeek = useMemo(() => {
+    const map = {}
+    records.forEach(r => {
+      if (!r.date) return
+      // Find Monday of this record's week
+      const [y, m, d] = r.date.split('-').map(Number)
+      const dt  = new Date(y, m - 1, d)
+      const dow = dt.getDay()                      // 0=Sun, 1=Mon…
+      const diff = dow === 0 ? -6 : 1 - dow
+      dt.setDate(dt.getDate() + diff)
+      const weekKey = format(dt)
+
+      if (!map[weekKey]) {
+        map[weekKey] = {
+          weekStart: weekKey,
+          weekEnd:   format(addDays(dt, 6)),
+          records:   [],
+          total:          0,
+          tractorTotal:   0,
+          trailerTotal:   0,
+          catMap:         {},
+        }
+      }
+      const w = map[weekKey]
+      const amt = Number(r.amount) || 0
+      w.records.push(r)
+      w.total         += amt
+      if (r.unit_type?.toLowerCase() === 'tractor') w.tractorTotal += amt
+      if (r.unit_type?.toLowerCase() === 'trailer') w.trailerTotal += amt
+      const cat = r.category || 'other'
+      w.catMap[cat] = (w.catMap[cat] || 0) + amt
+    })
+    return Object.values(map).sort((a, b) => b.weekStart.localeCompare(a.weekStart))
+  }, [records])
+
+  if (!records.length) return <div className="maint-empty">No records for the selected period.</div>
+
+  const grandTotal        = byWeek.reduce((s, w) => s + w.total, 0)
+  const grandTractor      = byWeek.reduce((s, w) => s + w.tractorTotal, 0)
+  const grandTrailer      = byWeek.reduce((s, w) => s + w.trailerTotal, 0)
+  const grandRecords      = byWeek.reduce((s, w) => s + w.records.length, 0)
+
+  function topCat(w) {
+    const entries = Object.entries(w.catMap)
+    if (!entries.length) return null
+    const [cat] = entries.sort((a, b) => b[1] - a[1])[0]
+    return cat
+  }
+
+  function fmtWeek(weekStart, weekEnd) {
+    const fmt = d => {
+      const [y, m, day] = d.split('-').map(Number)
+      return new Date(y, m - 1, day).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    }
+    return `${fmt(weekStart)} – ${fmt(weekEnd)}`
+  }
+
+  return (
+    <div className="maint-table-wrap">
+      <table className="maint-table">
+        <thead>
+          <tr>
+            <th>Week</th>
+            <th style={{ textAlign: 'center' }}>Records</th>
+            <th style={{ textAlign: 'right' }}>Tractors</th>
+            <th style={{ textAlign: 'right' }}>Trailers</th>
+            <th>Top Category</th>
+            <th style={{ textAlign: 'right' }}>Week Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {byWeek.map(w => {
+            const cat = topCat(w)
+            return (
+              <tr key={w.weekStart}>
+                <td style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{fmtWeek(w.weekStart, w.weekEnd)}</td>
+                <td style={{ textAlign: 'center', color: '#6B7280' }}>{w.records.length}</td>
+                <td style={{ textAlign: 'right', color: '#6B7280' }}>
+                  {w.tractorTotal > 0 ? fmt$(w.tractorTotal) : <span style={{ color: '#D1D5DB' }}>—</span>}
+                </td>
+                <td style={{ textAlign: 'right', color: '#6B7280' }}>
+                  {w.trailerTotal > 0 ? fmt$(w.trailerTotal) : <span style={{ color: '#D1D5DB' }}>—</span>}
+                </td>
+                <td>
+                  {cat ? (
+                    <span className="maint-cat-badge" style={{
+                      background: (CAT_COLORS[cat] || '#6B7280') + '22',
+                      color: CAT_COLORS[cat] || '#6B7280',
+                    }}>
+                      {CAT_LABELS[cat] || cat}
+                    </span>
+                  ) : '—'}
+                </td>
+                <td style={{ textAlign: 'right', fontWeight: 700 }}>{fmt$(w.total)}</td>
+              </tr>
+            )
+          })}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td style={{ fontWeight: 700, padding: '8px 12px', borderTop: '2px solid #E5E7EB' }}>
+              Total ({byWeek.length} week{byWeek.length !== 1 ? 's' : ''})
+            </td>
+            <td style={{ textAlign: 'center', fontWeight: 700, padding: '8px 12px', borderTop: '2px solid #E5E7EB' }}>
+              {grandRecords}
+            </td>
+            <td style={{ textAlign: 'right', fontWeight: 700, padding: '8px 12px', borderTop: '2px solid #E5E7EB' }}>
+              {fmt$(grandTractor)}
+            </td>
+            <td style={{ textAlign: 'right', fontWeight: 700, padding: '8px 12px', borderTop: '2px solid #E5E7EB' }}>
+              {fmt$(grandTrailer)}
+            </td>
+            <td style={{ borderTop: '2px solid #E5E7EB' }} />
+            <td style={{ textAlign: 'right', fontWeight: 700, fontSize: 15, padding: '8px 12px', borderTop: '2px solid #E5E7EB' }}>
+              {fmt$(grandTotal)}
+            </td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  )
+}
+
 // ── Main View ──────────────────────────────────────────────────────────────
 export default function MaintenanceView({ onClose }) {
   const [periodType, setPeriodType] = useState('all')
@@ -401,7 +527,7 @@ export default function MaintenanceView({ onClose }) {
 
         <div className="topbar-center">
           <div className="view-toggle">
-            {[['records','Records'],['spending','Spending'],['shops','Shops']].map(([v,l]) => (
+            {[['records','Records'],['spending','Spending'],['weekly','Weekly'],['shops','Shops']].map(([v,l]) => (
               <button key={v} className={tab === v ? 'active' : ''} onClick={() => setTab(v)}>{l}</button>
             ))}
           </div>
@@ -477,6 +603,7 @@ export default function MaintenanceView({ onClose }) {
           />
         )}
         {tab === 'spending' && <SpendingTab records={records} />}
+        {tab === 'weekly'   && <WeeklyTab  records={records} />}
         {tab === 'shops'    && <ShopsTab shops={shops} onAddShop={addShop} onRemoveShop={removeShop} />}
       </div>
 
