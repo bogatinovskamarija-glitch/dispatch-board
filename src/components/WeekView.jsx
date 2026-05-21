@@ -32,17 +32,21 @@ function daysBetweenStr(a, b) {
 }
 
 // ── Chain builder ──────────────────────────────────────────────
-// Returns an array of segments:
-//   { type: 'load', load, startCol, endCol }   (load block)
-//   { type: 'gap',        startCol, endCol }   (dashed grey gap)
-// Columns are 1-indexed (1 = Mon … 7 = Sun), clamped to the week.
+// Uses a 14-column internal grid (2 half-columns per day) so that
+// same-day handoffs (Load A delivers Tue, Load B picks up Tue) split
+// Tuesday into a delivery-morning half and a pickup-afternoon half
+// with no overlap and no lost days.
+//
+// Returns segments:
+//   { type: 'load', load, startCol, endCol }  — colums 1-14
+//   { type: 'gap',        startCol, endCol }
 function buildChain(truckLoads, weekStartStr, weekEndStr) {
-  function clamp(s)   { return s < weekStartStr ? weekStartStr : s > weekEndStr ? weekEndStr : s }
-  function toCol(s)   { return daysBetweenStr(weekStartStr, clamp(s)) + 1 }
-  function prevDay(s) { return addDaysToStr(s, -1) }
-  function nextDay(s) { return addDaysToStr(s,  1) }
+  function clamp(s)     { return s < weekStartStr ? weekStartStr : s > weekEndStr ? weekEndStr : s }
+  function dayIdx(s)    { return daysBetweenStr(weekStartStr, clamp(s)) + 1 }  // 1-7
+  function leftCol(s)   { return 2 * dayIdx(s) - 1 }   // morning half  (1,3,5,…13)
+  function rightCol(s)  { return 2 * dayIdx(s) }        // afternoon half (2,4,6,…14)
+  function nextDay(s)   { return addDaysToStr(s, 1) }
 
-  // Loads that overlap this week, sorted by effective start
   const sorted = truckLoads
     .filter(l => {
       const s = l.pickup_date  || l.date
@@ -56,36 +60,52 @@ function buildChain(truckLoads, weekStartStr, weekEndStr) {
     })
 
   if (sorted.length === 0) {
-    return [{ type: 'gap', startCol: 1, endCol: 7 }]
+    return [{ type: 'gap', startCol: 1, endCol: 14 }]
   }
 
   const segments = []
-  let pointer = weekStartStr
+  let pointerCol = 1   // current position in 1-14 half-column space
 
-  for (const load of sorted) {
-    if (pointer > weekEndStr) break
+  for (let i = 0; i < sorted.length; i++) {
+    if (pointerCol > 14) break
 
+    const load     = sorted[i]
     const effStart = clamp(load.pickup_date  || load.date)
     const effEnd   = clamp(load.delivery_date || load.date)
+    if (leftCol(effStart) > 14) break
 
-    if (effStart > weekEndStr) break
+    // Same-day handoff: next load picks up on the same day this one delivers
+    const nextLoad      = sorted[i + 1]
+    const nextEffStart  = nextLoad ? clamp(nextLoad.pickup_date || nextLoad.date) : null
+    const sameDayOff    = !!nextEffStart && nextEffStart === effEnd
+
+    // Where this block starts and ends (in half-columns)
+    const loadStartCol = Math.max(leftCol(effStart), pointerCol)
+    const loadEndCol   = sameDayOff ? leftCol(effEnd) : rightCol(effEnd)
 
     // Gap before this load
-    if (pointer < effStart) {
-      const gapEnd = prevDay(effStart)
-      segments.push({ type: 'gap', startCol: toCol(pointer), endCol: toCol(gapEnd) })
+    if (pointerCol < loadStartCol) {
+      segments.push({ type: 'gap', startCol: pointerCol, endCol: loadStartCol - 1 })
     }
 
-    // Load block (if loads overlap, visually start from pointer position)
-    const startCol = Math.max(toCol(effStart), toCol(pointer))
-    segments.push({ type: 'load', load, startCol, endCol: toCol(effEnd) })
+    // Load block
+    if (loadStartCol <= loadEndCol) {
+      segments.push({ type: 'load', load, startCol: loadStartCol, endCol: loadEndCol })
+    }
 
-    pointer = nextDay(effEnd)
+    // Advance pointer
+    if (sameDayOff) {
+      pointerCol = rightCol(effEnd)         // next load picks up the afternoon half
+    } else if (effEnd >= weekEndStr) {
+      pointerCol = 15                        // past week end — no trailing gap needed
+    } else {
+      pointerCol = leftCol(nextDay(effEnd)) // normal: start of the next day
+    }
   }
 
   // Trailing gap
-  if (pointer <= weekEndStr) {
-    segments.push({ type: 'gap', startCol: toCol(pointer), endCol: 7 })
+  if (pointerCol <= 14) {
+    segments.push({ type: 'gap', startCol: pointerCol, endCol: 14 })
   }
 
   return segments
@@ -181,11 +201,12 @@ export default function WeekView({ loads, loading, weekStart, today, onLoadClick
             }
 
             const l      = seg.load
-            const colors = STATUS_COLORS[l.status] ?? STATUS_COLORS.no_driver
-            const route  = l.pickup_location && l.delivery_location
+            const colors   = STATUS_COLORS[l.status] ?? STATUS_COLORS.no_driver
+            const route    = l.pickup_location && l.delivery_location
               ? `${l.pickup_location.split(',')[0]} → ${l.delivery_location.split(',')[0]}`
               : l.pickup_location || l.delivery_location || '—'
-            const span   = seg.endCol - seg.startCol + 1   // number of days spanned
+            // half-cols: 2 = 1 full day, 4 = 2 full days, etc.
+            const halfCols = seg.endCol - seg.startCol + 1
 
             return (
               <div
@@ -200,13 +221,13 @@ export default function WeekView({ loads, loading, weekStart, today, onLoadClick
                 title={`${l.status ?? ''}  ${route}`}
               >
                 <div className="gantt-route" style={{ color: colors.text }}>{route}</div>
-                {span >= 2 && l.broker && (
+                {halfCols >= 3 && l.broker && (
                   <div className="gantt-meta">{l.broker}{l.load_number ? ` · ${l.load_number}` : ''}</div>
                 )}
-                {span >= 2 && l.price && (
+                {halfCols >= 4 && l.price && (
                   <div className="gantt-price">{fmt$(l.price)}</div>
                 )}
-                {span >= 3 && dpm(l.price, l.total_miles) && (
+                {halfCols >= 6 && dpm(l.price, l.total_miles) && (
                   <div className="gantt-dpm">{dpm(l.price, l.total_miles)}</div>
                 )}
               </div>

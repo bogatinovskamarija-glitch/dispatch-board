@@ -254,7 +254,7 @@ tbody tr:hover { background: #FAFAFA; }
 .gantt-timeline {
   grid-column: 2 / 9;
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(14, 1fr);  /* 2 half-cols per day */
   align-items: center;
   min-height: 68px;
   border-bottom: 1px solid #F3F4F6;
