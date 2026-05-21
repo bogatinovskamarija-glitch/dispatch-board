@@ -224,10 +224,10 @@ export default function WeekView({ loads, loading, weekStart, today, onLoadClick
                 {halfCols >= 3 && l.broker && (
                   <div className="gantt-meta">{l.broker}{l.load_number ? ` · ${l.load_number}` : ''}</div>
                 )}
-                {halfCols >= 4 && l.price && (
+                {l.price && (
                   <div className="gantt-price">{fmt$(l.price)}</div>
                 )}
-                {halfCols >= 6 && dpm(l.price, l.total_miles) && (
+                {halfCols >= 4 && dpm(l.price, l.total_miles) && (
                   <div className="gantt-dpm">{dpm(l.price, l.total_miles)}</div>
                 )}
               </div>
