@@ -5,13 +5,20 @@ import { addDays, format, isSameDay } from '../lib/dateUtils'
 const STATUS_COLORS = {
   covered:     { bg: '#DCFCE7', border: '#16A34A', text: '#15803D' },
   empty:       { bg: '#FEF9C3', border: '#CA8A04', text: '#92400E' },
-  at_home:     { bg: '#FCE7F3', border: '#DB2777', text: '#9D174D' },
-  broken_down: { bg: '#FEE2E2', border: '#DC2626', text: '#991B1B' },
+  home:        { bg: '#FCE7F3', border: '#DB2777', text: '#9D174D' },
+  broken:      { bg: '#FEE2E2', border: '#DC2626', text: '#991B1B' },
   no_driver:   { bg: '#F3F4F6', border: '#9CA3AF', text: '#6B7280' },
   prebooked:   { bg: '#EEF2FF', border: '#4F46E5', text: '#4338CA' },
   at_pickup:   { bg: '#E0F2FE', border: '#0284C7', text: '#075985' },
   at_delivery: { bg: '#FFF7ED', border: '#EA580C', text: '#9A3412' },
   tonu:        { bg: '#F1F5F9', border: '#475569', text: '#1E293B' },
+}
+
+const STATUS_LABELS = {
+  covered: 'Covered', empty: 'Empty', home: 'At Home',
+  broken: 'Broken Down', no_driver: 'No Driver',
+  prebooked: 'Pre-Booked', at_pickup: 'At Pick Up',
+  at_delivery: 'At Delivery', tonu: 'TONU',
 }
 
 const fmt$ = n => n ? '$' + Number(n).toLocaleString('en-US') : null
@@ -203,9 +210,10 @@ export default function WeekView({ loads, loading, weekStart, today, onLoadClick
 
             const l      = seg.load
             const colors   = STATUS_COLORS[l.status] ?? STATUS_COLORS.no_driver
+            const hasRoute = l.pickup_location || l.delivery_location
             const route    = l.pickup_location && l.delivery_location
               ? `${l.pickup_location.split(',')[0]} → ${l.delivery_location.split(',')[0]}`
-              : l.pickup_location || l.delivery_location || '—'
+              : l.pickup_location || l.delivery_location || STATUS_LABELS[l.status] || '—'
             // half-cols: 2 = 1 full day, 4 = 2 full days, etc.
             const halfCols = seg.endCol - seg.startCol + 1
 
@@ -221,7 +229,15 @@ export default function WeekView({ loads, loading, weekStart, today, onLoadClick
                 onClick={() => onLoadClick(l)}
                 title={`${l.status ?? ''}  ${route}`}
               >
-                <div className="gantt-route" style={{ color: colors.text }}>{route}</div>
+                <div
+                  className="gantt-route"
+                  style={{
+                    color: colors.text,
+                    fontWeight: hasRoute ? 500 : 700,
+                    textAlign: hasRoute ? 'left' : 'center',
+                    fontSize: hasRoute ? undefined : 12,
+                  }}
+                >{route}</div>
                 {halfCols >= 3 && (l.broker || l.load_number) && (
                   <div className="gantt-meta">
                     {[l.broker, l.load_number].filter(Boolean).join(' · ')}
