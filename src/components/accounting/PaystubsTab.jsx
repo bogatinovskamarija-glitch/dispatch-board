@@ -47,7 +47,7 @@ const BLANK_LINE = { label: '', amount: '', balance: '' }
 
 export default function PaystubsTab({ drivers, company }) {
   const week = currentWeek()
-  const { profiles, loading: profLoading, saveProfile, removeProfile } = useDriverProfiles()
+  const { profiles, inactiveProfiles, loading: profLoading, saveProfile, removeProfile, reactivateProfile, fetchInactive } = useDriverProfiles()
   const { paystubs, loading: histLoading, refresh: refreshHistory } = usePaystubHistory(company)
 
   // ── Tab: 'generate' | 'history' ─────────────────────────────────────────
@@ -97,10 +97,27 @@ export default function PaystubsTab({ drivers, company }) {
     setPsTab('history')
   }
 
+  // ── History filters ──────────────────────────────────────────────────────
+  const [histSearch,    setHistSearch]    = useState('')
+  const [histFromDate,  setHistFromDate]  = useState('')
+  const [histToDate,    setHistToDate]    = useState('')
+
+  const filteredPaystubs = useMemo(() => {
+    let list = paystubs
+    if (histSearch.trim()) {
+      const q = histSearch.trim().toLowerCase()
+      list = list.filter(ps => (ps.driver_name || '').toLowerCase().includes(q))
+    }
+    if (histFromDate) list = list.filter(ps => (ps.start_date || '') >= histFromDate)
+    if (histToDate)   list = list.filter(ps => (ps.end_date   || '') <= histToDate)
+    return list
+  }, [paystubs, histSearch, histFromDate, histToDate])
+
   // ── Paystub generator state ──────────────────────────────────────────────
   const [driverName, setDriverName] = useState('')
   const [startDate,  setStartDate]  = useState(week.start)
   const [endDate,    setEndDate]    = useState(week.end)
+  const [dateField,  setDateField]  = useState('pickup_date')  // 'pickup_date' | 'delivery_date'
   const [loads,      setLoads]      = useState([])
   const [loaded,     setLoaded]     = useState(false)
   const [loading,    setLoading]    = useState(false)
@@ -137,7 +154,7 @@ export default function PaystubsTab({ drivers, company }) {
     setError(null)
     setLoaded(false)
     try {
-      const data = await fetchDriverLoads(driverName, startDate, endDate)
+      const data = await fetchDriverLoads(driverName, startDate, endDate, dateField)
       setLoads(data)
       // Initialize pay per load
       const init = {}
@@ -291,33 +308,67 @@ export default function PaystubsTab({ drivers, company }) {
         <>
           {histLoading ? (
             <div style={{ color: '#9CA3AF' }}>Loading…</div>
-          ) : paystubs.length === 0 ? (
-            <div className="acct-empty">No paystubs generated yet. Generate and mark a paystub as paid to see it here.</div>
           ) : (
-            <table className="acct-table">
-              <thead>
-                <tr>
-                  <th>Driver</th>
-                  <th>Period</th>
-                  <th>Company</th>
-                  <th>Created</th>
-                  <th style={{ textAlign: 'right' }}>Grand Total</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {paystubs.map(ps => (
-                  <tr key={ps.id} style={{ cursor: 'pointer' }} onClick={() => openHistoryPaystub(ps)}>
-                    <td><strong>{ps.driver_name}</strong></td>
-                    <td>{ps.start_date} – {ps.end_date}</td>
-                    <td>{ps.company === 'carat' ? 'Carat' : 'Pro Freight'}</td>
-                    <td>{fmtDate(ps.created_at)}</td>
-                    <td style={{ textAlign: 'right', fontWeight: 700 }}>{fmt(ps.grand_total)}</td>
-                    <td className="acct-click-hint">View / Reprint</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <>
+              {/* Filter bar */}
+              <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="Search driver name…"
+                  value={histSearch}
+                  onChange={e => setHistSearch(e.target.value)}
+                  style={{ width: 200, fontSize: 13 }}
+                />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+                  <label style={{ color: '#6B7280', whiteSpace: 'nowrap' }}>Period from</label>
+                  <input type="date" value={histFromDate} onChange={e => setHistFromDate(e.target.value)} style={{ fontSize: 13, padding: '4px 8px', border: '1px solid #D1D5DB', borderRadius: 6 }} />
+                  <label style={{ color: '#6B7280' }}>to</label>
+                  <input type="date" value={histToDate} onChange={e => setHistToDate(e.target.value)} style={{ fontSize: 13, padding: '4px 8px', border: '1px solid #D1D5DB', borderRadius: 6 }} />
+                </div>
+                {(histSearch || histFromDate || histToDate) && (
+                  <button className="btn btn-ghost btn-xs" onClick={() => { setHistSearch(''); setHistFromDate(''); setHistToDate('') }}>
+                    ✕ Clear
+                  </button>
+                )}
+                <span style={{ fontSize: 12, color: '#9CA3AF', marginLeft: 'auto' }}>
+                  {filteredPaystubs.length} of {paystubs.length} paystub{paystubs.length !== 1 ? 's' : ''}
+                </span>
+              </div>
+
+              {filteredPaystubs.length === 0 ? (
+                <div className="acct-empty">
+                  {paystubs.length === 0
+                    ? 'No paystubs generated yet. Generate and mark a paystub as paid to see it here.'
+                    : 'No paystubs match your filters.'}
+                </div>
+              ) : (
+                <table className="acct-table">
+                  <thead>
+                    <tr>
+                      <th>Driver</th>
+                      <th>Period</th>
+                      <th>Company</th>
+                      <th>Created</th>
+                      <th style={{ textAlign: 'right' }}>Grand Total</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredPaystubs.map(ps => (
+                      <tr key={ps.id} style={{ cursor: 'pointer' }} onClick={() => openHistoryPaystub(ps)}>
+                        <td><strong>{ps.driver_name}</strong></td>
+                        <td>{ps.start_date} – {ps.end_date}</td>
+                        <td>{ps.company === 'carat' ? 'Carat' : 'Pro Freight'}</td>
+                        <td>{fmtDate(ps.created_at)}</td>
+                        <td style={{ textAlign: 'right', fontWeight: 700 }}>{fmt(ps.grand_total)}</td>
+                        <td className="acct-click-hint">View / Reprint</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </>
           )}
         </>
       )}
@@ -335,9 +386,12 @@ export default function PaystubsTab({ drivers, company }) {
       {/* ── Driver Profiles Panel ── */}
       <DriversPanel
         profiles={profiles}
+        inactiveProfiles={inactiveProfiles}
         drivers={drivers}
         saveProfile={saveProfile}
         removeProfile={removeProfile}
+        reactivateProfile={reactivateProfile}
+        fetchInactive={fetchInactive}
       />
 
       <div className="paystub-section-divider" />
@@ -374,6 +428,13 @@ export default function PaystubsTab({ drivers, company }) {
         <div className="form-group">
           <label>To</label>
           <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} />
+        </div>
+        <div className="form-group">
+          <label>Date By</label>
+          <select value={dateField} onChange={e => setDateField(e.target.value)} style={{ fontSize: 13 }}>
+            <option value="pickup_date">Pickup Date</option>
+            <option value="delivery_date">Delivery Date</option>
+          </select>
         </div>
         <div className="form-group form-group-btn">
           <label>&nbsp;</label>

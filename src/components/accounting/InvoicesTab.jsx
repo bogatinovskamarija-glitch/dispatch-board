@@ -15,6 +15,8 @@ export default function InvoicesTab({ company }) {
   // ── History filters ────────────────────────────────────────────────────────
   const [filterText,    setFilterText]    = useState('')
   const [filterCompany, setFilterCompany] = useState('all')
+  const [filterFrom,    setFilterFrom]    = useState('')
+  const [filterTo,      setFilterTo]      = useState('')
 
   const filteredInvoices = useMemo(() => {
     let list = invoices
@@ -29,8 +31,14 @@ export default function InvoicesTab({ company }) {
         (inv.company        || '').toLowerCase().includes(q)
       )
     }
+    if (filterFrom) {
+      list = list.filter(inv => inv.created_at && inv.created_at.slice(0, 10) >= filterFrom)
+    }
+    if (filterTo) {
+      list = list.filter(inv => inv.created_at && inv.created_at.slice(0, 10) <= filterTo)
+    }
     return list
-  }, [invoices, filterText, filterCompany])
+  }, [invoices, filterText, filterCompany, filterFrom, filterTo])
 
   function toggleRow(id) {
     setSelected(prev => {
@@ -164,8 +172,14 @@ export default function InvoicesTab({ company }) {
                     <option value="pro_freight">Pro Freight</option>
                   </select>
                 )}
-                {(filterText || filterCompany !== 'all') && (
-                  <button className="btn btn-ghost btn-xs" onClick={() => { setFilterText(''); setFilterCompany('all') }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+                  <label style={{ color: '#6B7280', whiteSpace: 'nowrap' }}>From</label>
+                  <input type="date" value={filterFrom} onChange={e => setFilterFrom(e.target.value)} style={{ fontSize: 13, padding: '4px 8px', border: '1px solid #D1D5DB', borderRadius: 6 }} />
+                  <label style={{ color: '#6B7280' }}>To</label>
+                  <input type="date" value={filterTo} onChange={e => setFilterTo(e.target.value)} style={{ fontSize: 13, padding: '4px 8px', border: '1px solid #D1D5DB', borderRadius: 6 }} />
+                </div>
+                {(filterText || filterCompany !== 'all' || filterFrom || filterTo) && (
+                  <button className="btn btn-ghost btn-xs" onClick={() => { setFilterText(''); setFilterCompany('all'); setFilterFrom(''); setFilterTo('') }}>
                     ✕ Clear
                   </button>
                 )}

@@ -2,8 +2,9 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 
 export function useDriverProfiles() {
-  const [profiles, setProfiles]   = useState([])
-  const [loading,  setLoading]    = useState(true)
+  const [profiles,         setProfiles]         = useState([])
+  const [inactiveProfiles, setInactiveProfiles] = useState([])
+  const [loading,          setLoading]          = useState(true)
 
   const fetch = useCallback(async () => {
     setLoading(true)
@@ -14,6 +15,15 @@ export function useDriverProfiles() {
       .order('driver_name')
     setProfiles(data ?? [])
     setLoading(false)
+  }, [])
+
+  const fetchInactive = useCallback(async () => {
+    const { data } = await supabase
+      .from('driver_profiles')
+      .select('*')
+      .eq('is_active', false)
+      .order('driver_name')
+    setInactiveProfiles(data ?? [])
   }, [])
 
   useEffect(() => { fetch() }, [fetch])
@@ -40,5 +50,17 @@ export function useDriverProfiles() {
     setProfiles(prev => prev.filter(p => p.id !== id))
   }
 
-  return { profiles, loading, saveProfile, removeProfile, refetch: fetch }
+  async function reactivateProfile(id) {
+    await supabase.from('driver_profiles').update({ is_active: true }).eq('id', id)
+    const reactivated = inactiveProfiles.find(p => p.id === id)
+    setInactiveProfiles(prev => prev.filter(p => p.id !== id))
+    if (reactivated) {
+      setProfiles(prev =>
+        [...prev, { ...reactivated, is_active: true }]
+          .sort((a, b) => a.driver_name.localeCompare(b.driver_name))
+      )
+    }
+  }
+
+  return { profiles, inactiveProfiles, loading, saveProfile, removeProfile, reactivateProfile, fetchInactive, refetch: fetch }
 }

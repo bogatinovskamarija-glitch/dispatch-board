@@ -6,11 +6,13 @@ const BLANK_PROFILE = {
   pay_rate: '', commission_pct: 15, is_active: true,
 }
 
-export default function DriversPanel({ profiles, drivers, saveProfile, removeProfile }) {
-  const [collapsed, setCollapsed] = useState(false)
-  const [editing,   setEditing]   = useState(null) // profile id or 'new'
-  const [form,      setForm]      = useState(BLANK_PROFILE)
-  const [saving,    setSaving]    = useState(false)
+export default function DriversPanel({ profiles, inactiveProfiles, drivers, saveProfile, removeProfile, reactivateProfile, fetchInactive }) {
+  const [collapsed,     setCollapsed]     = useState(false)
+  const [editing,       setEditing]       = useState(null) // profile id or 'new'
+  const [form,          setForm]          = useState(BLANK_PROFILE)
+  const [saving,        setSaving]        = useState(false)
+  const [showInactive,  setShowInactive]  = useState(false)
+  const [loadingInact,  setLoadingInact]  = useState(false)
 
   function startAdd() {
     setForm({ ...BLANK_PROFILE })
@@ -41,6 +43,19 @@ export default function DriversPanel({ profiles, drivers, saveProfile, removePro
     } finally {
       setSaving(false)
     }
+  }
+
+  async function handleToggleInactive() {
+    if (!showInactive) {
+      setLoadingInact(true)
+      await fetchInactive()
+      setLoadingInact(false)
+    }
+    setShowInactive(v => !v)
+  }
+
+  async function handleReactivate(id) {
+    await reactivateProfile(id)
   }
 
   const set = (field, val) => setForm(f => ({ ...f, [field]: val }))
@@ -82,17 +97,83 @@ export default function DriversPanel({ profiles, drivers, saveProfile, removePro
                       : `${p.commission_pct ?? 15}% commission`
                     }
                   </td>
-                  <td>
+                  <td style={{ whiteSpace: 'nowrap' }}>
                     <button className="btn btn-ghost btn-xs" onClick={() => startEdit(p)}>Edit</button>
-                    <button className="btn btn-ghost btn-xs" style={{ color: '#B91C1C', marginLeft: 4 }} onClick={() => removeProfile(p.id)}>✕</button>
+                    <button
+                      className="btn btn-ghost btn-xs"
+                      style={{ color: '#B45309', marginLeft: 4 }}
+                      title="Deactivate — hides from paystub generator. History is preserved."
+                      onClick={() => {
+                        if (confirm(`Deactivate ${p.driver_name}? They will be hidden from the paystub generator but all pay history is preserved.`)) {
+                          removeProfile(p.id)
+                        }
+                      }}
+                    >Deactivate</button>
                   </td>
                 </tr>
               ))}
               {profiles.length === 0 && (
-                <tr><td colSpan={5} style={{ color: '#9CA3AF', padding: '16px 12px' }}>No driver profiles yet. Add one below.</td></tr>
+                <tr><td colSpan={5} style={{ color: '#9CA3AF', padding: '16px 12px' }}>No active driver profiles. Add one below.</td></tr>
               )}
             </tbody>
           </table>
+
+          {/* ── Inactive drivers section ── */}
+          <div style={{ marginTop: 10 }}>
+            <button
+              className="btn btn-ghost btn-xs"
+              onClick={handleToggleInactive}
+              disabled={loadingInact}
+              style={{ color: '#6B7280' }}
+            >
+              {loadingInact ? 'Loading…' : showInactive ? '▾ Hide inactive drivers' : '▸ Show inactive drivers'}
+            </button>
+          </div>
+
+          {showInactive && (
+            <div style={{ marginTop: 8 }}>
+              {inactiveProfiles.length === 0 ? (
+                <div style={{ fontSize: 12, color: '#9CA3AF', padding: '8px 0' }}>No inactive profiles.</div>
+              ) : (
+                <table className="acct-table drivers-table" style={{ opacity: 0.7 }}>
+                  <thead>
+                    <tr>
+                      <th>Driver</th>
+                      <th>Company</th>
+                      <th>Type</th>
+                      <th>Pay Rate</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {inactiveProfiles.map(p => (
+                      <tr key={p.id} style={{ color: '#9CA3AF' }}>
+                        <td><strong style={{ color: '#6B7280' }}>{p.driver_name}</strong></td>
+                        <td>{p.company === 'carat' ? 'Carat' : 'Pro Freight'}</td>
+                        <td>
+                          <span className={`profile-badge ${p.profile_type === 'owner_operator' ? 'badge-oo' : 'badge-co'}`} style={{ opacity: 0.5 }}>
+                            {p.profile_type === 'owner_operator' ? 'Owner Operator' : 'Company Driver'}
+                          </span>
+                        </td>
+                        <td style={{ fontSize: 12 }}>
+                          {p.profile_type === 'company'
+                            ? p.pay_type === 'per_mile' ? `$${p.pay_rate}/mile` : 'Flat rate'
+                            : `${p.commission_pct ?? 15}% commission`}
+                        </td>
+                        <td>
+                          <button
+                            className="btn btn-ghost btn-xs"
+                            style={{ color: '#059669' }}
+                            onClick={() => handleReactivate(p.id)}
+                          >Reactivate</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          )}
 
           {editing ? (
             <form className="driver-profile-form" onSubmit={handleSave}>

@@ -114,16 +114,17 @@ export async function updateInvoice(invoiceId, data) {
 }
 
 // ── Driver loads for paystub (only unpaid loads) ───────────────────────────
-export async function fetchDriverLoads(driverName, startDate, endDate) {
+// dateField: 'pickup_date' | 'delivery_date' — which date to filter the range by
+export async function fetchDriverLoads(driverName, startDate, endDate, dateField = 'pickup_date') {
   const { data, error } = await supabase
     .from('loads')
     .select('*')
     .eq('driver_name', driverName)
     .is('paid_at', null)           // exclude already-paid loads
-    .order('pickup_date', { ascending: true })
+    .order(dateField, { ascending: true })
   if (error) throw new Error(error.message)
   return (data ?? []).filter(l => {
-    const d = l.pickup_date || l.date
+    const d = l[dateField] || l.date
     return d >= startDate && d <= endDate
   })
 }
