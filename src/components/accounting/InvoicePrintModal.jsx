@@ -2,26 +2,9 @@ import { useState } from 'react'
 import BrokerPicker from './BrokerPicker'
 import FactoringPicker from './FactoringPicker'
 import { createInvoice, updateInvoice } from '../../hooks/useAccounting'
+import { useCompanySettings } from '../../hooks/useSettings'
 
-// Company info
-const CO = {
-  carat: {
-    name:    'CARAT EXPEDITED INC',
-    address: '475 S Frontage Rd Ste 210',
-    city:    'Burr Ridge, IL 60527',
-    phone:   '630-491-5555',
-    color:   '#111827',
-    logo:    '/logo-carat.png',
-  },
-  pro_freight: {
-    name:    'PRO FREIGHT TRANSPORTATION INC',
-    address: '2526 Alligator Creek Rd',
-    city:    'Clearwater, FL 33765',
-    phone:   '',
-    color:   '#111827',
-    logo:    '/logo-pro-freight.png',
-  },
-}
+const LOGOS = { carat: '/logo-carat.png', pro_freight: '/logo-pro-freight.png' }
 
 const EXTRA_TYPES = ['TONU', 'Lumper Fee', 'Detention', 'Layover']
 
@@ -30,7 +13,9 @@ const today = () => new Date().toLocaleDateString('en-US', { year: 'numeric', mo
 
 export default function InvoicePrintModal({ loads, existingInvoice, company: companyFilter, onCreated, onClose }) {
   const loadCompany = loads[0]?.company || 'carat'
-  const co = CO[loadCompany] || CO.carat
+  const { companies } = useCompanySettings()
+  const coKey = loadCompany === 'pro_freight' ? 'company_pro_freight' : 'company_carat'
+  const co = { ...companies[coKey], logo: LOGOS[loadCompany] || LOGOS.carat }
 
   // Pre-fill from existing invoice if re-opening from history
   const [broker,           setBroker]           = useState(existingInvoice ? { name: existingInvoice.bill_to_name } : null)
@@ -261,7 +246,6 @@ ${cssLinks}
                   <th>Origin</th>
                   <th>Delivery Date</th>
                   <th>Destination</th>
-                  <th>Miles</th>
                   <th>Amount</th>
                 </tr>
               </thead>
@@ -273,7 +257,6 @@ ${cssLinks}
                     <td>{l.pickup_location?.split(',')[0]  || '—'}</td>
                     <td>{l.delivery_date || '—'}</td>
                     <td>{l.delivery_location?.split(',')[0] || '—'}</td>
-                    <td>{l.total_miles || '—'}</td>
                     <td className="inv-amount">{l.price ? fmt(l.price) : '—'}</td>
                   </tr>
                 ))}
@@ -281,14 +264,13 @@ ${cssLinks}
                   <tr key={`extra-${i}`} className="inv-extra-row">
                     <td><strong>{e.type}</strong></td>
                     <td colSpan={4} style={{ color: '#6B7280', fontStyle: 'italic' }}>{e.description || ''}</td>
-                    <td></td>
                     <td className="inv-amount">{fmt(e.amount)}</td>
                   </tr>
                 ))}
               </tbody>
               <tfoot>
                 <tr>
-                  <td colSpan={6} className="inv-total-label">TOTAL DUE</td>
+                  <td colSpan={5} className="inv-total-label">TOTAL DUE</td>
                   <td className="inv-total-val">{fmt(total)}</td>
                 </tr>
               </tfoot>

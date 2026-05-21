@@ -57,7 +57,7 @@ export default function BrokerPicker({ value, onChange, company = 'all' }) {  //
         type="text"
         value={query}
         onChange={handleInput}
-        onFocus={() => query.length >= 2 && setOpen(true)}
+        onFocus={() => query.length >= 1 && setOpen(true)}
         placeholder="Search broker name…"
         autoComplete="off"
       />
@@ -65,7 +65,7 @@ export default function BrokerPicker({ value, onChange, company = 'all' }) {  //
       {open && !addMode && (
         <div className="broker-dropdown">
           {loading && <div className="broker-dd-item broker-dd-hint">Searching…</div>}
-          {!loading && brokers.length === 0 && query.length >= 2 && (
+          {!loading && brokers.length === 0 && query.length >= 1 && (
             <div className="broker-dd-item broker-dd-hint">No results for "{query}"</div>
           )}
           {brokers.map(b => (

@@ -144,15 +144,15 @@ export default function PaystubsTab({ drivers, company }) {
       data.forEach(l => {
         if (isOO) {
           // Owner operator: gross = load price
-          init[l.id] = { amount: String(l.price || '') }
+          init[l.id] = { amount: String(l.price || ''), emptyMiles: String(l.empty_miles || '') }
         } else if (isPerMile) {
           // Company driver per mile: auto-calc
           const miles = l.total_miles || 0
           const rate  = profile?.pay_rate || 0
-          init[l.id] = { miles: String(miles), rate: String(rate), amount: String((miles * rate).toFixed(2)) }
+          init[l.id] = { miles: String(miles), emptyMiles: String(l.empty_miles || ''), rate: String(rate), amount: String((miles * rate).toFixed(2)) }
         } else {
           // Flat rate or no profile: blank
-          init[l.id] = { amount: '' }
+          init[l.id] = { amount: '', emptyMiles: String(l.empty_miles || '') }
         }
       })
       setLoadPay(init)
@@ -398,7 +398,9 @@ export default function PaystubsTab({ drivers, company }) {
                         <td>
                           <input type="number" className="pay-amount-input" value={pay.miles ?? ''} onChange={e => updateLoadMiles(l.id, e.target.value)} />
                         </td>
-                        <td>{l.empty_miles || '—'}</td>
+                        <td>
+                          <input type="number" className="pay-amount-input" placeholder="0" value={pay.emptyMiles ?? ''} onChange={e => setLoadPay(p => ({ ...p, [l.id]: { ...p[l.id], emptyMiles: e.target.value } }))} />
+                        </td>
                         <td>
                           <input type="number" className="pay-amount-input" style={{ width: 70 }} step="0.01" value={pay.rate ?? ''} onChange={e => updateLoadRate(l.id, e.target.value)} />
                         </td>
@@ -406,7 +408,9 @@ export default function PaystubsTab({ drivers, company }) {
                     ) : (
                       <>
                         <td>{l.total_miles || '—'}</td>
-                        <td>{l.empty_miles || '—'}</td>
+                        <td>
+                          <input type="number" className="pay-amount-input" placeholder="0" value={pay.emptyMiles ?? ''} onChange={e => setLoadPay(p => ({ ...p, [l.id]: { ...p[l.id], emptyMiles: e.target.value } }))} />
+                        </td>
                       </>
                     )}
                     <td>

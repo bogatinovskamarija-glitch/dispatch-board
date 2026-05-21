@@ -7,7 +7,7 @@ export function useBrokerSearch(query = '', company = 'all') {
   const [loading, setLoading]   = useState(false)
 
   useEffect(() => {
-    if (query.length < 2) { setBrokers([]); return }
+    if (query.length < 1) { setBrokers([]); return }
     let cancelled = false
     const timer = setTimeout(async () => {
       setLoading(true)
@@ -16,11 +16,11 @@ export function useBrokerSearch(query = '', company = 'all') {
         .select('id, name, address, city, state, zip, phone, email, company')
         .ilike('name', `%${query}%`)
         .order('name')
-        .limit(150)
+        .limit(200)
       if (company !== 'all') q = q.eq('company', company)
       const { data } = await q
       if (!cancelled) { setBrokers(data ?? []); setLoading(false) }
-    }, 250)
+    }, 200)
     return () => { cancelled = true; clearTimeout(timer) }
   }, [query, company])
 

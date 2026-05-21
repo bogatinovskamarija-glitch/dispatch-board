@@ -6,6 +6,17 @@ const fmt = n => n ? '$' + Number(n).toLocaleString('en-US') : '—'
 const dpm = (price, miles) =>
   price && miles ? '$' + (price / miles).toFixed(2) + '/mi' : null
 
+const STATUS_ROUTE_BG = {
+  covered:      { bg: '#F0FDF4', border: '#86EFAC' },  // green
+  empty:        { bg: '#FEFCE8', border: '#FDE047' },  // yellow
+  at_home:      { bg: '#FDF2F8', border: '#F9A8D4' },  // pink
+  broken_down:  { bg: '#FEF2F2', border: '#FCA5A5' },  // red
+  no_driver:    { bg: '#F9FAFB', border: '#D1D5DB' },  // grey
+  prebooked:    { bg: '#EEF2FF', border: '#A5B4FC' },  // indigo
+  at_pickup:    { bg: '#F0F9FF', border: '#7DD3FC' },  // sky
+  at_delivery:  { bg: '#FFF7ED', border: '#FDBA74' },  // orange
+}
+
 export default function DayView({ loads, loading, trucks, trailers, drivers, fleet = [], statusFilter, onEdit, onDelete, onDriverClick, onTruckClick, onTrailerClick }) {
   const truckOpts = trucks.map(e => ({
     value: e.truckNumber,
@@ -238,7 +249,11 @@ export default function DayView({ loads, loading, trucks, trailers, drivers, fle
           </div>
         </td>
 
-        <td>
+        <td style={{
+          background: STATUS_ROUTE_BG[load.status]?.bg,
+          borderLeft: `3px solid ${STATUS_ROUTE_BG[load.status]?.border ?? 'transparent'}`,
+          borderRadius: 6,
+        }}>
           {load.pickup_location || load.delivery_location ? (
             <div className="route-cell">
               <div>
@@ -322,7 +337,11 @@ export default function DayView({ loads, loading, trucks, trailers, drivers, fle
         {/* truck / trailer / type / driver: same as primary — leave blank */}
         <td /><td /><td /><td />
 
-        <td>
+        <td style={{
+          background: STATUS_ROUTE_BG[load.status]?.bg,
+          borderLeft: `3px solid ${STATUS_ROUTE_BG[load.status]?.border ?? 'transparent'}`,
+          borderRadius: 6,
+        }}>
           {load.pickup_location || load.delivery_location ? (
             <div className="route-cell">
               <div>
