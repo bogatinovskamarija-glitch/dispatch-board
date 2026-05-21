@@ -986,3 +986,30 @@ textarea { resize: vertical; min-height: 60px; }
   .inv-loads-table th { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .paystub-adddeds, .paystub-grand-print { page-break-inside: avoid; }
 }
+
+/* ── YTD Summary ── */
+.ytd-summary-bar {
+  display: flex; gap: 0; margin-bottom: 20px;
+  border: 1px solid #E5E7EB; border-radius: 10px; overflow: hidden;
+}
+.ytd-bar-item {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  padding: 14px 10px; border-right: 1px solid #E5E7EB; background: #F9FAFB;
+}
+.ytd-bar-item:last-child { border-right: none; }
+.ytd-bar-net { background: #EFF6FF; }
+.ytd-bar-item span  { font-size: 11px; color: #9CA3AF; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4px; }
+.ytd-bar-item strong { font-size: 16px; font-weight: 700; color: #111827; }
+.ytd-table .ytd-driver-row:hover { background: #F9FAFB; }
+.ytd-detail-row td { background: #F9FAFB !important; padding: 0 !important; }
+.ytd-detail-grid {
+  display: flex; gap: 32px; padding: 12px 16px 16px 32px; flex-wrap: wrap;
+}
+.ytd-detail-section { min-width: 200px; }
+.ytd-detail-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 6px; }
+.ytd-detail-line {
+  display: flex; justify-content: space-between; gap: 24px;
+  font-size: 12px; padding: 3px 0; border-bottom: 1px solid #E5E7EB;
+}
+.ytd-detail-line span:first-child { color: #374151; }
+.ytd-detail-line span:last-child  { font-weight: 600; white-space: nowrap; }

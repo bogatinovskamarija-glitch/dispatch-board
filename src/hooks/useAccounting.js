@@ -129,6 +129,64 @@ export async function fetchDriverLoads(driverName, startDate, endDate, dateField
   })
 }
 
+// ── YTD summary ───────────────────────────────────────────────────────────
+export function useYTDSummary(company = 'all', year = new Date().getFullYear()) {
+  const [rows,    setRows]    = useState([])
+  const [loading, setLoading] = useState(true)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    const from = `${year}-01-01`
+    const to   = `${year}-12-31`
+    let q = supabase
+      .from('paystubs')
+      .select('driver_name, company, load_total, grand_total, additions, deductions, start_date')
+      .gte('start_date', from)
+      .lte('start_date', to)
+      .order('driver_name')
+    if (company !== 'all') q = q.eq('company', company)
+    const { data } = await q
+
+    // Aggregate by driver
+    const map = {}
+    for (const ps of (data ?? [])) {
+      if (!map[ps.driver_name]) {
+        map[ps.driver_name] = {
+          driver_name:  ps.driver_name,
+          company:      ps.company,
+          paystubCount: 0,
+          gross:        0,
+          addTotal:     0,
+          dedTotal:     0,
+          net:          0,
+          addsByLabel:  {},
+          dedsByLabel:  {},
+        }
+      }
+      const d = map[ps.driver_name]
+      d.paystubCount++
+      d.gross += Number(ps.load_total)  || 0
+      d.net   += Number(ps.grand_total) || 0
+      ;(ps.additions || []).forEach(a => {
+        if (!a.label || !a.amount) return
+        d.addsByLabel[a.label] = (d.addsByLabel[a.label] || 0) + Number(a.amount)
+        d.addTotal += Number(a.amount)
+      })
+      ;(ps.deductions || []).forEach(ded => {
+        if (!ded.label || !ded.amount) return
+        d.dedsByLabel[ded.label] = (d.dedsByLabel[ded.label] || 0) + Number(ded.amount)
+        d.dedTotal += Number(ded.amount)
+      })
+    }
+
+    setRows(Object.values(map).sort((a, b) => a.driver_name.localeCompare(b.driver_name)))
+    setLoading(false)
+  }, [company, year])
+
+  useEffect(() => { load() }, [load])
+  return { rows, loading, refresh: load }
+}
+
 // ── Paystub history ────────────────────────────────────────────────────────
 export function usePaystubHistory(company = 'all') {
   const [paystubs, setPaystubs] = useState([])

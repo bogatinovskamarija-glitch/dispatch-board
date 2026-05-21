@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { fetchDriverLoads, createPaystub, updatePaystub, usePaystubHistory, fetchPaystubLoads } from '../../hooks/useAccounting'
+import { fetchDriverLoads, createPaystub, updatePaystub, usePaystubHistory, fetchPaystubLoads, useYTDSummary } from '../../hooks/useAccounting'
 import { useDriverProfiles } from '../../hooks/useDriverProfiles'
 import DriversPanel from './DriversPanel'
 import PaystubPrintModal from './PaystubPrintModal'
@@ -50,8 +50,15 @@ export default function PaystubsTab({ drivers, company }) {
   const { profiles, inactiveProfiles, loading: profLoading, saveProfile, removeProfile, reactivateProfile, fetchInactive } = useDriverProfiles()
   const { paystubs, loading: histLoading, refresh: refreshHistory } = usePaystubHistory(company)
 
-  // ── Tab: 'generate' | 'history' ─────────────────────────────────────────
+  // ── Tab: 'generate' | 'history' | 'ytd' ────────────────────────────────
   const [psTab, setPsTab] = useState('generate')
+
+  // ── YTD ─────────────────────────────────────────────────────────────────
+  const currentYear = new Date().getFullYear()
+  const [ytdYear, setYtdYear] = useState(currentYear)
+  const { rows: ytdRows, loading: ytdLoading, refresh: ytdRefresh } = useYTDSummary(company, ytdYear)
+  const [ytdExpanded, setYtdExpanded] = useState({})
+  const yearOptions = Array.from({ length: 4 }, (_, i) => currentYear - i)
 
   // History — open a past paystub for reprint
   const [historyModal, setHistoryModal] = useState(null)   // { paystub, loads }
@@ -301,6 +308,10 @@ export default function PaystubsTab({ drivers, company }) {
           className={`btn ${psTab === 'history' ? 'btn-primary' : 'btn-ghost'}`}
           onClick={() => setPsTab('history')}
         >History ({paystubs.length})</button>
+        <button
+          className={`btn ${psTab === 'ytd' ? 'btn-primary' : 'btn-ghost'}`}
+          onClick={() => setPsTab('ytd')}
+        >YTD Summary</button>
       </div>
 
       {/* ── History tab ── */}
@@ -371,6 +382,122 @@ export default function PaystubsTab({ drivers, company }) {
             </>
           )}
         </>
+      )}
+
+      {/* ── YTD Summary tab ── */}
+      {psTab === 'ytd' && (
+        <div>
+          {/* Year selector */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18 }}>
+            <span style={{ fontWeight: 600, fontSize: 14 }}>Year:</span>
+            {yearOptions.map(y => (
+              <button
+                key={y}
+                className={`btn btn-xs ${ytdYear === y ? 'btn-primary' : 'btn-ghost'}`}
+                onClick={() => setYtdYear(y)}
+              >{y}</button>
+            ))}
+            <button className="btn btn-ghost btn-xs" onClick={ytdRefresh} style={{ marginLeft: 'auto' }}>↻ Refresh</button>
+          </div>
+
+          {ytdLoading ? (
+            <div style={{ color: '#9CA3AF' }}>Loading…</div>
+          ) : ytdRows.length === 0 ? (
+            <div className="acct-empty">No paystubs found for {ytdYear}.</div>
+          ) : (
+            <>
+              {/* Totals summary bar */}
+              {(() => {
+                const totGross = ytdRows.reduce((s, r) => s + r.gross,    0)
+                const totAdd   = ytdRows.reduce((s, r) => s + r.addTotal, 0)
+                const totDed   = ytdRows.reduce((s, r) => s + r.dedTotal, 0)
+                const totNet   = ytdRows.reduce((s, r) => s + r.net,      0)
+                return (
+                  <div className="ytd-summary-bar">
+                    <div className="ytd-bar-item"><span>Drivers</span><strong>{ytdRows.length}</strong></div>
+                    <div className="ytd-bar-item"><span>Gross Pay</span><strong>{fmt(totGross)}</strong></div>
+                    <div className="ytd-bar-item"><span>Additions</span><strong style={{ color: '#059669' }}>+{fmt(totAdd)}</strong></div>
+                    <div className="ytd-bar-item"><span>Deductions</span><strong style={{ color: '#DC2626' }}>-{fmt(totDed)}</strong></div>
+                    <div className="ytd-bar-item ytd-bar-net"><span>Net Pay</span><strong>{fmt(totNet)}</strong></div>
+                  </div>
+                )
+              })()}
+
+              <table className="acct-table ytd-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: 24 }}></th>
+                    <th>Driver</th>
+                    <th>Company</th>
+                    <th style={{ textAlign: 'right' }}>Paystubs</th>
+                    <th style={{ textAlign: 'right' }}>Gross Pay</th>
+                    <th style={{ textAlign: 'right' }}>Additions</th>
+                    <th style={{ textAlign: 'right' }}>Deductions</th>
+                    <th style={{ textAlign: 'right' }}>Net Pay</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ytdRows.map(r => {
+                    const expanded = !!ytdExpanded[r.driver_name]
+                    const addEntries = Object.entries(r.addsByLabel)
+                    const dedEntries = Object.entries(r.dedsByLabel)
+                    return [
+                      <tr
+                        key={r.driver_name}
+                        className="ytd-driver-row"
+                        onClick={() => setYtdExpanded(prev => ({ ...prev, [r.driver_name]: !prev[r.driver_name] }))}
+                        style={{ cursor: 'pointer' }}
+                      >
+                        <td style={{ color: '#9CA3AF', fontSize: 11 }}>{expanded ? '▾' : '▸'}</td>
+                        <td><strong>{r.driver_name}</strong></td>
+                        <td style={{ color: '#6B7280', fontSize: 12 }}>{r.company === 'carat' ? 'Carat' : 'Pro Freight'}</td>
+                        <td style={{ textAlign: 'right', color: '#6B7280' }}>{r.paystubCount}</td>
+                        <td style={{ textAlign: 'right', fontWeight: 600 }}>{fmt(r.gross)}</td>
+                        <td style={{ textAlign: 'right', color: '#059669' }}>{r.addTotal > 0 ? `+${fmt(r.addTotal)}` : '—'}</td>
+                        <td style={{ textAlign: 'right', color: '#DC2626' }}>{r.dedTotal > 0 ? `-${fmt(r.dedTotal)}` : '—'}</td>
+                        <td style={{ textAlign: 'right', fontWeight: 700, fontSize: 14 }}>{fmt(r.net)}</td>
+                      </tr>,
+                      expanded && (
+                        <tr key={`${r.driver_name}-detail`} className="ytd-detail-row">
+                          <td></td>
+                          <td colSpan={7}>
+                            <div className="ytd-detail-grid">
+                              {addEntries.length > 0 && (
+                                <div className="ytd-detail-section">
+                                  <div className="ytd-detail-title" style={{ color: '#059669' }}>Additions</div>
+                                  {addEntries.map(([label, amt]) => (
+                                    <div key={label} className="ytd-detail-line">
+                                      <span>{label}</span>
+                                      <span style={{ color: '#059669' }}>+{fmt(amt)}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              {dedEntries.length > 0 && (
+                                <div className="ytd-detail-section">
+                                  <div className="ytd-detail-title" style={{ color: '#DC2626' }}>Deductions</div>
+                                  {dedEntries.map(([label, amt]) => (
+                                    <div key={label} className="ytd-detail-line">
+                                      <span>{label}</span>
+                                      <span style={{ color: '#DC2626' }}>-{fmt(amt)}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              {addEntries.length === 0 && dedEntries.length === 0 && (
+                                <span style={{ color: '#9CA3AF', fontSize: 12 }}>No additions or deductions recorded.</span>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    ]
+                  })}
+                </tbody>
+              </table>
+            </>
+          )}
+        </div>
       )}
 
       {psTab === 'generate' && <>
