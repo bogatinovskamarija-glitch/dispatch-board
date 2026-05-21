@@ -1,22 +1,9 @@
 import { useState } from 'react'
+import { useCompanySettings } from '../../hooks/useSettings'
 
-const CO = {
-  carat: {
-    name:    'CARAT EXPEDITED INC',
-    address: '475 S Frontage Rd Ste 210',
-    city:    'Burr Ridge, IL 60527',
-    phone:   '630-491-5555',
-    color:   '#111827',
-    logo:    '/logo-carat.png',
-  },
-  pro_freight: {
-    name:    'PRO FREIGHT TRANSPORTATION INC',
-    address: '2526 Alligator Creek Rd',
-    city:    'Clearwater, FL 33765',
-    phone:   '',
-    color:   '#111827',
-    logo:    '/logo-pro-freight.png',
-  },
+const LOGOS = {
+  carat:       '/logo-carat.png',
+  pro_freight: '/logo-pro-freight.png',
 }
 
 const fmt = n => '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2 })
@@ -28,7 +15,9 @@ export default function PaystubPrintModal({
   onMarkPaid, isHistory, isEdit, onEdit, onClose,
 }) {
   const [saving, setSaving] = useState(false)
-  const co     = CO[company] || CO.carat
+  const { companies } = useCompanySettings()
+  const coSettings = company === 'pro_freight' ? companies.company_pro_freight : companies.company_carat
+  const co = { ...coSettings, logo: LOGOS[company] || LOGOS.carat }
   const today  = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
 
   const isOO      = profile?.profile_type === 'owner_operator'
@@ -141,13 +130,17 @@ ${cssLinks}
                   <th>Destination</th>
                   <th>Loaded Mi</th>
                   <th>Empty Mi</th>
-                  {isPerMile && <th>Rate</th>}
+                  <th>Rate</th>
                   <th>{isOO ? 'Gross' : 'Pay'}</th>
                 </tr>
               </thead>
               <tbody>
                 {loads.map(l => {
                   const pay = loadPay[l.id] || {}
+                  const emptyMi = pay.emptyMiles ?? l.empty_miles
+                  const rateCell = isPerMile
+                    ? `$${pay.rate || profile?.pay_rate || '—'}/mi`
+                    : isOO ? '—' : 'Flat Rate'
                   return (
                     <tr key={l.id}>
                       <td>{l.load_number || '—'}</td>
@@ -156,8 +149,8 @@ ${cssLinks}
                       <td>{l.delivery_date || '—'}</td>
                       <td>{l.delivery_location?.split(',')[0] || '—'}</td>
                       <td>{isPerMile ? (pay.miles || l.total_miles || '—') : (l.total_miles || '—')}</td>
-                      <td>{l.empty_miles || '—'}</td>
-                      {isPerMile && <td>${pay.rate || profile?.pay_rate || '—'}</td>}
+                      <td>{emptyMi || '—'}</td>
+                      <td>{rateCell}</td>
                       <td className="inv-amount">{pay.amount ? fmt(pay.amount) : '—'}</td>
                     </tr>
                   )
@@ -165,7 +158,7 @@ ${cssLinks}
               </tbody>
               <tfoot>
                 <tr>
-                  <td colSpan={isPerMile ? 8 : 7} className="inv-total-label" style={{ fontWeight: 600 }}>Sub-Total</td>
+                  <td colSpan={8} className="inv-total-label" style={{ fontWeight: 600 }}>Sub-Total</td>
                   <td className="inv-amount" style={{ fontWeight: 700 }}>{fmt(loadTotal)}</td>
                 </tr>
               </tfoot>
@@ -178,7 +171,7 @@ ${cssLinks}
                 {additions.map((a, i) => (
                   <div key={i} className="paystub-addded-row">
                     <span>{a.label}</span>
-                    {a.balance && <span className="paystub-addded-balance">{a.balance}</span>}
+                    <span className="paystub-addded-balance">{a.balance || ''}</span>
                     <span className="paystub-addded-amount">{fmt(a.amount || 0)}</span>
                   </div>
                 ))}
@@ -195,7 +188,7 @@ ${cssLinks}
                 {deductions.map((d, i) => (
                   <div key={i} className="paystub-addded-row">
                     <span>{d.label}</span>
-                    {d.balance && <span className="paystub-addded-balance">{d.balance}</span>}
+                    <span className="paystub-addded-balance">{d.balance || ''}</span>
                     <span className="paystub-addded-amount" style={{ color: '#DC2626' }}>-{fmt(d.amount || 0)}</span>
                   </div>
                 ))}

@@ -146,10 +146,11 @@ export default function PaystubsTab({ drivers, company }) {
           // Owner operator: gross = load price
           init[l.id] = { amount: String(l.price || ''), emptyMiles: String(l.empty_miles || '') }
         } else if (isPerMile) {
-          // Company driver per mile: auto-calc
+          // Company driver per mile: auto-calc (loaded + empty) * rate
           const miles = l.total_miles || 0
+          const empty = l.empty_miles || 0
           const rate  = profile?.pay_rate || 0
-          init[l.id] = { miles: String(miles), emptyMiles: String(l.empty_miles || ''), rate: String(rate), amount: String((miles * rate).toFixed(2)) }
+          init[l.id] = { miles: String(miles), emptyMiles: String(empty || ''), rate: String(rate), amount: String(((miles + empty) * rate).toFixed(2)) }
         } else {
           // Flat rate or no profile: blank
           init[l.id] = { amount: '', emptyMiles: String(l.empty_miles || '') }
@@ -170,17 +171,31 @@ export default function PaystubsTab({ drivers, company }) {
   }
 
   // ── Load pay calculations ────────────────────────────────────────────────
+  // Per-mile total = (loaded miles + empty miles) * rate
+  function calcAmount(entry) {
+    const loaded = Number(entry.miles)      || 0
+    const empty  = Number(entry.emptyMiles) || 0
+    const rate   = Number(entry.rate)       || 0
+    return String(((loaded + empty) * rate).toFixed(2))
+  }
   function updateLoadMiles(id, miles) {
     setLoadPay(p => {
       const entry = { ...p[id], miles }
-      entry.amount = String(((Number(miles) || 0) * (Number(entry.rate) || 0)).toFixed(2))
+      entry.amount = calcAmount(entry)
       return { ...p, [id]: entry }
     })
   }
   function updateLoadRate(id, rate) {
     setLoadPay(p => {
       const entry = { ...p[id], rate }
-      entry.amount = String(((Number(p[id]?.miles) || 0) * (Number(rate) || 0)).toFixed(2))
+      entry.amount = calcAmount(entry)
+      return { ...p, [id]: entry }
+    })
+  }
+  function updateLoadEmptyMiles(id, emptyMiles) {
+    setLoadPay(p => {
+      const entry = { ...p[id], emptyMiles }
+      if (isPerMile) entry.amount = calcAmount(entry)
       return { ...p, [id]: entry }
     })
   }
@@ -399,7 +414,7 @@ export default function PaystubsTab({ drivers, company }) {
                           <input type="number" className="pay-amount-input" value={pay.miles ?? ''} onChange={e => updateLoadMiles(l.id, e.target.value)} />
                         </td>
                         <td>
-                          <input type="number" className="pay-amount-input" placeholder="0" value={pay.emptyMiles ?? ''} onChange={e => setLoadPay(p => ({ ...p, [l.id]: { ...p[l.id], emptyMiles: e.target.value } }))} />
+                          <input type="number" className="pay-amount-input" placeholder="0" value={pay.emptyMiles ?? ''} onChange={e => updateLoadEmptyMiles(l.id, e.target.value)} />
                         </td>
                         <td>
                           <input type="number" className="pay-amount-input" style={{ width: 70 }} step="0.01" value={pay.rate ?? ''} onChange={e => updateLoadRate(l.id, e.target.value)} />
@@ -409,7 +424,7 @@ export default function PaystubsTab({ drivers, company }) {
                       <>
                         <td>{l.total_miles || '—'}</td>
                         <td>
-                          <input type="number" className="pay-amount-input" placeholder="0" value={pay.emptyMiles ?? ''} onChange={e => setLoadPay(p => ({ ...p, [l.id]: { ...p[l.id], emptyMiles: e.target.value } }))} />
+                          <input type="number" className="pay-amount-input" placeholder="0" value={pay.emptyMiles ?? ''} onChange={e => updateLoadEmptyMiles(l.id, e.target.value)} />
                         </td>
                       </>
                     )}
