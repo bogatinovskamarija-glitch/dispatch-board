@@ -345,14 +345,15 @@ function ShopsTab({ shops, onAddShop, onRemoveShop }) {
 
 // ── Weekly Tab ─────────────────────────────────────────────────────────────
 function WeeklyTab({ records }) {
+  const [expanded, setExpanded] = useState({})   // weekKey → bool
+
   const byWeek = useMemo(() => {
     const map = {}
     records.forEach(r => {
       if (!r.date) return
-      // Find Monday of this record's week
       const [y, m, d] = r.date.split('-').map(Number)
       const dt  = new Date(y, m - 1, d)
-      const dow = dt.getDay()                      // 0=Sun, 1=Mon…
+      const dow = dt.getDay()
       const diff = dow === 0 ? -6 : 1 - dow
       dt.setDate(dt.getDate() + diff)
       const weekKey = format(dt)
@@ -362,91 +363,142 @@ function WeeklyTab({ records }) {
           weekStart: weekKey,
           weekEnd:   format(addDays(dt, 6)),
           records:   [],
-          total:          0,
-          tractorTotal:   0,
-          trailerTotal:   0,
-          catMap:         {},
+          total: 0, tractorTotal: 0, trailerTotal: 0,
         }
       }
       const w = map[weekKey]
       const amt = Number(r.amount) || 0
       w.records.push(r)
-      w.total         += amt
+      w.total += amt
       if (r.unit_type?.toLowerCase() === 'tractor') w.tractorTotal += amt
       if (r.unit_type?.toLowerCase() === 'trailer') w.trailerTotal += amt
-      const cat = r.category || 'other'
-      w.catMap[cat] = (w.catMap[cat] || 0) + amt
     })
     return Object.values(map).sort((a, b) => b.weekStart.localeCompare(a.weekStart))
   }, [records])
 
-  if (!records.length) return <div className="maint-empty">No records for the selected period.</div>
-
-  const grandTotal        = byWeek.reduce((s, w) => s + w.total, 0)
-  const grandTractor      = byWeek.reduce((s, w) => s + w.tractorTotal, 0)
-  const grandTrailer      = byWeek.reduce((s, w) => s + w.trailerTotal, 0)
-  const grandRecords      = byWeek.reduce((s, w) => s + w.records.length, 0)
-
-  function topCat(w) {
-    const entries = Object.entries(w.catMap)
-    if (!entries.length) return null
-    const [cat] = entries.sort((a, b) => b[1] - a[1])[0]
-    return cat
+  // Per-vehicle breakdown for a week's records
+  function vehicleRows(weekRecords) {
+    const map = {}
+    weekRecords.forEach(r => {
+      const key = (r.unit_number || '?') + '|' + (r.unit_type || '')
+      if (!map[key]) map[key] = { unit: r.unit_number, type: r.unit_type, total: 0, cats: {}, records: [] }
+      const amt = Number(r.amount) || 0
+      map[key].total += amt
+      map[key].cats[r.category || 'other'] = (map[key].cats[r.category || 'other'] || 0) + amt
+      map[key].records.push(r)
+    })
+    return Object.values(map).sort((a, b) => b.total - a.total)
   }
 
-  function fmtWeek(weekStart, weekEnd) {
-    const fmt = d => {
+  function fmtWeek(s, e) {
+    const f = d => {
       const [y, m, day] = d.split('-').map(Number)
       return new Date(y, m - 1, day).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
     }
-    return `${fmt(weekStart)} – ${fmt(weekEnd)}`
+    return `${f(s)} – ${f(e)}`
   }
+
+  function toggleWeek(key) {
+    setExpanded(p => ({ ...p, [key]: !p[key] }))
+  }
+
+  if (!records.length) return <div className="maint-empty">No records for the selected period.</div>
+
+  const grandTotal   = byWeek.reduce((s, w) => s + w.total, 0)
+  const grandTractor = byWeek.reduce((s, w) => s + w.tractorTotal, 0)
+  const grandTrailer = byWeek.reduce((s, w) => s + w.trailerTotal, 0)
+  const grandRecords = byWeek.reduce((s, w) => s + w.records.length, 0)
 
   return (
     <div className="maint-table-wrap">
       <table className="maint-table">
         <thead>
           <tr>
-            <th>Week</th>
+            <th style={{ width: 28 }}></th>
+            <th>Week / Unit</th>
             <th style={{ textAlign: 'center' }}>Records</th>
             <th style={{ textAlign: 'right' }}>Tractors</th>
             <th style={{ textAlign: 'right' }}>Trailers</th>
-            <th>Top Category</th>
-            <th style={{ textAlign: 'right' }}>Week Total</th>
+            <th>Categories</th>
+            <th style={{ textAlign: 'right' }}>Total</th>
           </tr>
         </thead>
         <tbody>
           {byWeek.map(w => {
-            const cat = topCat(w)
+            const open    = !!expanded[w.weekStart]
+            const vehicles = open ? vehicleRows(w.records) : []
             return (
-              <tr key={w.weekStart}>
-                <td style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{fmtWeek(w.weekStart, w.weekEnd)}</td>
-                <td style={{ textAlign: 'center', color: '#6B7280' }}>{w.records.length}</td>
-                <td style={{ textAlign: 'right', color: '#6B7280' }}>
-                  {w.tractorTotal > 0 ? fmt$(w.tractorTotal) : <span style={{ color: '#D1D5DB' }}>—</span>}
-                </td>
-                <td style={{ textAlign: 'right', color: '#6B7280' }}>
-                  {w.trailerTotal > 0 ? fmt$(w.trailerTotal) : <span style={{ color: '#D1D5DB' }}>—</span>}
-                </td>
-                <td>
-                  {cat ? (
-                    <span className="maint-cat-badge" style={{
-                      background: (CAT_COLORS[cat] || '#6B7280') + '22',
-                      color: CAT_COLORS[cat] || '#6B7280',
-                    }}>
-                      {CAT_LABELS[cat] || cat}
-                    </span>
-                  ) : '—'}
-                </td>
-                <td style={{ textAlign: 'right', fontWeight: 700 }}>{fmt$(w.total)}</td>
-              </tr>
+              <>
+                {/* ── Week header row ── */}
+                <tr
+                  key={w.weekStart}
+                  className="maint-week-row"
+                  onClick={() => toggleWeek(w.weekStart)}
+                  style={{ cursor: 'pointer' }}
+                >
+                  <td style={{ textAlign: 'center', color: '#9CA3AF', fontSize: 11 }}>
+                    {open ? '▾' : '▸'}
+                  </td>
+                  <td style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>
+                    {fmtWeek(w.weekStart, w.weekEnd)}
+                  </td>
+                  <td style={{ textAlign: 'center', color: '#6B7280' }}>{w.records.length}</td>
+                  <td style={{ textAlign: 'right', color: '#6B7280' }}>
+                    {w.tractorTotal > 0 ? fmt$(w.tractorTotal) : <span style={{ color: '#D1D5DB' }}>—</span>}
+                  </td>
+                  <td style={{ textAlign: 'right', color: '#6B7280' }}>
+                    {w.trailerTotal > 0 ? fmt$(w.trailerTotal) : <span style={{ color: '#D1D5DB' }}>—</span>}
+                  </td>
+                  <td />
+                  <td style={{ textAlign: 'right', fontWeight: 700 }}>{fmt$(w.total)}</td>
+                </tr>
+
+                {/* ── Per-vehicle rows (expanded) ── */}
+                {open && vehicles.map(v => {
+                  const cats = Object.entries(v.cats).sort((a, b) => b[1] - a[1])
+                  return (
+                    <tr key={v.unit + v.type} className="maint-vehicle-row">
+                      <td />
+                      <td style={{ paddingLeft: 28 }}>
+                        <span style={{ fontWeight: 600, marginRight: 6 }}>Unit {v.unit || '—'}</span>
+                        <span style={{ fontSize: 11, color: '#9CA3AF', textTransform: 'capitalize' }}>{v.type}</span>
+                      </td>
+                      <td style={{ textAlign: 'center', color: '#6B7280' }}>{v.records.length}</td>
+                      <td style={{ textAlign: 'right', color: '#6B7280' }}>
+                        {v.type?.toLowerCase() === 'tractor'
+                          ? fmt$(v.total)
+                          : <span style={{ color: '#D1D5DB' }}>—</span>}
+                      </td>
+                      <td style={{ textAlign: 'right', color: '#6B7280' }}>
+                        {v.type?.toLowerCase() === 'trailer'
+                          ? fmt$(v.total)
+                          : <span style={{ color: '#D1D5DB' }}>—</span>}
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                          {cats.map(([cat, amt]) => (
+                            <span key={cat} className="maint-cat-badge" style={{
+                              background: (CAT_COLORS[cat] || '#6B7280') + '22',
+                              color: CAT_COLORS[cat] || '#6B7280',
+                            }} title={fmt$(amt)}>
+                              {CAT_LABELS[cat] || cat}
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+                      <td style={{ textAlign: 'right', fontWeight: 600, color: '#374151' }}>{fmt$(v.total)}</td>
+                    </tr>
+                  )
+                })}
+              </>
             )
           })}
         </tbody>
         <tfoot>
           <tr>
+            <td style={{ borderTop: '2px solid #E5E7EB' }} />
             <td style={{ fontWeight: 700, padding: '8px 12px', borderTop: '2px solid #E5E7EB' }}>
-              Total ({byWeek.length} week{byWeek.length !== 1 ? 's' : ''})
+              {byWeek.length} week{byWeek.length !== 1 ? 's' : ''}
             </td>
             <td style={{ textAlign: 'center', fontWeight: 700, padding: '8px 12px', borderTop: '2px solid #E5E7EB' }}>
               {grandRecords}
