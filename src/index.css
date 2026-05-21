@@ -227,32 +227,11 @@ tbody tr:hover { background: #FAFAFA; }
 .week-truck-cell {
   padding: 10px 12px; border-right: 1px solid #E5E7EB; border-bottom: 1px solid #F3F4F6;
   display: flex; flex-direction: column; justify-content: center; gap: 3px; background: #FAFAFA;
-  min-height: 60px;
+  min-height: 68px;
 }
 .wtc-truck  { font-weight: 600; font-size: 13px; }
 .wtc-type   { font-size: 11px; color: #9CA3AF; }
 .wtc-driver { font-size: 11px; color: #6B7280; }
-.week-day-cell {
-  padding: 8px; border-right: 1px solid #F3F4F6; border-bottom: 1px solid #F3F4F6;
-  display: flex; align-items: center; justify-content: center; min-height: 60px;
-}
-.week-day-cell:last-child { border-right: none; }
-.week-day-cell.today-col  { background: #FFFBEB; }
-.wdc-card { width: 100%; padding: 6px 8px; border-radius: 7px; font-size: 11px; line-height: 1.4; cursor: pointer; transition: opacity .15s; }
-.wdc-card:hover { opacity: .85; }
-.wdc-covered  { background: #DCFCE7; border-left: 3px solid #16A34A; }
-.wdc-empty    { background: #FEF9C3; border-left: 3px solid #CA8A04; }
-.wdc-home     { background: #FCE7F3; border-left: 3px solid #DB2777; }
-.wdc-broken   { background: #FEE2E2; border-left: 3px solid #DC2626; }
-.wdc-no_driver  { background: #F3F4F6; border-left: 3px solid #9CA3AF; }
-.wdc-prebooked  { background: #EEF2FF; border-left: 3px solid #4F46E5; }
-.wdc-at_pickup  { background: #E0F2FE; border-left: 3px solid #0284C7; }
-.wdc-at_delivery{ background: #FFF7ED; border-left: 3px solid #EA580C; }
-.wdc-route  { font-weight: 600; color: #111827; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.wdc-broker { font-size: 10px; color: #6B7280; margin-top: 1px; }
-.wdc-price  { font-size: 10px; font-weight: 600; color: #15803D; margin-top: 2px; }
-.wdc-dpm    { font-size: 10px; color: #6B7280; margin-top: 1px; }
-.wdc-empty-state { color: #D1D5DB; font-size: 12px; }
 .empty-week { grid-column: 1 / -1; text-align: center; color: #9CA3AF; padding: 32px; }
 .wrf-label {
   padding: 10px 12px; font-size: 11px; font-weight: 700; color: #6B7280;
@@ -269,6 +248,55 @@ tbody tr:hover { background: #FAFAFA; }
 .wrf-day.today-col { background: #FFFBEB; }
 .wrf-amount { font-size: 13px; font-weight: 700; }
 .wrf-count  { font-size: 10px; color: #9CA3AF; }
+
+/* ── GANTT TIMELINE (chain view) ── */
+/* Timeline cell spans all 7 day columns in the outer grid */
+.gantt-timeline {
+  grid-column: 2 / 9;
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  align-items: center;
+  min-height: 68px;
+  border-bottom: 1px solid #F3F4F6;
+  padding: 6px 0;
+  /* Subtle column guides to echo the header separators */
+  background-image: repeating-linear-gradient(
+    90deg,
+    transparent 0,
+    transparent calc(100% / 7 - 1px),
+    #F3F4F6 calc(100% / 7 - 1px),
+    #F3F4F6 calc(100% / 7)
+  );
+}
+/* Load block */
+.gantt-block {
+  height: 56px;
+  margin: 0 3px;
+  border-radius: 7px;
+  padding: 6px 9px;
+  cursor: pointer;
+  font-size: 11px;
+  line-height: 1.35;
+  transition: opacity .15s;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  box-shadow: 0 1px 3px rgba(0,0,0,.06);
+}
+.gantt-block:hover { opacity: .82; }
+/* Gap block — dashed "available" indicator */
+.gantt-gap {
+  height: 56px;
+  margin: 0 3px;
+  border-radius: 7px;
+  border: 1.5px dashed #D1D5DB;
+  background: #FAFAFA;
+}
+.gantt-route { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
+.gantt-meta  { font-size: 10px; color: #6B7280; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 1px; }
+.gantt-price { font-size: 10px; font-weight: 600; color: #15803D; margin-top: 1px; }
+.gantt-dpm   { font-size: 10px; color: #9CA3AF; }
 
 /* ── FLEET GHOST ROWS ── */
 .row-fleet-ghost td { background: #FAFAFA; }

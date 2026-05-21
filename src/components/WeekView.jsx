@@ -1,25 +1,104 @@
 import React from 'react'
 import { addDays, format, isSameDay } from '../lib/dateUtils'
 
-const STATUS_CLASS = {
-  covered:    'wdc-covered',
-  empty:      'wdc-empty',
-  home:       'wdc-home',
-  broken:     'wdc-broken',
-  no_driver:  'wdc-no_driver',
-  prebooked:  'wdc-prebooked',
-  at_pickup:  'wdc-at_pickup',
-  at_delivery:'wdc-at_delivery',
+// ── Status colours ─────────────────────────────────────────────
+const STATUS_COLORS = {
+  covered:     { bg: '#DCFCE7', border: '#16A34A', text: '#15803D' },
+  empty:       { bg: '#FEF9C3', border: '#CA8A04', text: '#92400E' },
+  at_home:     { bg: '#FCE7F3', border: '#DB2777', text: '#9D174D' },
+  broken_down: { bg: '#FEE2E2', border: '#DC2626', text: '#991B1B' },
+  no_driver:   { bg: '#F3F4F6', border: '#9CA3AF', text: '#6B7280' },
+  prebooked:   { bg: '#EEF2FF', border: '#4F46E5', text: '#4338CA' },
+  at_pickup:   { bg: '#E0F2FE', border: '#0284C7', text: '#075985' },
+  at_delivery: { bg: '#FFF7ED', border: '#EA580C', text: '#9A3412' },
 }
 
 const fmt$ = n => n ? '$' + Number(n).toLocaleString('en-US') : null
 const dpm  = (price, miles) => price && miles ? '$' + (price / miles).toFixed(2) + '/mi' : null
 
-export default function WeekView({ loads, loading, weekStart, today, onLoadClick, fleet = [], statusFilter = [] }) {
-  const days     = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
-  const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+// ── Date helpers (string-based, no timezone drift) ─────────────
+function addDaysToStr(dateStr, n) {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  const dt = new Date(y, m - 1, d)
+  dt.setDate(dt.getDate() + n)
+  return format(dt)
+}
 
-  // Build row sources: use fleet if populated, else derive from loads
+function daysBetweenStr(a, b) {
+  // a and b are 'YYYY-MM-DD' strings; returns b - a in whole days
+  const [ay, am, ad] = a.split('-').map(Number)
+  const [by, bm, bd] = b.split('-').map(Number)
+  return Math.round((new Date(by, bm - 1, bd) - new Date(ay, am - 1, ad)) / 86400000)
+}
+
+// ── Chain builder ──────────────────────────────────────────────
+// Returns an array of segments:
+//   { type: 'load', load, startCol, endCol }   (load block)
+//   { type: 'gap',        startCol, endCol }   (dashed grey gap)
+// Columns are 1-indexed (1 = Mon … 7 = Sun), clamped to the week.
+function buildChain(truckLoads, weekStartStr, weekEndStr) {
+  function clamp(s)   { return s < weekStartStr ? weekStartStr : s > weekEndStr ? weekEndStr : s }
+  function toCol(s)   { return daysBetweenStr(weekStartStr, clamp(s)) + 1 }
+  function prevDay(s) { return addDaysToStr(s, -1) }
+  function nextDay(s) { return addDaysToStr(s,  1) }
+
+  // Loads that overlap this week, sorted by effective start
+  const sorted = truckLoads
+    .filter(l => {
+      const s = l.pickup_date  || l.date
+      const e = l.delivery_date || l.date
+      return s <= weekEndStr && e >= weekStartStr
+    })
+    .sort((a, b) => {
+      const as = a.pickup_date || a.date
+      const bs = b.pickup_date || b.date
+      return as < bs ? -1 : as > bs ? 1 : 0
+    })
+
+  if (sorted.length === 0) {
+    return [{ type: 'gap', startCol: 1, endCol: 7 }]
+  }
+
+  const segments = []
+  let pointer = weekStartStr
+
+  for (const load of sorted) {
+    if (pointer > weekEndStr) break
+
+    const effStart = clamp(load.pickup_date  || load.date)
+    const effEnd   = clamp(load.delivery_date || load.date)
+
+    if (effStart > weekEndStr) break
+
+    // Gap before this load
+    if (pointer < effStart) {
+      const gapEnd = prevDay(effStart)
+      segments.push({ type: 'gap', startCol: toCol(pointer), endCol: toCol(gapEnd) })
+    }
+
+    // Load block (if loads overlap, visually start from pointer position)
+    const startCol = Math.max(toCol(effStart), toCol(pointer))
+    segments.push({ type: 'load', load, startCol, endCol: toCol(effEnd) })
+
+    pointer = nextDay(effEnd)
+  }
+
+  // Trailing gap
+  if (pointer <= weekEndStr) {
+    segments.push({ type: 'gap', startCol: toCol(pointer), endCol: 7 })
+  }
+
+  return segments
+}
+
+// ── Main component ─────────────────────────────────────────────
+export default function WeekView({ loads, loading, weekStart, today, onLoadClick, fleet = [], statusFilter = [] }) {
+  const days        = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
+  const DAY_NAMES   = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+  const weekStartStr = format(weekStart)
+  const weekEndStr   = format(addDays(weekStart, 6))
+
+  // ── Build truck rows ──
   let caratRows, proRows
   if (fleet.length > 0) {
     caratRows = fleet.filter(e => e.company === 'carat')
@@ -43,11 +122,9 @@ export default function WeekView({ loads, loading, weekStart, today, onLoadClick
     proRows   = [...truckMap.values()].filter(v => v.company === 'pro_freight')
   }
 
-  const dayStr = day => format(day)
-
-  // Revenue counts only on delivery date to avoid double-counting
+  // ── Revenue footer ──
   const dayRevenue = days.map(day => {
-    const d = dayStr(day)
+    const d = format(day)
     const dayLoads = loads.filter(l => (l.delivery_date || l.date) === d)
     return {
       total: dayLoads.reduce((s, l) => s + (Number(l.price) || 0), 0),
@@ -56,26 +133,32 @@ export default function WeekView({ loads, loading, weekStart, today, onLoadClick
   })
   const weekTotal = dayRevenue.reduce((s, d) => s + d.total, 0)
 
-  function loadsForTruckDay(truckNumber, day) {
-    const d = dayStr(day)
-    return loads.filter(l => {
-      if (l.truck_number !== truckNumber) return false
-      if (statusFilter.length > 0 && !statusFilter.includes(l.status)) return false
-      const start = l.pickup_date || l.date
-      const end   = l.delivery_date || l.date
-      return d >= start && d <= end
-    })
-  }
-
-  // When filtering, hide truck rows that have no matching loads anywhere this week
+  // ── Status filter ──
   function truckHasMatch(truckNumber) {
     if (statusFilter.length === 0) return true
     return loads.some(l => l.truck_number === truckNumber && statusFilter.includes(l.status))
   }
+  if (statusFilter.length > 0) {
+    caratRows = caratRows.filter(e => truckHasMatch(e.truck_number))
+    proRows   = proRows.filter(e => truckHasMatch(e.truck_number))
+  }
 
-  function renderTruckRows(rows) {
-    return rows.map(entry => (
+  function loadsForTruck(truckNumber) {
+    return loads.filter(l => {
+      if (l.truck_number !== truckNumber) return false
+      if (statusFilter.length > 0 && !statusFilter.includes(l.status)) return false
+      return true
+    })
+  }
+
+  // ── Render one gantt row ──
+  function renderGanttRow(entry) {
+    const truckLoads = loadsForTruck(entry.truck_number)
+    const chain      = buildChain(truckLoads, weekStartStr, weekEndStr)
+
+    return (
       <React.Fragment key={entry.id}>
+        {/* Label cell */}
         <div className="week-truck-cell">
           <div className="wtc-truck">Truck {entry.truck_number ?? '—'}</div>
           <div className="wtc-type">
@@ -83,39 +166,55 @@ export default function WeekView({ loads, loading, weekStart, today, onLoadClick
           </div>
           {entry.driver_name && <div className="wtc-driver">{entry.driver_name}</div>}
         </div>
-        {days.map((day, i) => {
-          const isToday  = isSameDay(day, today)
-          const dayLoads = loadsForTruckDay(entry.truck_number, day)
-          return (
-            <div key={i} className={`week-day-cell${isToday ? ' today-col' : ''}`}>
-              {dayLoads.length > 0 ? dayLoads.map(l => (
-                <div
-                  key={l.id}
-                  className={`wdc-card ${STATUS_CLASS[l.status] ?? ''}`}
-                  onClick={() => onLoadClick(l)}
-                >
-                  <div className="wdc-route">
-                    {l.pickup_location && l.delivery_location
-                      ? `${l.pickup_location.split(',')[0]} → ${l.delivery_location.split(',')[0]}`
-                      : l.pickup_location || l.delivery_location || '—'}
-                  </div>
-                  {l.broker && <div className="wdc-broker">{l.broker}{l.load_number ? ` · ${l.load_number}` : ''}</div>}
-                  {l.price  && <div className="wdc-price">{fmt$(l.price)}</div>}
-                  {dpm(l.price, l.total_miles) && <div className="wdc-dpm">{dpm(l.price, l.total_miles)}</div>}
-                </div>
-              )) : (
-                <span className="wdc-empty-state">—</span>
-              )}
-            </div>
-          )
-        })}
-      </React.Fragment>
-    ))
-  }
 
-  if (statusFilter.length > 0) {
-    caratRows = caratRows.filter(e => truckHasMatch(e.truck_number))
-    proRows   = proRows.filter(e => truckHasMatch(e.truck_number))
+        {/* Timeline cell — spans all 7 day columns */}
+        <div className="gantt-timeline">
+          {chain.map((seg, si) => {
+            if (seg.type === 'gap') {
+              return (
+                <div
+                  key={si}
+                  className="gantt-gap"
+                  style={{ gridColumn: `${seg.startCol} / ${seg.endCol + 1}` }}
+                />
+              )
+            }
+
+            const l      = seg.load
+            const colors = STATUS_COLORS[l.status] ?? STATUS_COLORS.no_driver
+            const route  = l.pickup_location && l.delivery_location
+              ? `${l.pickup_location.split(',')[0]} → ${l.delivery_location.split(',')[0]}`
+              : l.pickup_location || l.delivery_location || '—'
+            const span   = seg.endCol - seg.startCol + 1   // number of days spanned
+
+            return (
+              <div
+                key={si}
+                className="gantt-block"
+                style={{
+                  gridColumn: `${seg.startCol} / ${seg.endCol + 1}`,
+                  background:  colors.bg,
+                  borderLeft:  `3px solid ${colors.border}`,
+                }}
+                onClick={() => onLoadClick(l)}
+                title={`${l.status ?? ''}  ${route}`}
+              >
+                <div className="gantt-route" style={{ color: colors.text }}>{route}</div>
+                {span >= 2 && l.broker && (
+                  <div className="gantt-meta">{l.broker}{l.load_number ? ` · ${l.load_number}` : ''}</div>
+                )}
+                {span >= 2 && l.price && (
+                  <div className="gantt-price">{fmt$(l.price)}</div>
+                )}
+                {span >= 3 && dpm(l.price, l.total_miles) && (
+                  <div className="gantt-dpm">{dpm(l.price, l.total_miles)}</div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      </React.Fragment>
+    )
   }
 
   const hasRows = caratRows.length > 0 || proRows.length > 0
@@ -124,7 +223,7 @@ export default function WeekView({ loads, loading, weekStart, today, onLoadClick
     <div className="week-wrap">
       <div className="week-grid">
 
-        {/* Header row — 8 direct grid children */}
+        {/* ── Header ── */}
         <div className="week-header-label">
           <span style={{ fontSize: 11, fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '.04em' }}>
             Truck / Driver
@@ -140,7 +239,7 @@ export default function WeekView({ loads, loading, weekStart, today, onLoadClick
           )
         })}
 
-        {/* Body */}
+        {/* ── Body ── */}
         {loading ? (
           <div className="empty-week">Loading week…</div>
         ) : (
@@ -148,13 +247,13 @@ export default function WeekView({ loads, loading, weekStart, today, onLoadClick
             {caratRows.length > 0 && (
               <>
                 <div className="week-section-label">Carat Expedited</div>
-                {renderTruckRows(caratRows)}
+                {caratRows.map(e => renderGanttRow(e))}
               </>
             )}
             {proRows.length > 0 && (
               <>
                 <div className="week-section-label">Pro Freight Transportation</div>
-                {renderTruckRows(proRows)}
+                {proRows.map(e => renderGanttRow(e))}
               </>
             )}
             {!hasRows && (
@@ -163,7 +262,7 @@ export default function WeekView({ loads, loading, weekStart, today, onLoadClick
           </>
         )}
 
-        {/* Revenue footer — 8 direct grid children */}
+        {/* ── Revenue footer ── */}
         {!loading && hasRows && (
           <>
             <div className="wrf-label">
