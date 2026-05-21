@@ -139,7 +139,7 @@ ${cssLinks}
                   const pay = loadPay[l.id] || {}
                   const emptyMi = pay.emptyMiles ?? l.empty_miles
                   const rateCell = isPerMile
-                    ? `$${pay.rate || profile?.pay_rate || '—'}/mi`
+                    ? ((pay.payType ?? 'per_mile') === 'flat' ? 'Flat Rate' : `$${pay.rate || profile?.pay_rate || '—'}/mi`)
                     : isOO ? '—' : 'Flat Rate'
                   return (
                     <tr key={l.id}>

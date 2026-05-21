@@ -508,6 +508,12 @@ textarea { resize: vertical; min-height: 60px; }
   font-size: 13px; text-align: right;
 }
 .pay-amount-input:focus { outline: none; border-color: #6366F1; }
+.pay-amount-input:disabled { cursor: not-allowed; }
+.pay-type-select {
+  padding: 5px 6px; border: 1px solid #D1D5DB; border-radius: 6px;
+  font-size: 12px; background: #fff; cursor: pointer; min-width: 80px;
+}
+.pay-type-select:focus { outline: none; border-color: #6366F1; }
 
 /* Paystub table footer */
 .acct-table.acct-table-paystub tfoot td { border-top: 2px solid #E5E7EB; background: #F9FAFB; }
