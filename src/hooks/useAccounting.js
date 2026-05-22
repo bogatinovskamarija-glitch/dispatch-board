@@ -56,15 +56,24 @@ export async function fetchInvoiceLoads(invoiceId) {
   return data ?? []
 }
 
-// ── Get + increment invoice number ────────────────────────────────────────
-export async function getNextInvoiceNumber() {
+// ── Get + increment invoice number (per company) ──────────────────────────
+export async function getNextInvoiceNumber(company = 'carat') {
   const { data, error } = await supabase
     .from('invoice_counter')
-    .select('next_number')
-    .eq('id', 1)
+    .select('id, next_number')
+    .eq('company', company)
     .single()
 
   if (error || !data) {
+    // Fallback: try legacy id=1 row for carat, or generate timestamp-based
+    if (company === 'carat') {
+      const { data: legacy } = await supabase
+        .from('invoice_counter').select('next_number').eq('id', 1).single()
+      if (legacy) {
+        await supabase.from('invoice_counter').update({ next_number: legacy.next_number + 1 }).eq('id', 1)
+        return String(legacy.next_number).padStart(5, '0')
+      }
+    }
     return 'INV-' + Date.now().toString().slice(-6)
   }
 
@@ -72,14 +81,14 @@ export async function getNextInvoiceNumber() {
   await supabase
     .from('invoice_counter')
     .update({ next_number: num + 1 })
-    .eq('id', 1)
+    .eq('id', data.id)
 
   return String(num).padStart(5, '0')
 }
 
 // ── Create invoice + mark loads ────────────────────────────────────────────
 export async function createInvoice(invoiceData, loadIds) {
-  const invNum = await getNextInvoiceNumber()
+  const invNum = await getNextInvoiceNumber(invoiceData.company || 'carat')
 
   const { data: invoice, error: invErr } = await supabase
     .from('invoices')
