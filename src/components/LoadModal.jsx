@@ -24,6 +24,7 @@ const BLANK = {
   equipment_type: 'REEF', is_tanker: false, driver_name: '', driver_clickup_id: '',
   phone: '', zip: '', load_number: '', broker: '',
   total_miles: '', empty_miles: '', price: '', safety_notes: '', notes: '', hometown: '',
+  flat_rate_pay: false, flat_rate_amount: '',
   stops: DEFAULT_STOPS,
 }
 
@@ -45,9 +46,11 @@ export default function LoadModal({ load, date, drivers, trucks, trailers, onSav
     if (load) {
       setForm({
         ...BLANK, ...load,
-        total_miles: load.total_miles ?? '',
-        price:       load.price       ?? '',
-        stops:       stopsFromLoad(load),
+        total_miles:       load.total_miles       ?? '',
+        price:             load.price             ?? '',
+        flat_rate_pay:     load.flat_rate_pay     ?? false,
+        flat_rate_amount:  load.flat_rate_amount  ?? '',
+        stops:             stopsFromLoad(load),
       })
     } else {
       setForm({ ...BLANK, date })
@@ -125,10 +128,12 @@ export default function LoadModal({ load, date, drivers, trucks, trailers, onSav
         delivery_location: lastDelivery?.location || '',
         delivery_date:    lastDelivery?.date      || null,
         delivery_appt:    lastDelivery?.appt      || '',
-        total_miles:  form.total_miles  ? Number(form.total_miles)  : null,
-        empty_miles:  form.empty_miles  ? Number(form.empty_miles)  : null,
-        price:        form.price        ? Number(form.price)        : null,
-        date:         form.date || date,
+        total_miles:      form.total_miles      ? Number(form.total_miles)      : null,
+        empty_miles:      form.empty_miles      ? Number(form.empty_miles)      : null,
+        price:            form.price            ? Number(form.price)            : null,
+        flat_rate_pay:    form.flat_rate_pay    || false,
+        flat_rate_amount: form.flat_rate_pay && form.flat_rate_amount ? Number(form.flat_rate_amount) : null,
+        date:             form.date || date,
       }
       await onSave(payload)
       onClose()
@@ -342,6 +347,43 @@ export default function LoadModal({ load, date, drivers, trucks, trailers, onSav
                     style={form.status === 'tonu' ? { borderColor: '#475569' } : {}}
                   />
                 </div>
+                {form.status !== 'tonu' && (
+                  <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                    <label
+                      style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', userSelect: 'none' }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={form.flat_rate_pay}
+                        onChange={e => {
+                          set('flat_rate_pay', e.target.checked)
+                          if (!e.target.checked) set('flat_rate_amount', '')
+                        }}
+                        style={{ width: 16, height: 16, cursor: 'pointer' }}
+                      />
+                      <span style={{ fontWeight: 600 }}>Flat Rate Driver Pay</span>
+                      <span style={{ color: '#6B7280', fontWeight: 400, fontSize: 12 }}>
+                        — check this if dispatch agreed to a fixed pay amount for this load
+                      </span>
+                    </label>
+                    {form.flat_rate_pay && (
+                      <div style={{ marginTop: 8, maxWidth: 200 }}>
+                        <label style={{ fontSize: 12, color: '#6B7280', marginBottom: 4, display: 'block' }}>
+                          Driver Pay Amount ($)
+                        </label>
+                        <input
+                          type="number"
+                          placeholder="250.00"
+                          step="0.01"
+                          value={form.flat_rate_amount}
+                          onChange={e => set('flat_rate_amount', e.target.value)}
+                          style={{ borderColor: '#F59E0B', boxShadow: '0 0 0 2px #FEF3C7' }}
+                          autoFocus
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 

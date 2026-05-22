@@ -170,11 +170,16 @@ export default function PaystubsTab({ drivers, company }) {
           // Owner operator: gross = load price
           init[l.id] = { amount: String(l.price || ''), emptyMiles: String(l.empty_miles || '') }
         } else if (isPerMile) {
-          // Company driver per mile: auto-calc (loaded + empty) * rate
           const miles = l.total_miles || 0
           const empty = l.empty_miles || 0
           const rate  = profile?.pay_rate || 0
-          init[l.id] = { miles: String(miles), emptyMiles: String(empty || ''), rate: String(rate), amount: String(((miles + empty) * rate).toFixed(2)) }
+          if (l.flat_rate_pay && l.flat_rate_amount) {
+            // Dispatch pre-agreed a flat rate for this load — use it directly
+            init[l.id] = { miles: String(miles), emptyMiles: String(empty || ''), rate: String(rate), payType: 'flat', amount: String(l.flat_rate_amount) }
+          } else {
+            // Company driver per mile: auto-calc (loaded + empty) * rate
+            init[l.id] = { miles: String(miles), emptyMiles: String(empty || ''), rate: String(rate), amount: String(((miles + empty) * rate).toFixed(2)) }
+          }
         } else {
           // Flat rate or no profile: blank
           init[l.id] = { amount: '', emptyMiles: String(l.empty_miles || '') }
