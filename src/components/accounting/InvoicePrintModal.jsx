@@ -27,6 +27,9 @@ export default function InvoicePrintModal({ loads, existingInvoice, company: com
   const [saving,           setSaving]           = useState(false)
   const [previewNum,       setPreviewNum]       = useState(null)
 
+  const invoiceNum = existingInvoice?.invoice_number || '—'
+  const isExisting = Boolean(existingInvoice)
+
   // Pre-fetch the invoice number so it shows before the user clicks "Mark as Invoiced"
   useEffect(() => {
     if (!isExisting) {
@@ -37,9 +40,6 @@ export default function InvoicePrintModal({ loads, existingInvoice, company: com
   const loadsTotal  = loads.reduce((s, l) => s + (Number(l.price) || 0), 0)
   const extrasTotal = extras.reduce((s, e) => s + (Number(e.amount) || 0), 0)
   const total       = loadsTotal + extrasTotal
-
-  const invoiceNum = existingInvoice?.invoice_number || '—'
-  const isExisting = Boolean(existingInvoice)
 
   // Auto-fill address from broker picker
   function handleBrokerChange(b) {
