@@ -658,11 +658,11 @@ textarea { resize: vertical; min-height: 60px; }
 .broker-dd-hint    { color: #9CA3AF; font-size: 12px; cursor: default; }
 .broker-dd-add     { color: #4F46E5; font-weight: 600; border-top: 1px solid #E5E7EB; }
 
-/* Add broker inline form */
+/* Add broker inline form — rendered in flow (not absolute) so modal overflow doesn't clip it */
 .broker-add-form {
-  position: absolute; z-index: 200; top: calc(100% + 4px); left: 0; right: 0;
-  background: #fff; border: 1px solid #D1D5DB; border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(0,0,0,.12); padding: 16px;
+  margin-top: 6px;
+  background: #F9FAFB; border: 1px solid #D1D5DB; border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.06); padding: 16px;
 }
 .broker-add-title { font-weight: 700; font-size: 13px; margin-bottom: 12px; }
 
