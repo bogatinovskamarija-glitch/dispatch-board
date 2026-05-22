@@ -68,7 +68,7 @@ export default function BrokerPicker({ value, onChange, company = 'all' }) {
   }
 
   return (
-    <div ref={wrapRef}>
+    <div ref={wrapRef} style={{ position: 'relative' }}>
       {/* Search row */}
       <div style={{ display: 'flex', gap: 6 }}>
         <input
