@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import BrokerPicker from './BrokerPicker'
 import FactoringPicker from './FactoringPicker'
-import { createInvoice, updateInvoice } from '../../hooks/useAccounting'
+import { createInvoice, updateInvoice, peekNextInvoiceNumber } from '../../hooks/useAccounting'
 import { useCompanySettings } from '../../hooks/useSettings'
 
 const LOGOS = { carat: '/logo-carat.png', pro_freight: '/logo-pro-freight.png' }
@@ -25,6 +25,14 @@ export default function InvoicePrintModal({ loads, existingInvoice, company: com
   const [notes,            setNotes]            = useState(existingInvoice?.notes              || '')
   const [extras,           setExtras]           = useState(existingInvoice?.extra_charges      || [])
   const [saving,           setSaving]           = useState(false)
+  const [previewNum,       setPreviewNum]       = useState(null)
+
+  // Pre-fetch the invoice number so it shows before the user clicks "Mark as Invoiced"
+  useEffect(() => {
+    if (!isExisting) {
+      peekNextInvoiceNumber(loadCompany).then(n => { if (n) setPreviewNum(n) })
+    }
+  }, [loadCompany, isExisting])
 
   const loadsTotal  = loads.reduce((s, l) => s + (Number(l.price) || 0), 0)
   const extrasTotal = extras.reduce((s, e) => s + (Number(e.amount) || 0), 0)
@@ -208,7 +216,7 @@ ${cssLinks}
                 <div className="inv-title">INVOICE</div>
                 <table className="inv-meta-table">
                   <tbody>
-                    <tr><td>Invoice #</td><td><strong>{isExisting ? invoiceNum : 'Pending'}</strong></td></tr>
+                    <tr><td>Invoice #</td><td><strong>{isExisting ? invoiceNum : (previewNum || 'Pending')}</strong></td></tr>
                     <tr><td>Date</td><td>{today()}</td></tr>
                   </tbody>
                 </table>

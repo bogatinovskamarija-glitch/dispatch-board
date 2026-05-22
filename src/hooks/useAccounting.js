@@ -56,6 +56,25 @@ export async function fetchInvoiceLoads(invoiceId) {
   return data ?? []
 }
 
+// ── Peek at next invoice number without incrementing ──────────────────────
+export async function peekNextInvoiceNumber(company = 'carat') {
+  const { data } = await supabase
+    .from('invoice_counter')
+    .select('next_number')
+    .eq('company', company)
+    .single()
+
+  if (data?.next_number) return String(data.next_number).padStart(5, '0')
+
+  // Fallback: legacy id=1 row for carat
+  if (company === 'carat') {
+    const { data: legacy } = await supabase
+      .from('invoice_counter').select('next_number').eq('id', 1).single()
+    if (legacy) return String(legacy.next_number).padStart(5, '0')
+  }
+  return null
+}
+
 // ── Get + increment invoice number (per company) ──────────────────────────
 export async function getNextInvoiceNumber(company = 'carat') {
   const { data, error } = await supabase

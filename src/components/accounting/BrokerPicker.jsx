@@ -1,23 +1,26 @@
 import { useState, useRef, useEffect } from 'react'
 import { useBrokerSearch, createBroker } from '../../hooks/useBrokers'
 
-// Searchable broker dropdown with inline Add New Broker form
-export default function BrokerPicker({ value, onChange, company = 'all' }) {  // eslint-disable-line no-unused-vars
-  const [query,    setQuery]    = useState(value?.name || '')
-  const [open,     setOpen]     = useState(false)
-  const [addMode,  setAddMode]  = useState(false)
-  const [newBroker, setNewBroker] = useState({ name: '', address: '', city: '', state: '', zip: '', phone: '', email: '', company: company === 'all' ? 'carat' : company })
-  const [saving,   setSaving]   = useState(false)
+export default function BrokerPicker({ value, onChange, company = 'all' }) {
+  const [query,     setQuery]     = useState(value?.name || '')
+  const [open,      setOpen]      = useState(false)
+  const [addMode,   setAddMode]   = useState(false)
+  const [newBroker, setNewBroker] = useState({
+    name: '', address: '', city: '', state: '', zip: '',
+    phone: '', email: '',
+    company: company === 'all' ? 'carat' : company,
+  })
+  const [saving,  setSaving]  = useState(false)
+  const [saveErr, setSaveErr] = useState(null)
   const wrapRef = useRef(null)
 
-  const { brokers, loading } = useBrokerSearch(query, 'all')  // search all brokers regardless of company
+  const { brokers, loading } = useBrokerSearch(query, 'all')
 
   // Close dropdown on outside click
   useEffect(() => {
     function onClickOutside(e) {
       if (wrapRef.current && !wrapRef.current.contains(e.target)) {
         setOpen(false)
-        setAddMode(false)
       }
     }
     document.addEventListener('mousedown', onClickOutside)
@@ -37,36 +40,63 @@ export default function BrokerPicker({ value, onChange, company = 'all' }) {  //
     if (!e.target.value) onChange(null)
   }
 
+  function openAddForm() {
+    setAddMode(true)
+    setOpen(false)
+    setNewBroker(n => ({ ...n, name: query }))
+    setSaveErr(null)
+  }
+
+  function cancelAdd() {
+    setAddMode(false)
+    setSaveErr(null)
+  }
+
   async function handleAddBroker(e) {
     e.preventDefault()
     setSaving(true)
+    setSaveErr(null)
     try {
       const broker = await createBroker({ ...newBroker, name: newBroker.name || query })
       selectBroker(broker)
       setAddMode(false)
     } catch (err) {
-      alert('Error saving broker: ' + err.message)
+      setSaveErr(err.message)
     } finally {
       setSaving(false)
     }
   }
 
   return (
-    <div ref={wrapRef} style={{ position: 'relative' }}>
-      <input
-        type="text"
-        value={query}
-        onChange={handleInput}
-        onFocus={() => query.length >= 1 && setOpen(true)}
-        placeholder="Search broker name…"
-        autoComplete="off"
-      />
+    <div ref={wrapRef}>
+      {/* Search row */}
+      <div style={{ display: 'flex', gap: 6 }}>
+        <input
+          type="text"
+          value={query}
+          onChange={handleInput}
+          onFocus={() => setOpen(true)}
+          placeholder="Search broker name…"
+          autoComplete="off"
+          style={{ flex: 1 }}
+        />
+        <button
+          type="button"
+          className="btn btn-ghost btn-xs"
+          style={{ whiteSpace: 'nowrap' }}
+          onClick={openAddForm}
+        >+ New Broker</button>
+      </div>
 
+      {/* Search dropdown */}
       {open && !addMode && (
         <div className="broker-dropdown">
           {loading && <div className="broker-dd-item broker-dd-hint">Searching…</div>}
-          {!loading && brokers.length === 0 && query.length >= 1 && (
+          {!loading && query.length >= 1 && brokers.length === 0 && (
             <div className="broker-dd-item broker-dd-hint">No results for "{query}"</div>
+          )}
+          {!loading && query.length < 1 && (
+            <div className="broker-dd-item broker-dd-hint">Type to search brokers…</div>
           )}
           {brokers.map(b => (
             <div key={b.id} className="broker-dd-item" onMouseDown={() => selectBroker(b)}>
@@ -76,26 +106,26 @@ export default function BrokerPicker({ value, onChange, company = 'all' }) {  //
               )}
             </div>
           ))}
-          <div
-            className="broker-dd-item broker-dd-add"
-            onMouseDown={() => {
-              setAddMode(true)
-              setNewBroker(n => ({ ...n, name: query }))
-            }}
-          >
+          <div className="broker-dd-item broker-dd-add" onMouseDown={openAddForm}>
             + Add new broker
           </div>
         </div>
       )}
 
+      {/* Add broker form — inline so modal overflow doesn't clip it */}
       {addMode && (
         <div className="broker-add-form">
           <div className="broker-add-title">New Broker</div>
+          {saveErr && <div style={{ color: '#B91C1C', fontSize: 12, marginBottom: 8 }}>Error: {saveErr}</div>}
           <form onSubmit={handleAddBroker}>
             <div className="form-grid">
               <div className="form-group">
                 <label>Company Name *</label>
-                <input required value={newBroker.name} onChange={e => setNewBroker(n => ({ ...n, name: e.target.value }))} />
+                <input
+                  required
+                  value={newBroker.name}
+                  onChange={e => setNewBroker(n => ({ ...n, name: e.target.value }))}
+                />
               </div>
               <div className="form-group">
                 <label>Address</label>
@@ -131,8 +161,10 @@ export default function BrokerPicker({ value, onChange, company = 'all' }) {  //
               </div>
             </div>
             <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-              <button type="button" className="btn btn-ghost" onClick={() => setAddMode(false)}>Cancel</button>
-              <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Saving…' : 'Save Broker'}</button>
+              <button type="button" className="btn btn-ghost" onClick={cancelAdd}>Cancel</button>
+              <button type="submit" className="btn btn-primary" disabled={saving}>
+                {saving ? 'Saving…' : 'Save Broker'}
+              </button>
             </div>
           </form>
         </div>
