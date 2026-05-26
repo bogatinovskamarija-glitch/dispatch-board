@@ -258,7 +258,7 @@ tbody tr:hover { background: #FAFAFA; }
   display: flex; flex-direction: column; justify-content: center; gap: 2px; background: #F9FAFB;
 }
 .wrf-day:last-child { border-right: none; }
-.wrf-day.today-col { background: #FFFBEB; }
+.wrf-day.today-col { background: rgba(253, 211, 77, 0.2); }
 .wrf-amount { font-size: 13px; font-weight: 700; }
 .wrf-count  { font-size: 10px; color: #9CA3AF; }
 
@@ -272,34 +272,43 @@ tbody tr:hover { background: #FAFAFA; }
   min-height: 68px;
   border-bottom: 1px solid #F3F4F6;
   padding: 6px 0;
-  /* Alternating day column shading + clear separator lines */
+  position: relative;  /* needed for ::after overlay */
+  /* Today column highlight + alternating day backgrounds (behind loads) */
   background-image:
-    /* Separator lines — one per day boundary */
-    repeating-linear-gradient(
-      90deg,
-      transparent 0,
-      transparent calc(100% / 7 - 1px),
-      #D1D5DB calc(100% / 7 - 1px),
-      #D1D5DB calc(100% / 7)
-    ),
-    /* Alternating day backgrounds: even days (Mon, Wed, Fri, Sun) get a faint tint */
+    /* Today column — position driven by --today-col CSS var set in React */
     linear-gradient(
       90deg,
-      rgba(241,245,249,.55)  0%,
-      rgba(241,245,249,.55)  calc(100% / 7),
-      transparent            calc(100% / 7),
-      transparent            calc(200% / 7),
-      rgba(241,245,249,.55)  calc(200% / 7),
-      rgba(241,245,249,.55)  calc(300% / 7),
-      transparent            calc(300% / 7),
-      transparent            calc(400% / 7),
-      rgba(241,245,249,.55)  calc(400% / 7),
-      rgba(241,245,249,.55)  calc(500% / 7),
-      transparent            calc(500% / 7),
-      transparent            calc(600% / 7),
-      rgba(241,245,249,.55)  calc(600% / 7),
-      rgba(241,245,249,.55)  100%
+      transparent                               calc(var(--today-col, -100) * 100% / 7),
+      rgba(253, 211, 77, 0.18)                  calc(var(--today-col, -100) * 100% / 7),
+      rgba(253, 211, 77, 0.18)                  calc((var(--today-col, -100) + 1) * 100% / 7),
+      transparent                               calc((var(--today-col, -100) + 1) * 100% / 7)
+    ),
+    /* Alternating day shading */
+    linear-gradient(
+      90deg,
+      rgba(241,245,249,.5)  0%,             rgba(241,245,249,.5)  calc(100% / 7),
+      transparent            calc(100% / 7), transparent            calc(200% / 7),
+      rgba(241,245,249,.5)  calc(200% / 7), rgba(241,245,249,.5)  calc(300% / 7),
+      transparent            calc(300% / 7), transparent            calc(400% / 7),
+      rgba(241,245,249,.5)  calc(400% / 7), rgba(241,245,249,.5)  calc(500% / 7),
+      transparent            calc(500% / 7), transparent            calc(600% / 7),
+      rgba(241,245,249,.5)  calc(600% / 7), rgba(241,245,249,.5)  100%
     );
+}
+/* Day separator lines drawn ON TOP of load blocks — pointer-events:none so clicks pass through */
+.gantt-timeline::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 10;
+  background-image: repeating-linear-gradient(
+    90deg,
+    transparent             0,
+    transparent             calc(100% / 7 - 1px),
+    rgba(100,116,139, 0.45) calc(100% / 7 - 1px),
+    rgba(100,116,139, 0.45) calc(100% / 7)
+  );
 }
 /* Load block */
 .gantt-block {

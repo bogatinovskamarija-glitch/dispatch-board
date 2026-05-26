@@ -125,6 +125,8 @@ export default function WeekView({ loads, loading, weekStart, today, onLoadClick
   const DAY_NAMES   = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
   const weekStartStr = format(weekStart)
   const weekEndStr   = format(addDays(weekStart, 6))
+  // 0=Mon…6=Sun; -100 when today is outside this week so the CSS highlight is off-screen
+  const todayColIndex = days.findIndex(d => isSameDay(d, today))
 
   // ── Build truck rows ──
   let caratRows, proRows
@@ -261,7 +263,7 @@ export default function WeekView({ loads, loading, weekStart, today, onLoadClick
 
   return (
     <div className="week-wrap">
-      <div className="week-grid">
+      <div className="week-grid" style={{ '--today-col': todayColIndex >= 0 ? todayColIndex : -100 }}>
 
         {/* ── Header ── */}
         <div className="week-header-label">
