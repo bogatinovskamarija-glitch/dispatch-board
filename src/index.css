@@ -254,7 +254,7 @@ tbody tr:hover { background: #FAFAFA; }
 }
 .wrf-total  { font-size: 16px; font-weight: 700; color: #111827; text-transform: none; letter-spacing: 0; }
 .wrf-day {
-  padding: 10px 8px; border-right: 1px solid #F3F4F6; border-top: 2px solid #E5E7EB;
+  padding: 10px 8px; border-right: 1px solid #D1D5DB; border-top: 2px solid #E5E7EB;
   display: flex; flex-direction: column; justify-content: center; gap: 2px; background: #F9FAFB;
 }
 .wrf-day:last-child { border-right: none; }
@@ -272,14 +272,34 @@ tbody tr:hover { background: #FAFAFA; }
   min-height: 68px;
   border-bottom: 1px solid #F3F4F6;
   padding: 6px 0;
-  /* Subtle column guides to echo the header separators */
-  background-image: repeating-linear-gradient(
-    90deg,
-    transparent 0,
-    transparent calc(100% / 7 - 1px),
-    #F3F4F6 calc(100% / 7 - 1px),
-    #F3F4F6 calc(100% / 7)
-  );
+  /* Alternating day column shading + clear separator lines */
+  background-image:
+    /* Separator lines — one per day boundary */
+    repeating-linear-gradient(
+      90deg,
+      transparent 0,
+      transparent calc(100% / 7 - 1px),
+      #D1D5DB calc(100% / 7 - 1px),
+      #D1D5DB calc(100% / 7)
+    ),
+    /* Alternating day backgrounds: even days (Mon, Wed, Fri, Sun) get a faint tint */
+    linear-gradient(
+      90deg,
+      rgba(241,245,249,.55)  0%,
+      rgba(241,245,249,.55)  calc(100% / 7),
+      transparent            calc(100% / 7),
+      transparent            calc(200% / 7),
+      rgba(241,245,249,.55)  calc(200% / 7),
+      rgba(241,245,249,.55)  calc(300% / 7),
+      transparent            calc(300% / 7),
+      transparent            calc(400% / 7),
+      rgba(241,245,249,.55)  calc(400% / 7),
+      rgba(241,245,249,.55)  calc(500% / 7),
+      transparent            calc(500% / 7),
+      transparent            calc(600% / 7),
+      rgba(241,245,249,.55)  calc(600% / 7),
+      rgba(241,245,249,.55)  100%
+    );
 }
 /* Load block */
 .gantt-block {
