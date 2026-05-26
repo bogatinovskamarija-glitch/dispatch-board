@@ -258,7 +258,7 @@ tbody tr:hover { background: #FAFAFA; }
   display: flex; flex-direction: column; justify-content: center; gap: 2px; background: #F9FAFB;
 }
 .wrf-day:last-child { border-right: none; }
-.wrf-day.today-col { background: rgba(253, 211, 77, 0.2); }
+.wrf-day.today-col { background: rgba(30, 41, 59, 0.07); }
 .wrf-amount { font-size: 13px; font-weight: 700; }
 .wrf-count  { font-size: 10px; color: #9CA3AF; }
 
@@ -279,8 +279,8 @@ tbody tr:hover { background: #FAFAFA; }
     linear-gradient(
       90deg,
       transparent                               calc(var(--today-col, -100) * 100% / 7),
-      rgba(253, 211, 77, 0.18)                  calc(var(--today-col, -100) * 100% / 7),
-      rgba(253, 211, 77, 0.18)                  calc((var(--today-col, -100) + 1) * 100% / 7),
+      rgba(30, 41, 59, 0.07)                  calc(var(--today-col, -100) * 100% / 7),
+      rgba(30, 41, 59, 0.07)                  calc((var(--today-col, -100) + 1) * 100% / 7),
       transparent                               calc((var(--today-col, -100) + 1) * 100% / 7)
     ),
     /* Alternating day shading */
