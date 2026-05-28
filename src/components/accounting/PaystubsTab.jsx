@@ -272,6 +272,12 @@ export default function PaystubsTab({ drivers, company }) {
   function removeLine(arr, setArr, idx) { setArr(arr.filter((_, i) => i !== idx)) }
 
   // ── Totals ───────────────────────────────────────────────────────────────
+  const sortedLoads = [...loads].sort((a, b) => {
+    const da = a.pickup_date || a.date || ''
+    const db = b.pickup_date || b.date || ''
+    return da < db ? -1 : da > db ? 1 : 0
+  })
+
   const loadTotal = loads.reduce((s, l) => s + (Number(loadPay[l.id]?.amount) || 0), 0)
   const addTotal  = additions.reduce((s, a) => s + (Number(a.amount) || 0), 0)
 
@@ -684,7 +690,7 @@ export default function PaystubsTab({ drivers, company }) {
               </tr>
             </thead>
             <tbody>
-              {loads.map(l => {
+              {sortedLoads.map(l => {
                 const pay = loadPay[l.id] || {}
                 const flatLoad = isPerMile && (pay.payType ?? 'per_mile') === 'flat'
                 return (
@@ -900,7 +906,7 @@ export default function PaystubsTab({ drivers, company }) {
           profile={profile}
           startDate={startDate}
           endDate={endDate}
-          loads={loads}
+          loads={sortedLoads}
           loadPay={loadPay}
           additions={additions.filter(a => a.label || a.amount)}
           deductions={effectiveDeds.filter(d => d.label || d.amount)}
@@ -922,7 +928,7 @@ export default function PaystubsTab({ drivers, company }) {
           profile={profiles.find(p => p.driver_name === historyModal.paystub.driver_name)}
           startDate={historyModal.paystub.start_date}
           endDate={historyModal.paystub.end_date}
-          loads={historyModal.loads}
+          loads={[...historyModal.loads].sort((a,b) => (a.pickup_date||a.date||'') < (b.pickup_date||b.date||'') ? -1 : 1)}
           loadPay={historyModal.paystub.load_pay || {}}
           additions={historyModal.paystub.additions || []}
           deductions={historyModal.paystub.deductions || []}
