@@ -238,6 +238,38 @@ export async function archiveInvoice(id) {
   if (error) throw new Error(error.message)
 }
 
+// ── Find loads by load number (for manual re-linking to invoices) ─────────
+export async function findLoadsByNumbers(loadNumbers, company) {
+  let q = supabase
+    .from('loads')
+    .select('*')
+    .in('load_number', loadNumbers)
+  if (company && company !== 'all') q = q.eq('company', company)
+  const { data, error } = await q
+  if (error) throw new Error(error.message)
+  return data ?? []
+}
+
+// ── Re-link loads to an existing invoice (repair broken links) ────────────
+// Stamps invoice_id/invoice_number back onto loads and updates load_ids on invoice.
+export async function relinkLoadsToInvoice(invoiceId, invoiceNumber, loadIds) {
+  // Update the invoice's load_ids (best-effort — column may not exist yet)
+  try {
+    await supabase.from('invoices').update({ load_ids: loadIds }).eq('id', invoiceId)
+  } catch { /* ignore if column missing */ }
+
+  // Stamp the loads with the correct invoice reference
+  const { error } = await supabase
+    .from('loads')
+    .update({
+      invoice_id:     invoiceId,
+      invoice_number: invoiceNumber,
+      invoiced_at:    new Date().toISOString(),
+    })
+    .in('id', loadIds)
+  if (error) throw new Error(error.message)
+}
+
 // ── Update existing invoice metadata (for re-export) ──────────────────────
 export async function updateInvoice(invoiceId, data) {
   const { data: inv, error } = await supabase

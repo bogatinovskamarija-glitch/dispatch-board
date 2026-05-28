@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import BrokerPicker from './BrokerPicker'
 import FactoringPicker from './FactoringPicker'
-import { createInvoice, updateInvoice, peekNextInvoiceNumber } from '../../hooks/useAccounting'
+import { createInvoice, updateInvoice, peekNextInvoiceNumber, findLoadsByNumbers, relinkLoadsToInvoice } from '../../hooks/useAccounting'
 import { useCompanySettings } from '../../hooks/useSettings'
 
 const LOGOS = { carat: '/logo-carat.png', pro_freight: '/logo-pro-freight.png' }
@@ -12,7 +12,8 @@ const fmt   = n => '$' + Number(n).toLocaleString('en-US', { minimumFractionDigi
 const today = () => new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
 
 export default function InvoicePrintModal({ loads, existingInvoice, company: companyFilter, onCreated, onClose }) {
-  const loadCompany = loads[0]?.company || 'carat'
+  // For existing invoices with no linked loads, use the company stored on the invoice itself
+  const loadCompany = loads[0]?.company || existingInvoice?.company || 'carat'
   const { companies } = useCompanySettings()
   const coKey = loadCompany === 'pro_freight' ? 'company_pro_freight' : 'company_carat'
   const co = { ...companies[coKey], logo: LOGOS[loadCompany] || LOGOS.carat }
@@ -27,6 +28,14 @@ export default function InvoicePrintModal({ loads, existingInvoice, company: com
   const [saving,           setSaving]           = useState(false)
   const [previewNum,       setPreviewNum]       = useState(null)
 
+  // ── Re-link panel (for invoices where loads lost their link) ────────────
+  const [attached,   setAttached]   = useState([])  // loads manually re-linked
+  const [linkInput,  setLinkInput]  = useState('')
+  const [foundLoads, setFoundLoads] = useState([])
+  const [finding,    setFinding]    = useState(false)
+  // Open re-link panel by default when no loads are linked
+  const [linkOpen,   setLinkOpen]   = useState(Boolean(existingInvoice && loads.length === 0))
+
   const invoiceNum = existingInvoice?.invoice_number || '—'
   const isExisting = Boolean(existingInvoice)
 
@@ -37,7 +46,9 @@ export default function InvoicePrintModal({ loads, existingInvoice, company: com
     }
   }, [loadCompany, isExisting])
 
-  const loadsTotal  = loads.reduce((s, l) => s + (Number(l.price) || 0), 0)
+  // allLoads = prop loads (if any) OR manually re-attached loads
+  const allLoads    = loads.length > 0 ? loads : attached
+  const loadsTotal  = allLoads.reduce((s, l) => s + (Number(l.price) || 0), 0)
   const extrasTotal = extras.reduce((s, e) => s + (Number(e.amount) || 0), 0)
   const computedTotal = loadsTotal + extrasTotal
 
@@ -75,6 +86,35 @@ export default function InvoicePrintModal({ loads, existingInvoice, company: com
   }
   function removeExtra(i) {
     setExtras(ex => ex.filter((_, idx) => idx !== i))
+  }
+
+  // ── Re-link: look up loads by load number ─────────────────────────────
+  async function handleFindLoads() {
+    const nums = linkInput.split(/[\n,;]+/).map(s => s.trim()).filter(Boolean)
+    if (!nums.length) return
+    setFinding(true)
+    try {
+      const results = await findLoadsByNumbers(nums, loadCompany)
+      setFoundLoads(results)
+      if (results.length === 0) alert('No loads found for those load numbers. Check the numbers and try again.')
+    } catch (e) {
+      alert('Error: ' + e.message)
+    } finally {
+      setFinding(false)
+    }
+  }
+
+  function handleAttachLoads() {
+    setAttached(foundLoads)
+    setFoundLoads([])
+    setLinkOpen(false)
+    // Offer to sync the total override with the newly computed total
+    const newComputed = foundLoads.reduce((s, l) => s + (Number(l.price) || 0), 0) + extrasTotal
+    if (newComputed > 0 && window.confirm(
+      `Loads attached! The computed total from these loads is $${newComputed.toLocaleString('en-US', { minimumFractionDigits: 2 })}.\n\nUpdate the invoice total to this amount?`
+    )) {
+      setTotalOverride(String(newComputed))
+    }
   }
 
   function handlePrint() {
@@ -118,6 +158,14 @@ ${cssLinks}
       }
       if (isExisting) {
         await updateInvoice(existingInvoice.id, invoiceData)
+        // If loads were manually re-attached, stamp the DB link
+        if (attached.length > 0) {
+          await relinkLoadsToInvoice(
+            existingInvoice.id,
+            existingInvoice.invoice_number,
+            attached.map(l => l.id)
+          )
+        }
       } else {
         await createInvoice(invoiceData, loads.map(l => l.id), loads)
       }
@@ -171,15 +219,92 @@ ${cssLinks}
               </div>
             </div>
 
-            {/* Invoice total override (existing invoices) */}
+            {/* Invoice total override + re-link panel (existing invoices) */}
             {isExisting && (
-              <div style={{ marginTop: 12, padding: '10px 14px', background: loads.length === 0 ? '#FEF2F2' : '#F9FAFB', border: `1px solid ${loads.length === 0 ? '#FCA5A5' : '#E5E7EB'}`, borderRadius: 8 }}>
-                {loads.length === 0 && (
-                  <div style={{ fontSize: 12, color: '#DC2626', fontWeight: 600, marginBottom: 8 }}>
-                    ⚠ No loads are linked to this invoice — the amount was loaded from the saved total. Edit below if needed.
+              <div style={{ marginTop: 12, borderRadius: 8, overflow: 'hidden', border: `1px solid ${allLoads.length === 0 ? '#FCA5A5' : '#E5E7EB'}` }}>
+
+                {/* Re-link banner — shown when no loads are linked */}
+                {allLoads.length === 0 && (
+                  <div style={{ background: '#FEF2F2', padding: '10px 14px', borderBottom: linkOpen ? '1px solid #FCA5A5' : 'none' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div style={{ fontSize: 12, color: '#DC2626', fontWeight: 600 }}>
+                        ⚠ No loads are linked to this invoice. Re-attach them below to restore the load table.
+                      </div>
+                      <button
+                        className="btn btn-ghost btn-xs"
+                        style={{ color: '#DC2626', borderColor: '#FCA5A5', whiteSpace: 'nowrap', marginLeft: 12 }}
+                        onClick={() => setLinkOpen(v => !v)}
+                      >
+                        {linkOpen ? '▲ Hide' : '🔗 Re-link Loads'}
+                      </button>
+                    </div>
                   </div>
                 )}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+
+                {/* Re-link success banner */}
+                {attached.length > 0 && (
+                  <div style={{ background: '#F0FDF4', padding: '8px 14px', borderBottom: '1px solid #86EFAC', fontSize: 12, color: '#166534', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span>✓ {attached.length} load{attached.length > 1 ? 's' : ''} re-attached — will be saved when you click Update &amp; Save</span>
+                    <button className="btn btn-ghost btn-xs" style={{ color: '#6B7280' }} onClick={() => { setAttached([]); setLinkOpen(true) }}>Undo</button>
+                  </div>
+                )}
+
+                {/* Re-link search panel */}
+                {linkOpen && (
+                  <div style={{ background: '#FFF7F7', padding: '12px 14px', borderBottom: '1px solid #FCA5A5' }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
+                      Enter the load numbers for this invoice (one per line or comma-separated):
+                    </div>
+                    <textarea
+                      rows={3}
+                      value={linkInput}
+                      onChange={e => setLinkInput(e.target.value)}
+                      placeholder={'e.g.\n20317925\n20317926'}
+                      style={{ width: '100%', fontSize: 12, padding: '6px 8px', border: '1px solid #FCA5A5', borderRadius: 6, resize: 'vertical', boxSizing: 'border-box', fontFamily: 'monospace' }}
+                    />
+                    <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                      <button className="btn btn-ghost btn-xs" onClick={handleFindLoads} disabled={finding || !linkInput.trim()}>
+                        {finding ? 'Searching…' : '🔍 Find Loads'}
+                      </button>
+                      {foundLoads.length > 0 && (
+                        <button className="btn btn-primary btn-xs" onClick={handleAttachLoads}>
+                          ✓ Attach {foundLoads.length} load{foundLoads.length > 1 ? 's' : ''}
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Search results preview */}
+                    {foundLoads.length > 0 && (
+                      <div style={{ marginTop: 10, border: '1px solid #E5E7EB', borderRadius: 6, overflow: 'hidden' }}>
+                        <table style={{ width: '100%', fontSize: 11, borderCollapse: 'collapse' }}>
+                          <thead>
+                            <tr style={{ background: '#F3F4F6' }}>
+                              <th style={{ padding: '4px 8px', textAlign: 'left', fontWeight: 600 }}>Load #</th>
+                              <th style={{ padding: '4px 8px', textAlign: 'left', fontWeight: 600 }}>Broker</th>
+                              <th style={{ padding: '4px 8px', textAlign: 'left', fontWeight: 600 }}>Pickup</th>
+                              <th style={{ padding: '4px 8px', textAlign: 'left', fontWeight: 600 }}>Destination</th>
+                              <th style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 600 }}>Amount</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {foundLoads.map(l => (
+                              <tr key={l.id} style={{ borderTop: '1px solid #E5E7EB' }}>
+                                <td style={{ padding: '4px 8px' }}><strong>{l.load_number}</strong></td>
+                                <td style={{ padding: '4px 8px', color: '#6B7280' }}>{l.broker || '—'}</td>
+                                <td style={{ padding: '4px 8px', color: '#6B7280' }}>{l.pickup_date || l.date || '—'}</td>
+                                <td style={{ padding: '4px 8px', color: '#6B7280' }}>{l.delivery_location?.split(',')[0] || '—'}</td>
+                                <td style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 600, color: '#15803D' }}>{l.price ? fmt(l.price) : '—'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Total override row */}
+                <div style={{ padding: '10px 14px', background: '#F9FAFB', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                   <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', whiteSpace: 'nowrap' }}>
                     Invoice Total ($)
                   </label>
@@ -188,12 +313,19 @@ ${cssLinks}
                     step="0.01"
                     value={totalOverride ?? ''}
                     onChange={e => setTotalOverride(e.target.value)}
-                    placeholder={String(computedTotal)}
-                    style={{ width: 140, fontSize: 13, padding: '4px 8px', border: `1px solid ${loads.length === 0 ? '#FCA5A5' : '#D1D5DB'}`, borderRadius: 6 }}
+                    placeholder={String(computedTotal || '')}
+                    style={{ width: 140, fontSize: 13, padding: '4px 8px', border: `1px solid ${allLoads.length === 0 ? '#FCA5A5' : '#D1D5DB'}`, borderRadius: 6 }}
                   />
-                  {loads.length > 0 && (
+                  {allLoads.length > 0 && (
                     <span style={{ fontSize: 11, color: '#9CA3AF' }}>
                       Computed from loads: {fmt(computedTotal)}
+                      {totalOverride && Number(totalOverride) !== computedTotal && (
+                        <button
+                          className="btn btn-ghost btn-xs"
+                          style={{ marginLeft: 6, fontSize: 10 }}
+                          onClick={() => setTotalOverride(String(computedTotal))}
+                        >Use this</button>
+                      )}
                     </span>
                   )}
                 </div>
@@ -297,7 +429,7 @@ ${cssLinks}
                 </tr>
               </thead>
               <tbody>
-                {loads.map(l => (
+                {allLoads.map(l => (
                   <tr key={l.id}>
                     <td>{l.load_number || '—'}</td>
                     <td>{l.pickup_date  || l.date || '—'}</td>
