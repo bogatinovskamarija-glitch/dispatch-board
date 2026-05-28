@@ -18,10 +18,11 @@ const STATUS_ROUTE_BG = {
 }
 
 export default function DayView({ loads, loading, trucks, trailers, drivers, fleet = [], statusFilter, onEdit, onDelete, onDriverClick, onTruckClick, onTrailerClick }) {
-  // Tracks which multi-load truck groups are expanded. Default: collapsed.
-  const [expanded, setExpanded] = useState(new Set())
+  // Tracks which multi-load truck groups are manually COLLAPSED.
+  // Empty set = all groups open by default so dispatch sees everything on load.
+  const [collapsed, setCollapsed] = useState(new Set())
   function toggleExpand(key) {
-    setExpanded(prev => {
+    setCollapsed(prev => {
       const next = new Set(prev)
       next.has(key) ? next.delete(key) : next.add(key)
       return next
@@ -200,26 +201,28 @@ export default function DayView({ loads, loading, trucks, trailers, drivers, fle
     return (
       <tr key={load.id} className={`row-${load.status}`}>
         <td>
-          {extraCount > 0 ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <button
-                title={isExp ? 'Collapse' : `Show ${extraCount} more load${extraCount > 1 ? 's' : ''}`}
-                onClick={onToggle}
-                style={{
-                  background: isExp ? '#F3F4F6' : '#EEF2FF',
-                  border: `1px solid ${isExp ? '#D1D5DB' : '#C7D2FE'}`,
-                  cursor: 'pointer',
-                  fontSize: 10, color: isExp ? '#6B7280' : '#4F46E5',
-                  padding: '1px 5px', lineHeight: 1.4, borderRadius: 4,
-                  fontWeight: 600, whiteSpace: 'nowrap',
-                }}
-              >
-                {isExp ? '▾' : `▸ +${extraCount}`}
-              </button>
-              <StatusBadge status={load.status} />
-            </div>
-          ) : (
-            <StatusBadge status={load.status} />
+          <StatusBadge status={load.status} />
+          {extraCount > 0 && (
+            <button
+              title={isExp ? 'Click to collapse extra loads' : `Click to show ${extraCount} more load${extraCount > 1 ? 's' : ''}`}
+              onClick={onToggle}
+              style={{
+                display: 'block',
+                marginTop: 4,
+                background: isExp ? '#F3F4F6' : '#EEF2FF',
+                border: `1px solid ${isExp ? '#D1D5DB' : '#A5B4FC'}`,
+                cursor: 'pointer',
+                fontSize: 10,
+                color: isExp ? '#4B5563' : '#4F46E5',
+                padding: '2px 7px',
+                borderRadius: 10,
+                fontWeight: 700,
+                whiteSpace: 'nowrap',
+                lineHeight: 1.5,
+              }}
+            >
+              {isExp ? `▾ ${extraCount} load${extraCount > 1 ? 's' : ''}` : `▸ +${extraCount} load${extraCount > 1 ? 's' : ''}`}
+            </button>
           )}
         </td>
 
@@ -360,11 +363,20 @@ export default function DayView({ loads, loading, trucks, trailers, drivers, fle
     )
   }
 
-  // Compact row for 2nd, 3rd, … loads on the same truck
+  // Compact row for 2nd, 3rd, … loads on the same truck — visually nested
   function renderNextRow(load) {
     return (
-      <tr key={`next-${load.id}`} className="row-next-load">
-        <td><StatusBadge status={load.status} /></td>
+      <tr
+        key={`next-${load.id}`}
+        className="row-next-load"
+        style={{ background: '#F5F7FF', borderLeft: '4px solid #818CF8' }}
+      >
+        <td style={{ paddingLeft: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            <span style={{ color: '#818CF8', fontSize: 13, lineHeight: 1, userSelect: 'none' }}>└</span>
+            <StatusBadge status={load.status} />
+          </div>
+        </td>
 
         {/* truck / trailer / type / driver: same as primary — leave blank */}
         <td /><td /><td /><td />
@@ -439,7 +451,7 @@ export default function DayView({ loads, loading, trucks, trailers, drivers, fle
     const [primary, ...rest] = group
     const fragKey  = primary._ghost ? `ghost_${primary._fleetId}` : primary.id
     const groupKey = primary.truck_number || fragKey
-    const isExp    = expanded.has(groupKey)
+    const isExp    = !collapsed.has(groupKey)   // open by default
 
     return (
       <Fragment key={fragKey}>
