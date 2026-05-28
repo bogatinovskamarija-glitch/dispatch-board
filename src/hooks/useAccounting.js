@@ -43,7 +43,34 @@ export function useInvoiceHistory(company = 'all') {
       .limit(300)
     if (company !== 'all') q = q.eq('company', company)
     const { data } = await q
-    setInvoices(data ?? [])
+    const invoiceList = data ?? []
+
+    // Enrich every invoice with load numbers pulled from the loads table.
+    // This works for all invoices (old and new) because loads always have
+    // invoice_id set after invoicing, regardless of whether load_numbers
+    // was stored on the invoice itself.
+    if (invoiceList.length > 0) {
+      const ids = invoiceList.map(i => i.id)
+      const { data: invLoads } = await supabase
+        .from('loads')
+        .select('invoice_id, load_number')
+        .in('invoice_id', ids)
+        .not('load_number', 'is', null)
+        .neq('load_number', '')
+
+      const numMap = {}
+      for (const l of (invLoads ?? [])) {
+        if (!numMap[l.invoice_id]) numMap[l.invoice_id] = []
+        numMap[l.invoice_id].push(l.load_number)
+      }
+
+      setInvoices(invoiceList.map(inv => ({
+        ...inv,
+        load_numbers: numMap[inv.id]?.length ? numMap[inv.id] : (inv.load_numbers ?? []),
+      })))
+    } else {
+      setInvoices([])
+    }
     setLoading(false)
   }, [company])
 
