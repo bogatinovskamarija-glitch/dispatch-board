@@ -17,7 +17,7 @@ const STATUS_ROUTE_BG = {
   at_delivery:  { bg: '#FFF7ED', border: '#FDBA74' },  // orange
 }
 
-export default function DayView({ loads, loading, trucks, trailers, drivers, fleet = [], statusFilter, onEdit, onDelete, onDriverClick, onTruckClick, onTrailerClick }) {
+export default function DayView({ loads, loading, trucks, trailers, drivers, fleet = [], statusFilter, onEdit, onDelete, onDirectSave, onDriverClick, onTruckClick, onTrailerClick }) {
   // Tracks which multi-load truck groups are manually COLLAPSED.
   // Empty set = all groups open by default so dispatch sees everything on load.
   const [collapsed, setCollapsed] = useState(new Set())
@@ -178,17 +178,28 @@ export default function DayView({ loads, loading, trucks, trailers, drivers, fle
           </div>
         </td>
 
-        <td colSpan={7} style={{ color: '#D1D5DB', fontStyle: 'italic', fontSize: 12 }}>
-          No load assigned for today
-        </td>
-
-        <td>
-          <div className="actions-cell">
+        <td colSpan={7}>
+          <div className="ghost-quickpick">
             <button
-              className="action-btn"
-              title="Add load for this truck"
+              className="ghost-qp-btn qp-home"
+              title="Mark truck as At Home today"
+              onClick={() => onDirectSave({ ...chainPrefill(entry), status: 'home' })}
+            >🏠 At Home</button>
+            <button
+              className="ghost-qp-btn qp-empty"
+              title="Mark truck as Empty / Ready"
+              onClick={() => onDirectSave({ ...chainPrefill(entry), status: 'empty' })}
+            >🚛 Empty</button>
+            <button
+              className="ghost-qp-btn qp-broken"
+              title="Mark truck as Broken Down"
+              onClick={() => onDirectSave({ ...chainPrefill(entry), status: 'broken' })}
+            >🔧 Broken</button>
+            <button
+              className="ghost-qp-btn qp-add"
+              title="Add a load for this truck"
               onClick={() => onEdit(chainPrefill(entry))}
-            >+</button>
+            >+ Add Load</button>
           </div>
         </td>
       </tr>

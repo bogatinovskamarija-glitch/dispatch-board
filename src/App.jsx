@@ -14,6 +14,7 @@ import ExportModal from './components/ExportModal'
 import AccountingView    from './components/AccountingView'
 import MaintenanceView  from './components/maintenance/MaintenanceView'
 import AccountingLock, { isAccountingUnlocked, isUnlocked, lock } from './components/accounting/AccountingLock'
+import OnboardingGuide  from './components/OnboardingGuide'
 
 const MAINT_SESSION_KEY = 'maint_unlocked'
 const MAINT_PASSWORD    = import.meta.env.VITE_MAINTENANCE_PASSWORD || 'carat2026'
@@ -37,6 +38,7 @@ export default function App() {
   const [maintenanceLock,  setMaintenanceLock] = useState(false)
   const [safetyOpen,       setSafety]       = useState(false)
   const [statusFilter, setFilter]   = useState([])
+  const [guideOpen,    setGuide]    = useState(() => !localStorage.getItem('onboarding_v1_seen'))
 
   const weekStart = startOfWeek(currentDay)
   const weekEnd   = addDays(weekStart, 6)
@@ -53,8 +55,24 @@ export default function App() {
   }
 
   async function handleDelete(id) {
-    if (!window.confirm('Delete this load?')) return
+    const load = loads.find(l => l.id === id)
+    // Protect invoiced / paystubbed loads — can't delete them, only archive
+    const NON_REVENUE = ['home', 'empty', 'broken', 'no_driver']
+    const isNonRevenue = NON_REVENUE.includes(load?.status)
+    if (!isNonRevenue && (load?.invoiced_at || load?.paystub_id)) {
+      alert(
+        'This load has been invoiced or included in a paystub and cannot be deleted.\n\n' +
+        'To remove it from pending lists, use the Archive button (🗄) in the Accounting tab.'
+      )
+      return
+    }
+    if (!window.confirm('Delete this load? This cannot be undone.')) return
     await deleteLoad(id)
+  }
+
+  // Quick status change from DayView ghost rows (At Home / No Driver / etc.)
+  async function handleDirectSave(prefill) {
+    await createLoad({ ...prefill, date: format(currentDay) })
   }
 
   function shiftDay(n)  { setDay(d => addDays(d, n)) }
@@ -126,6 +144,12 @@ export default function App() {
           </button>
           <button className="btn btn-ghost" onClick={() => setFleetOpen(true)}>⊞ Fleet Roster</button>
           <button className="btn btn-primary" onClick={() => setModal('add')}>+ Add Load</button>
+          <button
+            className="btn btn-ghost"
+            title="What's new / Help"
+            style={{ fontSize: 16, padding: '0 10px', lineHeight: 1 }}
+            onClick={() => setGuide(true)}
+          >?</button>
         </div>
       </div>
 
@@ -167,6 +191,7 @@ export default function App() {
           fleet={fleet}
           onEdit={l => setModal(l)}
           onDelete={handleDelete}
+          onDirectSave={handleDirectSave}
           onDriverClick={(id, name) => setSidebar({ clickupId: id, name })}
           onTruckClick={t => setEquip({ equipment: t, equipType: 'truck' })}
           onTrailerClick={t => setEquip({ equipment: t, equipType: 'trailer' })}
@@ -252,6 +277,13 @@ export default function App() {
           }}
           onClose={() => setMaintenanceLock(false)}
         />
+      )}
+
+      {guideOpen && (
+        <OnboardingGuide onClose={() => {
+          localStorage.setItem('onboarding_v1_seen', '1')
+          setGuide(false)
+        }} />
       )}
     </>
   )

@@ -157,6 +157,17 @@ export default function LoadModal({ load, date, drivers, trucks, trailers, onSav
         flat_rate_amount: form.flat_rate_pay && form.flat_rate_amount ? Number(form.flat_rate_amount) : null,
         date:             form.date || date,
       }
+
+      // Strip accounting fields — these are managed exclusively by accounting
+      // operations (invoicing, paystubs) and must NEVER be overwritten by a
+      // load edit, even if the in-memory load object has stale values.
+      delete payload.invoice_id
+      delete payload.invoice_number
+      delete payload.invoiced_at
+      delete payload.paid_at
+      delete payload.paystub_id
+      delete payload.is_archived
+
       await onSave(payload)
       onClose()
     } catch (e) {

@@ -84,18 +84,29 @@ export function useInvoiceHistory(company = 'all') {
 }
 
 // ── Loads for a given invoice ──────────────────────────────────────────────
-// Falls back to invoice_number lookup for older invoices that predate the
-// invoice_id column being populated on load rows.
-export async function fetchInvoiceLoads(invoiceId, invoiceNumber) {
+// Three-tier lookup so old invoices never show $0:
+//   1. load_ids UUID[] stored on the invoice (most reliable — survives load edits)
+//   2. invoice_id on load rows (set when invoice was created)
+//   3. invoice_number on load rows (legacy fallback)
+export async function fetchInvoiceLoads(invoiceId, invoiceNumber, loadIds = []) {
+  // Primary: use the load_ids array stored on the invoice record
+  if (Array.isArray(loadIds) && loadIds.length > 0) {
+    const { data } = await supabase
+      .from('loads')
+      .select('*')
+      .in('id', loadIds)
+    if ((data ?? []).length > 0) return data
+  }
+
+  // Fallback 1: invoice_id on load rows
   const { data, error } = await supabase
     .from('loads')
     .select('*')
     .eq('invoice_id', invoiceId)
   if (error) throw new Error(error.message)
-
   if ((data ?? []).length > 0) return data
 
-  // Fallback: legacy loads only have invoice_number set
+  // Fallback 2: legacy loads only have invoice_number set
   if (invoiceNumber) {
     const { data: data2, error: err2 } = await supabase
       .from('loads')
@@ -162,12 +173,39 @@ export async function createInvoice(invoiceData, loadIds, loads = []) {
   const invNum = await getNextInvoiceNumber(invoiceData.company || 'carat')
   const load_numbers = loads.map(l => l.load_number).filter(Boolean)
 
-  const { data: invoice, error: invErr } = await supabase
-    .from('invoices')
-    .insert([{ ...invoiceData, invoice_number: invNum, load_numbers }])
-    .select()
-    .single()
-  if (invErr) throw new Error(invErr.message)
+  // Try to store load_ids for reliable future lookup (survives load edits).
+  // If the column doesn't exist yet, fall back gracefully without it.
+  let invoiceRecord = { ...invoiceData, invoice_number: invNum, load_numbers }
+  let invoice = null
+
+  const tryWithIds = async () => {
+    const { data, error } = await supabase
+      .from('invoices')
+      .insert([{ ...invoiceRecord, load_ids: loadIds }])
+      .select()
+      .single()
+    if (error) throw error
+    return data
+  }
+  const tryWithoutIds = async () => {
+    const { data, error } = await supabase
+      .from('invoices')
+      .insert([invoiceRecord])
+      .select()
+      .single()
+    if (error) throw new Error(error.message)
+    return data
+  }
+
+  try {
+    invoice = await tryWithIds()
+  } catch {
+    // Column may not exist yet — fall back
+    invoice = await tryWithoutIds()
+  }
+
+  const invErr = !invoice
+  if (invErr) throw new Error('Failed to create invoice')
 
   const { error: loadErr } = await supabase
     .from('loads')

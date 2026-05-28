@@ -100,7 +100,7 @@ export default function InvoicesTab({ company }) {
   // Re-open an existing invoice from history
   async function openHistoryInvoice(invoice) {
     try {
-      const invLoads = await fetchInvoiceLoads(invoice.id, invoice.invoice_number)
+      const invLoads = await fetchInvoiceLoads(invoice.id, invoice.invoice_number, invoice.load_ids)
       setPrintData({ loads: invLoads, invoice })
     } catch (e) {
       alert('Error loading invoice: ' + e.message)

@@ -356,6 +356,25 @@ tbody tr:hover { background: #FAFAFA; }
 }
 .row-next-load td:first-child { border-left: 3px solid #7C3AED; }
 
+/* ── GHOST ROW QUICK-PICK BUTTONS ── */
+.ghost-quickpick {
+  display: flex; align-items: center; gap: 6px; padding: 4px 0;
+}
+.ghost-qp-btn {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600;
+  border: 1px solid; cursor: pointer; white-space: nowrap; transition: all .15s;
+  background: #fff;
+}
+.ghost-qp-btn.qp-home   { color: #9D174D; border-color: #F9A8D4; }
+.ghost-qp-btn.qp-home:hover { background: #FDF2F8; }
+.ghost-qp-btn.qp-empty  { color: #92400E; border-color: #FDE047; }
+.ghost-qp-btn.qp-empty:hover { background: #FEFCE8; }
+.ghost-qp-btn.qp-broken { color: #991B1B; border-color: #FCA5A5; }
+.ghost-qp-btn.qp-broken:hover { background: #FEF2F2; }
+.ghost-qp-btn.qp-add    { color: #1D4ED8; border-color: #93C5FD; font-weight: 700; }
+.ghost-qp-btn.qp-add:hover { background: #EFF6FF; }
+
 
 /* ── CHAIN BUTTON ── */
 .action-btn.chain { color: #6D28D9; }
@@ -1056,3 +1075,29 @@ textarea { resize: vertical; min-height: 60px; }
 }
 .ytd-detail-line span:first-child { color: #374151; }
 .ytd-detail-line span:last-child  { font-weight: 600; white-space: nowrap; }
+
+/* ── ONBOARDING GUIDE ── */
+.guide-section {
+  margin-bottom: 24px; padding-bottom: 20px; border-bottom: 1px solid #F3F4F6;
+}
+.guide-section:last-of-type { border-bottom: none; }
+.guide-section-title {
+  font-size: 14px; font-weight: 700; color: #111827; margin-bottom: 12px;
+}
+.guide-item { margin-bottom: 14px; }
+.guide-item-head { font-weight: 600; color: #1F2937; margin-bottom: 4px; }
+.guide-item-body { color: #374151; font-size: 13px; }
+.guide-item-note {
+  margin-top: 6px; padding: 8px 12px; background: #F9FAFB;
+  border-left: 3px solid #D1D5DB; font-size: 12px; color: #6B7280; border-radius: 0 6px 6px 0;
+}
+.guide-list { margin: 8px 0 0 18px; padding: 0; font-size: 13px; color: #374151; }
+.guide-list li { margin-bottom: 4px; }
+.guide-chip {
+  display: inline-flex; align-items: center; padding: 1px 7px;
+  border-radius: 12px; font-size: 11px; font-weight: 600; border: 1px solid;
+}
+.guide-chip.grey   { background: #F3F4F6; color: #6B7280; border-color: #D1D5DB; }
+.guide-chip.indigo { background: #EEF2FF; color: #4F46E5; border-color: #A5B4FC; }
+.guide-chip.green  { background: #F0FDF4; color: #16A34A; border-color: #86EFAC; }
+.guide-qp-demo { display: flex; gap: 6px; margin: 8px 0; flex-wrap: wrap; }
