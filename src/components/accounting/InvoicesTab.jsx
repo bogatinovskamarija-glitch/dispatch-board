@@ -12,6 +12,20 @@ export default function InvoicesTab({ company }) {
   const [showHistory, setShowHistory] = useState(false)
   const [printData,   setPrintData]   = useState(null)  // { loads, invoice? }
 
+  // ── Pending search ─────────────────────────────────────────────────────────
+  const [pendingSearch, setPendingSearch] = useState('')
+
+  const filteredLoads = useMemo(() => {
+    if (!pendingSearch.trim()) return loads
+    const q = pendingSearch.trim().toLowerCase()
+    return loads.filter(l =>
+      (l.load_number  || '').toLowerCase().includes(q) ||
+      (l.broker       || '').toLowerCase().includes(q) ||
+      (l.truck_number || '').toLowerCase().includes(q) ||
+      (l.driver_name  || '').toLowerCase().includes(q)
+    )
+  }, [loads, pendingSearch])
+
   // ── History filters ────────────────────────────────────────────────────────
   const [filterText,    setFilterText]    = useState('')
   const [filterCompany, setFilterCompany] = useState('all')
@@ -153,6 +167,25 @@ export default function InvoicesTab({ company }) {
         loads.length === 0
           ? <div className="acct-empty">No loads pending invoicing.<br />Once a load with a broker and price is saved, it appears here.</div>
           : (
+            <>
+              {/* Search bar for pending */}
+              <div style={{ display: 'flex', gap: 10, marginBottom: 12, alignItems: 'center' }}>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="Search load #, broker, truck, driver…"
+                  value={pendingSearch}
+                  onChange={e => setPendingSearch(e.target.value)}
+                  style={{ width: 280, fontSize: 13 }}
+                />
+                {pendingSearch && (
+                  <button className="btn btn-ghost btn-xs" onClick={() => setPendingSearch('')}>✕ Clear</button>
+                )}
+                <span style={{ fontSize: 12, color: '#9CA3AF', marginLeft: 'auto' }}>
+                  {filteredLoads.length} of {loads.length} load{loads.length !== 1 ? 's' : ''}
+                </span>
+              </div>
+
             <table className="acct-table">
               <thead>
                 <tr>
@@ -171,7 +204,7 @@ export default function InvoicesTab({ company }) {
                 </tr>
               </thead>
               <tbody>
-                {loads.map(l => (
+                {filteredLoads.map(l => (
                   <tr key={l.id} className={selected.has(l.id) ? 'acct-row-selected' : ''} onClick={() => toggleRow(l.id)}>
                     <td onClick={e => e.stopPropagation()}>
                       <input type="checkbox" checked={selected.has(l.id)} onChange={() => toggleRow(l.id)} />
@@ -204,6 +237,7 @@ export default function InvoicesTab({ company }) {
                 ))}
               </tbody>
             </table>
+            </>
           )
       )}
 

@@ -147,19 +147,50 @@ ${cssLinks}
                 </tr>
               </thead>
               <tbody>
-                {loads.map(l => {
-                  const pay = loadPay[l.id] || {}
+                {loads.flatMap(l => {
+                  const pay     = loadPay[l.id] || {}
                   const emptyMi = pay.emptyMiles ?? l.empty_miles
                   const rateCell = isPerMile
                     ? ((pay.payType ?? 'per_mile') === 'flat' ? 'Flat Rate' : `$${pay.rate || profile?.pay_rate || '—'}/mi`)
                     : isOO ? '—' : 'Flat Rate'
-                  return (
+                  const loadNumCell = l.status === 'tonu'
+                    ? <><span className="tonu-badge" style={{ marginRight: 4 }}>TONU</span>{l.load_number || ''}</>
+                    : (l.load_number || '—')
+
+                  // Multi-stop: if stops array has more than 1 pickup OR more than 1 delivery
+                  const stops = (l.stops || []).filter(s => s.location || s.date)
+                  const isMultiStop = stops.length > 2
+
+                  if (isMultiStop) {
+                    return stops.map((stop, si) => {
+                      const isFirst = si === 0
+                      const isLast  = si === stops.length - 1
+                      const isPU    = stop.type === 'pickup'
+                      return (
+                        <tr key={`${l.id}-s${si}`} style={si > 0 ? { fontSize: 12, color: '#4B5563' } : {}}>
+                          <td style={{ color: isFirst ? undefined : '#9CA3AF', fontSize: isFirst ? undefined : 11 }}>
+                            {isFirst ? loadNumCell : '└'}
+                          </td>
+                          <td>{isPU ? (stop.date || '—') : ''}</td>
+                          <td>
+                            {isPU && <><span style={{ fontSize: 10, color: '#9CA3AF', marginRight: 3 }}>PU</span>{cityState(stop.location)}</>}
+                            {!isPU && <><span style={{ fontSize: 10, color: '#9CA3AF', marginRight: 3 }}>DEL</span>{cityState(stop.location)}</>}
+                          </td>
+                          <td>{!isPU ? (stop.date || '—') : ''}</td>
+                          <td></td>
+                          <td>{isFirst ? (isPerMile ? (pay.miles || l.total_miles || '—') : (l.total_miles || '—')) : ''}</td>
+                          <td>{isFirst ? (emptyMi || '—') : ''}</td>
+                          <td>{isFirst ? rateCell : ''}</td>
+                          <td className="inv-amount">{isLast ? (pay.amount ? fmt(pay.amount) : '—') : ''}</td>
+                        </tr>
+                      )
+                    })
+                  }
+
+                  // Standard single pickup → single delivery
+                  return [(
                     <tr key={l.id}>
-                      <td>
-                        {l.status === 'tonu'
-                          ? <><span className="tonu-badge" style={{ marginRight: 4 }}>TONU</span>{l.load_number || ''}</>
-                          : (l.load_number || '—')}
-                      </td>
+                      <td>{loadNumCell}</td>
                       <td>{l.pickup_date  || l.date || '—'}</td>
                       <td>{cityState(l.pickup_location)}</td>
                       <td>{l.delivery_date || '—'}</td>
@@ -169,7 +200,7 @@ ${cssLinks}
                       <td>{rateCell}</td>
                       <td className="inv-amount">{pay.amount ? fmt(pay.amount) : '—'}</td>
                     </tr>
-                  )
+                  )]
                 })}
               </tbody>
               <tfoot>
