@@ -172,12 +172,9 @@ ${cssLinks}
                             {isFirst ? loadNumCell : '└'}
                           </td>
                           <td>{isPU ? (stop.date || '—') : ''}</td>
-                          <td>
-                            {isPU && <><span style={{ fontSize: 10, color: '#9CA3AF', marginRight: 3 }}>PU</span>{cityState(stop.location)}</>}
-                            {!isPU && <><span style={{ fontSize: 10, color: '#9CA3AF', marginRight: 3 }}>DEL</span>{cityState(stop.location)}</>}
-                          </td>
+                          <td>{isPU ? cityState(stop.location) : ''}</td>
                           <td>{!isPU ? (stop.date || '—') : ''}</td>
-                          <td></td>
+                          <td>{!isPU ? cityState(stop.location) : ''}</td>
                           <td>{isFirst ? (isPerMile ? (pay.miles || l.total_miles || '—') : (l.total_miles || '—')) : ''}</td>
                           <td>{isFirst ? (emptyMi || '—') : ''}</td>
                           <td>{isFirst ? rateCell : ''}</td>
