@@ -257,6 +257,7 @@ export default function WeeklySummaryTab({ company }) {
                     <th style={{ textAlign: 'right' }}>Gross Revenue</th>
                     <th style={{ textAlign: 'right' }}>Est. Payroll</th>
                     <th style={{ textAlign: 'right' }}>Actual Payroll</th>
+                    <th style={{ textAlign: 'right' }}>Net After Payroll</th>
                     <th style={{ textAlign: 'right' }}>Est. Net</th>
                   </tr>
                 </thead>
@@ -273,6 +274,9 @@ export default function WeeklySummaryTab({ company }) {
                         </td>
                         <td style={{ textAlign: 'right', fontWeight: 700, color: actual != null ? '#7C3AED' : '#9CA3AF' }}>
                           {actual != null ? fmt(actual) : '—'}
+                        </td>
+                        <td style={{ textAlign: 'right', fontWeight: 700, color: actual != null ? '#059669' : '#9CA3AF' }}>
+                          {actual != null ? fmt(r.gross - actual) : '—'}
                         </td>
                         <td style={{ textAlign: 'right', fontWeight: 700, color: r.net == null ? '#9CA3AF' : r.net >= 0 ? '#111827' : '#DC2626' }}>
                           {r.net != null ? fmt(r.net) : '—'}
@@ -291,6 +295,11 @@ export default function WeeklySummaryTab({ company }) {
                     <td style={{ textAlign: 'right', fontWeight: 800, color: '#7C3AED' }}>
                       {Object.keys(paystubByDriver).length > 0
                         ? fmt(Object.values(paystubByDriver).reduce((s, v) => s + v, 0))
+                        : '—'}
+                    </td>
+                    <td style={{ textAlign: 'right', fontWeight: 800, color: '#059669' }}>
+                      {Object.keys(paystubByDriver).length > 0
+                        ? fmt(totalRevenue - Object.values(paystubByDriver).reduce((s, v) => s + v, 0))
                         : '—'}
                     </td>
                     <td style={{ textAlign: 'right', fontWeight: 800, color: '#F59E0B' }}>
