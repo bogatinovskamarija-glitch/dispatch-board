@@ -22,7 +22,10 @@ function formatRange(start, end) {
 function estimatePay(load, profile) {
   if (!profile) return null
   if (profile.profile_type === 'owner_operator') {
-    return (Number(load.price) || 0) * ((Number(profile.commission_pct) || 15) / 100)
+    // OO driver receives the load price MINUS the company's commission.
+    // commission_pct is what the company keeps, so the driver gets (1 - pct).
+    const pct = (Number(profile.commission_pct) || 15) / 100
+    return (Number(load.price) || 0) * (1 - pct)
   }
   if (profile.pay_type === 'per_mile' && profile.pay_rate && load.total_miles) {
     return Number(load.total_miles) * Number(profile.pay_rate)
