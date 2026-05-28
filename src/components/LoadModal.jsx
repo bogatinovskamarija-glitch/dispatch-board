@@ -109,11 +109,32 @@ export default function LoadModal({ load, date, drivers, trucks, trailers, onSav
     }
   }
 
+  // Statuses that require load details to be filled in
+  const ACTIVE_STATUSES = ['covered', 'at_pickup', 'at_delivery', 'tonu']
+
   async function handleSubmit(e) {
     e.preventDefault()
     setSaving(true)
     setErr(null)
     try {
+      // ── Required-field validation for active statuses ──────────────────
+      if (ACTIVE_STATUSES.includes(form.status)) {
+        const missing = []
+        if (!form.load_number?.trim())   missing.push('Load Number')
+        if (!form.price)                 missing.push(form.status === 'tonu' ? 'TONU Amount' : 'Price')
+        if (!form.broker?.trim())        missing.push('Broker')
+        if (form.status !== 'tonu') {
+          if (!form.total_miles)         missing.push('Total Miles')
+          if (form.empty_miles === '' || form.empty_miles === null || form.empty_miles === undefined)
+                                         missing.push('Empty Miles')
+        }
+        if (missing.length > 0) {
+          setErr('Required fields missing: ' + missing.join(', '))
+          setSaving(false)
+          return
+        }
+      }
+
       const stops      = form.stops.filter(s => s.location || s.date)
       const pickups    = stops.filter(s => s.type === 'pickup')
       const deliveries = stops.filter(s => s.type === 'delivery')
@@ -129,7 +150,8 @@ export default function LoadModal({ load, date, drivers, trucks, trailers, onSav
         delivery_date:    lastDelivery?.date      || null,
         delivery_appt:    lastDelivery?.appt      || '',
         total_miles:      form.total_miles      ? Number(form.total_miles)      : null,
-        empty_miles:      form.empty_miles      ? Number(form.empty_miles)      : null,
+        empty_miles:      form.empty_miles !== '' && form.empty_miles !== null && form.empty_miles !== undefined
+                            ? Number(form.empty_miles) : null,
         price:            form.price            ? Number(form.price)            : null,
         flat_rate_pay:    form.flat_rate_pay    || false,
         flat_rate_amount: form.flat_rate_pay && form.flat_rate_amount ? Number(form.flat_rate_amount) : null,
@@ -316,29 +338,49 @@ export default function LoadModal({ load, date, drivers, trucks, trailers, onSav
                   Driver will <strong>not</strong> be included in paystub calculations.
                 </div>
               )}
+              {ACTIVE_STATUSES.includes(form.status) && (
+                <div style={{ fontSize: 11, color: '#6B7280', marginBottom: 8 }}>
+                  Fields marked <span style={{ color: '#DC2626' }}>*</span> are required for this status.
+                </div>
+              )}
               <div className="form-grid">
                 <div className="form-group">
-                  <label>Load Number</label>
+                  <label>
+                    Load Number
+                    {ACTIVE_STATUSES.includes(form.status) && <span style={{ color: '#DC2626', marginLeft: 2 }}>*</span>}
+                  </label>
                   <input type="text" placeholder="20317925" value={form.load_number} onChange={e => set('load_number', e.target.value)} />
                 </div>
                 <div className="form-group">
-                  <label>Broker</label>
+                  <label>
+                    Broker
+                    {ACTIVE_STATUSES.includes(form.status) && <span style={{ color: '#DC2626', marginLeft: 2 }}>*</span>}
+                  </label>
                   <input type="text" placeholder="JERUE" value={form.broker} onChange={e => set('broker', e.target.value)} />
                 </div>
                 {form.status !== 'tonu' && (
                   <>
                     <div className="form-group">
-                      <label>Total Miles</label>
+                      <label>
+                        Total Miles
+                        {ACTIVE_STATUSES.includes(form.status) && <span style={{ color: '#DC2626', marginLeft: 2 }}>*</span>}
+                      </label>
                       <input type="number" placeholder="1377" value={form.total_miles} onChange={e => set('total_miles', e.target.value)} />
                     </div>
                     <div className="form-group">
-                      <label>Empty Miles</label>
+                      <label>
+                        Empty Miles
+                        {ACTIVE_STATUSES.includes(form.status) && <span style={{ color: '#DC2626', marginLeft: 2 }}>*</span>}
+                      </label>
                       <input type="number" placeholder="0" value={form.empty_miles} onChange={e => set('empty_miles', e.target.value)} />
                     </div>
                   </>
                 )}
                 <div className="form-group">
-                  <label>{form.status === 'tonu' ? 'TONU Amount ($)' : 'Price ($)'}</label>
+                  <label>
+                    {form.status === 'tonu' ? 'TONU Amount ($)' : 'Price ($)'}
+                    {ACTIVE_STATUSES.includes(form.status) && <span style={{ color: '#DC2626', marginLeft: 2 }}>*</span>}
+                  </label>
                   <input
                     type="number"
                     placeholder={form.status === 'tonu' ? '150.00' : '4000'}

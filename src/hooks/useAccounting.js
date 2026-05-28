@@ -79,13 +79,28 @@ export function useInvoiceHistory(company = 'all') {
 }
 
 // ── Loads for a given invoice ──────────────────────────────────────────────
-export async function fetchInvoiceLoads(invoiceId) {
+// Falls back to invoice_number lookup for older invoices that predate the
+// invoice_id column being populated on load rows.
+export async function fetchInvoiceLoads(invoiceId, invoiceNumber) {
   const { data, error } = await supabase
     .from('loads')
     .select('*')
     .eq('invoice_id', invoiceId)
   if (error) throw new Error(error.message)
-  return data ?? []
+
+  if ((data ?? []).length > 0) return data
+
+  // Fallback: legacy loads only have invoice_number set
+  if (invoiceNumber) {
+    const { data: data2, error: err2 } = await supabase
+      .from('loads')
+      .select('*')
+      .eq('invoice_number', invoiceNumber)
+    if (err2) throw new Error(err2.message)
+    return data2 ?? []
+  }
+
+  return []
 }
 
 // ── Peek at next invoice number without incrementing ──────────────────────
