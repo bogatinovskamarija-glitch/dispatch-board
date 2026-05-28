@@ -1,6 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 
+// Statuses that are valid for invoicing — excludes ghost/non-delivery statuses
+const INVOICEABLE_STATUSES = ['covered', 'at_pickup', 'at_delivery', 'tonu']
+
 // ── Pending loads (not yet invoiced, have broker + price) ──────────────────
 export function usePendingInvoices(company = 'all') {
   const [loads, setLoads]     = useState([])
@@ -13,10 +16,12 @@ export function usePendingInvoices(company = 'all') {
       .select('*')
       .is('invoiced_at', null)
       .not('price', 'is', null)
+      .in('status', INVOICEABLE_STATUSES)
       .order('delivery_date', { ascending: false })
     if (company !== 'all') q = q.eq('company', company)
     const { data } = await q
-    setLoads((data ?? []).filter(l => l.broker))
+    // Also exclude manually archived loads (safe even if column doesn't exist yet)
+    setLoads((data ?? []).filter(l => l.broker && !l.is_archived))
     setLoading(false)
   }, [company])
 
@@ -106,12 +111,13 @@ export async function getNextInvoiceNumber(company = 'carat') {
 }
 
 // ── Create invoice + mark loads ────────────────────────────────────────────
-export async function createInvoice(invoiceData, loadIds) {
+export async function createInvoice(invoiceData, loadIds, loads = []) {
   const invNum = await getNextInvoiceNumber(invoiceData.company || 'carat')
+  const load_numbers = loads.map(l => l.load_number).filter(Boolean)
 
   const { data: invoice, error: invErr } = await supabase
     .from('invoices')
-    .insert([{ ...invoiceData, invoice_number: invNum }])
+    .insert([{ ...invoiceData, invoice_number: invNum, load_numbers }])
     .select()
     .single()
   if (invErr) throw new Error(invErr.message)
@@ -127,6 +133,24 @@ export async function createInvoice(invoiceData, loadIds) {
   if (loadErr) throw new Error(loadErr.message)
 
   return invoice
+}
+
+// ── Archive a load (removes from pending invoices) ────────────────────────
+export async function archiveLoad(id) {
+  const { error } = await supabase
+    .from('loads')
+    .update({ is_archived: true })
+    .eq('id', id)
+  if (error) throw new Error(error.message)
+}
+
+// ── Archive an invoice (void / mistake) ──────────────────────────────────
+export async function archiveInvoice(id) {
+  const { error } = await supabase
+    .from('invoices')
+    .update({ is_archived: true })
+    .eq('id', id)
+  if (error) throw new Error(error.message)
 }
 
 // ── Update existing invoice metadata (for re-export) ──────────────────────

@@ -109,7 +109,7 @@ ${cssLinks}
       if (isExisting) {
         await updateInvoice(existingInvoice.id, invoiceData)
       } else {
-        await createInvoice(invoiceData, loads.map(l => l.id))
+        await createInvoice(invoiceData, loads.map(l => l.id), loads)
       }
       await onCreated()
     } catch (e) {

@@ -8,6 +8,18 @@ const LOGOS = {
 
 const fmt = n => '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2 })
 
+// Return "City, ST" from a "City, State Zip" string
+function cityState(loc) {
+  if (!loc) return '—'
+  const parts = loc.split(',')
+  if (parts.length >= 2) {
+    const city = parts[0].trim()
+    const stateWord = parts[1].trim().split(' ')[0]  // first word after comma = state abbrev
+    return stateWord ? `${city}, ${stateWord}` : city
+  }
+  return parts[0].trim() || '—'
+}
+
 export default function PaystubPrintModal({
   driver, profile, startDate, endDate,
   loads, loadPay, additions, deductions,
@@ -143,11 +155,15 @@ ${cssLinks}
                     : isOO ? '—' : 'Flat Rate'
                   return (
                     <tr key={l.id}>
-                      <td>{l.load_number || '—'}</td>
+                      <td>
+                        {l.status === 'tonu'
+                          ? <><span className="tonu-badge" style={{ marginRight: 4 }}>TONU</span>{l.load_number || ''}</>
+                          : (l.load_number || '—')}
+                      </td>
                       <td>{l.pickup_date  || l.date || '—'}</td>
-                      <td>{l.pickup_location?.split(',')[0]   || '—'}</td>
+                      <td>{cityState(l.pickup_location)}</td>
                       <td>{l.delivery_date || '—'}</td>
-                      <td>{l.delivery_location?.split(',')[0] || '—'}</td>
+                      <td>{cityState(l.delivery_location)}</td>
                       <td>{isPerMile ? (pay.miles || l.total_miles || '—') : (l.total_miles || '—')}</td>
                       <td>{emptyMi || '—'}</td>
                       <td>{rateCell}</td>

@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { usePendingInvoices, useInvoiceHistory, createInvoice, fetchInvoiceLoads } from '../../hooks/useAccounting'
+import { usePendingInvoices, useInvoiceHistory, createInvoice, fetchInvoiceLoads, archiveLoad, archiveInvoice } from '../../hooks/useAccounting'
 import InvoicePrintModal from './InvoicePrintModal'
 
 const fmt = n => '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2 })
@@ -17,9 +17,24 @@ export default function InvoicesTab({ company }) {
   const [filterCompany, setFilterCompany] = useState('all')
   const [filterFrom,    setFilterFrom]    = useState('')
   const [filterTo,      setFilterTo]      = useState('')
+  const [showArchived,  setShowArchived]  = useState(false)
+
+  // ── Sort state ─────────────────────────────────────────────────────────────
+  const [sortCol, setSortCol] = useState('created_at')
+  const [sortDir, setSortDir] = useState('desc')
+
+  function toggleSort(col) {
+    if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortCol(col); setSortDir('asc') }
+  }
+  function sortIcon(col) {
+    if (sortCol !== col) return ' ↕'
+    return sortDir === 'asc' ? ' ↑' : ' ↓'
+  }
 
   const filteredInvoices = useMemo(() => {
     let list = invoices
+    if (!showArchived) list = list.filter(inv => !inv.is_archived)
     if (filterCompany !== 'all') {
       list = list.filter(inv => inv.company === filterCompany)
     }
@@ -28,7 +43,8 @@ export default function InvoicesTab({ company }) {
       list = list.filter(inv =>
         (inv.invoice_number || '').toLowerCase().includes(q) ||
         (inv.bill_to_name   || '').toLowerCase().includes(q) ||
-        (inv.company        || '').toLowerCase().includes(q)
+        (inv.company        || '').toLowerCase().includes(q) ||
+        (inv.load_numbers   || []).some(ln => ln.toLowerCase().includes(q))
       )
     }
     if (filterFrom) {
@@ -37,8 +53,18 @@ export default function InvoicesTab({ company }) {
     if (filterTo) {
       list = list.filter(inv => inv.created_at && inv.created_at.slice(0, 10) <= filterTo)
     }
+
+    // Sort
+    list = [...list].sort((a, b) => {
+      let av = a[sortCol] ?? ''
+      let bv = b[sortCol] ?? ''
+      if (sortCol === 'total') { av = Number(av); bv = Number(bv) }
+      else { av = String(av); bv = String(bv) }
+      const cmp = av < bv ? -1 : av > bv ? 1 : 0
+      return sortDir === 'asc' ? cmp : -cmp
+    })
     return list
-  }, [invoices, filterText, filterCompany, filterFrom, filterTo])
+  }, [invoices, filterText, filterCompany, filterFrom, filterTo, showArchived, sortCol, sortDir])
 
   function toggleRow(id) {
     setSelected(prev => {
@@ -72,6 +98,28 @@ export default function InvoicesTab({ company }) {
     setPrintData(null)
     await refetch()
     if (showHistory) await refetchHist()
+  }
+
+  async function handleArchiveLoad(e, id) {
+    e.stopPropagation()
+    if (!window.confirm('Archive this load? It will be removed from pending invoices.')) return
+    try {
+      await archiveLoad(id)
+      await refetch()
+    } catch (err) {
+      alert('Error: ' + err.message)
+    }
+  }
+
+  async function handleArchiveInvoice(e, id) {
+    e.stopPropagation()
+    if (!window.confirm('Archive (void) this invoice? It will be marked as archived.')) return
+    try {
+      await archiveInvoice(id)
+      await refetchHist()
+    } catch (err) {
+      alert('Error: ' + err.message)
+    }
   }
 
   const selectedLoads = loads.filter(l => selected.has(l.id))
@@ -119,6 +167,7 @@ export default function InvoicesTab({ company }) {
                   <th>Delivery</th>
                   <th>Route</th>
                   <th>Price</th>
+                  <th style={{ width: 36 }} title="Archive load"></th>
                 </tr>
               </thead>
               <tbody>
@@ -143,6 +192,14 @@ export default function InvoicesTab({ company }) {
                         : l.pickup_location || l.delivery_location || '—'}
                     </td>
                     <td className="acct-price">{l.price ? fmt(l.price) : '—'}</td>
+                    <td>
+                      <button
+                        className="btn btn-ghost btn-xs"
+                        title="Archive load (remove from pending)"
+                        onClick={e => handleArchiveLoad(e, l.id)}
+                        style={{ color: '#9CA3AF', padding: '2px 6px' }}
+                      >🗄</button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -161,10 +218,10 @@ export default function InvoicesTab({ company }) {
                 <input
                   type="text"
                   className="form-input"
-                  placeholder="Search invoice #, broker…"
+                  placeholder="Search invoice #, broker, load #…"
                   value={filterText}
                   onChange={e => setFilterText(e.target.value)}
-                  style={{ width: 240, fontSize: 13 }}
+                  style={{ width: 260, fontSize: 13 }}
                 />
                 {company === 'all' && (
                   <select
@@ -184,6 +241,13 @@ export default function InvoicesTab({ company }) {
                   <label style={{ color: '#6B7280' }}>To</label>
                   <input type="date" value={filterTo} onChange={e => setFilterTo(e.target.value)} style={{ fontSize: 13, padding: '4px 8px', border: '1px solid #D1D5DB', borderRadius: 6 }} />
                 </div>
+                <button
+                  className={`btn btn-xs ${showArchived ? 'btn-primary' : 'btn-ghost'}`}
+                  onClick={() => setShowArchived(v => !v)}
+                  title="Toggle archived/voided invoices"
+                >
+                  {showArchived ? '🗄 Hide Archived' : '🗄 Show Archived'}
+                </button>
                 {(filterText || filterCompany !== 'all' || filterFrom || filterTo) && (
                   <button className="btn btn-ghost btn-xs" onClick={() => { setFilterText(''); setFilterCompany('all'); setFilterFrom(''); setFilterTo('') }}>
                     ✕ Clear
@@ -200,23 +264,46 @@ export default function InvoicesTab({ company }) {
                   <table className="acct-table">
                     <thead>
                       <tr>
-                        <th>Invoice #</th>
-                        <th>Date</th>
-                        <th>Broker</th>
-                        <th>Company</th>
-                        <th>Total</th>
+                        <th style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('invoice_number')}>Invoice #{sortIcon('invoice_number')}</th>
+                        <th style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('created_at')}>Date{sortIcon('created_at')}</th>
+                        <th style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('bill_to_name')}>Broker{sortIcon('bill_to_name')}</th>
+                        <th style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('company')}>Company{sortIcon('company')}</th>
+                        <th>Load #s</th>
+                        <th style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('total')}>Total{sortIcon('total')}</th>
                         <th></th>
                       </tr>
                     </thead>
                     <tbody>
                       {filteredInvoices.map(inv => (
-                        <tr key={inv.id} style={{ cursor: 'pointer' }} onClick={() => openHistoryInvoice(inv)}>
-                          <td><strong>{inv.invoice_number}</strong></td>
+                        <tr
+                          key={inv.id}
+                          style={{ cursor: 'pointer', opacity: inv.is_archived ? 0.5 : 1 }}
+                          onClick={() => !inv.is_archived && openHistoryInvoice(inv)}
+                        >
+                          <td>
+                            <strong>{inv.invoice_number}</strong>
+                            {inv.is_archived && <span style={{ marginLeft: 6, fontSize: 10, color: '#9CA3AF', background: '#F3F4F6', borderRadius: 4, padding: '1px 5px' }}>VOIDED</span>}
+                          </td>
                           <td>{inv.created_at ? new Date(inv.created_at).toLocaleDateString() : '—'}</td>
                           <td>{inv.bill_to_name || '—'}</td>
                           <td>{inv.company === 'carat' ? 'Carat' : inv.company === 'pro_freight' ? 'Pro Freight' : inv.company || '—'}</td>
+                          <td style={{ fontSize: 12, color: '#6B7280' }}>
+                            {(inv.load_numbers || []).length > 0
+                              ? inv.load_numbers.join(', ')
+                              : '—'}
+                          </td>
                           <td className="acct-price">{inv.total ? fmt(inv.total) : '—'}</td>
-                          <td><span className="acct-click-hint">View / Re-export →</span></td>
+                          <td style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                            {!inv.is_archived && <span className="acct-click-hint">View →</span>}
+                            {!inv.is_archived && (
+                              <button
+                                className="btn btn-ghost btn-xs"
+                                title="Archive / void this invoice"
+                                onClick={e => handleArchiveInvoice(e, inv.id)}
+                                style={{ color: '#9CA3AF', padding: '2px 6px' }}
+                              >🗄</button>
+                            )}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
