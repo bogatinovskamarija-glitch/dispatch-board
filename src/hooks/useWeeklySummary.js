@@ -14,6 +14,39 @@ export function getThursdayWeek(fromDate) {
   return { start: iso(thu), end: iso(wed) }
 }
 
+// Fetch paystubs whose period starts within the given week
+export function useWeekPaystubs(startDate, endDate, company) {
+  const [paystubs, setPaystubs] = useState([])
+  const [loading,  setLoading]  = useState(true)
+
+  useEffect(() => {
+    if (!startDate || !endDate) return
+    let cancelled = false
+    setLoading(true)
+
+    async function fetch() {
+      let q = supabase
+        .from('paystubs')
+        .select('driver_name, company, grand_total, load_total, start_date, end_date')
+        .gte('start_date', startDate)
+        .lte('start_date', endDate)
+
+      if (company && company !== 'all') q = q.eq('company', company)
+
+      const { data } = await q
+      if (!cancelled) {
+        setPaystubs(data ?? [])
+        setLoading(false)
+      }
+    }
+
+    fetch()
+    return () => { cancelled = true }
+  }, [startDate, endDate, company])
+
+  return { paystubs, loading }
+}
+
 export function useWeeklySummary(startDate, endDate, company) {
   const [loads,   setLoads]   = useState([])
   const [loading, setLoading] = useState(true)

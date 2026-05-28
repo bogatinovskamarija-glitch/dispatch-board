@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { useWeeklySummary, getThursdayWeek } from '../../hooks/useWeeklySummary'
+import { useWeeklySummary, useWeekPaystubs, getThursdayWeek } from '../../hooks/useWeeklySummary'
 import { useDriverProfiles } from '../../hooks/useDriverProfiles'
 
 const fmt    = n => '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2 })
@@ -99,8 +99,18 @@ export default function WeeklySummaryTab({ company }) {
   const [anchor, setAnchor] = useState(() => getThursdayWeek().start)
   const { start, end } = getThursdayWeek(anchor)
 
-  const { loads, loading }   = useWeeklySummary(start, end, company)
-  const { profiles }         = useDriverProfiles()
+  const { loads, loading }        = useWeeklySummary(start, end, company)
+  const { paystubs: weekPaystubs } = useWeekPaystubs(start, end, company)
+  const { profiles }               = useDriverProfiles()
+
+  // Map driver name → total grand_total paid this week (a driver could have 2 paystubs)
+  const paystubByDriver = useMemo(() => {
+    const map = {}
+    for (const ps of weekPaystubs) {
+      map[ps.driver_name] = (map[ps.driver_name] || 0) + (Number(ps.grand_total) || 0)
+    }
+    return map
+  }, [weekPaystubs])
 
   // ── Per-driver payroll rows ───────────────────────────────────────────────
   const driverRows = useMemo(() => {
@@ -246,23 +256,30 @@ export default function WeeklySummaryTab({ company }) {
                     <th style={{ textAlign: 'center' }}>Loads</th>
                     <th style={{ textAlign: 'right' }}>Gross Revenue</th>
                     <th style={{ textAlign: 'right' }}>Est. Payroll</th>
+                    <th style={{ textAlign: 'right' }}>Actual Payroll</th>
                     <th style={{ textAlign: 'right' }}>Est. Net</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {driverRows.map(r => (
-                    <tr key={r.name}>
-                      <td><strong>{r.name}</strong></td>
-                      <td style={{ textAlign: 'center' }}>{r.loads.length}</td>
-                      <td style={{ textAlign: 'right', fontWeight: 600, color: '#059669' }}>{fmt(r.gross)}</td>
-                      <td style={{ textAlign: 'right', color: '#2563EB' }}>
-                        {r.payroll != null ? fmt(r.payroll) : <span style={{ color: '#9CA3AF', fontSize: 11 }}>no profile</span>}
-                      </td>
-                      <td style={{ textAlign: 'right', fontWeight: 700, color: r.net == null ? '#9CA3AF' : r.net >= 0 ? '#111827' : '#DC2626' }}>
-                        {r.net != null ? fmt(r.net) : '—'}
-                      </td>
-                    </tr>
-                  ))}
+                  {driverRows.map(r => {
+                    const actual = paystubByDriver[r.name]
+                    return (
+                      <tr key={r.name}>
+                        <td><strong>{r.name}</strong></td>
+                        <td style={{ textAlign: 'center' }}>{r.loads.length}</td>
+                        <td style={{ textAlign: 'right', fontWeight: 600, color: '#059669' }}>{fmt(r.gross)}</td>
+                        <td style={{ textAlign: 'right', color: '#2563EB' }}>
+                          {r.payroll != null ? fmt(r.payroll) : <span style={{ color: '#9CA3AF', fontSize: 11 }}>no profile</span>}
+                        </td>
+                        <td style={{ textAlign: 'right', fontWeight: 700, color: actual != null ? '#7C3AED' : '#9CA3AF' }}>
+                          {actual != null ? fmt(actual) : '—'}
+                        </td>
+                        <td style={{ textAlign: 'right', fontWeight: 700, color: r.net == null ? '#9CA3AF' : r.net >= 0 ? '#111827' : '#DC2626' }}>
+                          {r.net != null ? fmt(r.net) : '—'}
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
                 <tfoot>
                   <tr style={{ background: '#F3F4F6' }}>
@@ -270,6 +287,11 @@ export default function WeeklySummaryTab({ company }) {
                     <td style={{ textAlign: 'right', fontWeight: 800 }}>{fmt(totalRevenue)}</td>
                     <td style={{ textAlign: 'right', fontWeight: 800, color: '#2563EB' }}>
                       {knownPayroll ? fmt(totalPayroll) : '—'}
+                    </td>
+                    <td style={{ textAlign: 'right', fontWeight: 800, color: '#7C3AED' }}>
+                      {Object.keys(paystubByDriver).length > 0
+                        ? fmt(Object.values(paystubByDriver).reduce((s, v) => s + v, 0))
+                        : '—'}
                     </td>
                     <td style={{ textAlign: 'right', fontWeight: 800, color: '#F59E0B' }}>
                       {knownPayroll ? fmt(totalRevenue - totalPayroll) : '—'}
