@@ -351,10 +351,10 @@ tbody tr:hover { background: #FAFAFA; }
 
 /* ── NEXT LOAD ROWS ── */
 .row-next-load td {
-  background: #F5F3FF; border-top: none !important;
+  background: #F0F0F0; border-top: none !important;
   padding-top: 5px; padding-bottom: 5px;
 }
-.row-next-load td:first-child { border-left: 3px solid #7C3AED; }
+.row-next-load td:first-child { border-left: 3px solid #9CA3AF; }
 
 /* ── GHOST ROW QUICK-PICK BUTTONS ── */
 .ghost-quickpick {

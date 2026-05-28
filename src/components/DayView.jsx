@@ -380,11 +380,11 @@ export default function DayView({ loads, loading, trucks, trailers, drivers, fle
       <tr
         key={`next-${load.id}`}
         className="row-next-load"
-        style={{ background: '#F5F7FF', borderLeft: '4px solid #818CF8' }}
+        style={{ background: '#F0F0F0', borderLeft: '4px solid #9CA3AF' }}
       >
-        <td style={{ paddingLeft: 10 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-            <span style={{ color: '#818CF8', fontSize: 13, lineHeight: 1, userSelect: 'none' }}>└</span>
+        <td style={{ paddingLeft: 24 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ color: '#9CA3AF', fontSize: 13, lineHeight: 1, userSelect: 'none' }}>└</span>
             <StatusBadge status={load.status} />
           </div>
         </td>
