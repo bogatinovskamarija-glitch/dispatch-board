@@ -45,28 +45,33 @@ export function useInvoiceHistory(company = 'all') {
     const { data } = await q
     const invoiceList = data ?? []
 
-    // Enrich every invoice with load numbers pulled from the loads table.
-    // This works for all invoices (old and new) because loads always have
-    // invoice_id set after invoicing, regardless of whether load_numbers
+    // Enrich every invoice with load numbers and truck numbers pulled from the loads
+    // table via invoice_id. Works for all invoices regardless of whether load_numbers
     // was stored on the invoice itself.
     if (invoiceList.length > 0) {
       const ids = invoiceList.map(i => i.id)
       const { data: invLoads } = await supabase
         .from('loads')
-        .select('invoice_id, load_number')
+        .select('invoice_id, load_number, truck_number')
         .in('invoice_id', ids)
-        .not('load_number', 'is', null)
-        .neq('load_number', '')
 
-      const numMap = {}
+      const numMap   = {}
+      const truckMap = {}
       for (const l of (invLoads ?? [])) {
-        if (!numMap[l.invoice_id]) numMap[l.invoice_id] = []
-        numMap[l.invoice_id].push(l.load_number)
+        if (l.load_number) {
+          if (!numMap[l.invoice_id]) numMap[l.invoice_id] = []
+          numMap[l.invoice_id].push(l.load_number)
+        }
+        if (l.truck_number) {
+          if (!truckMap[l.invoice_id]) truckMap[l.invoice_id] = new Set()
+          truckMap[l.invoice_id].add(l.truck_number)
+        }
       }
 
       setInvoices(invoiceList.map(inv => ({
         ...inv,
-        load_numbers: numMap[inv.id]?.length ? numMap[inv.id] : (inv.load_numbers ?? []),
+        load_numbers:  numMap[inv.id]?.length ? numMap[inv.id] : (inv.load_numbers ?? []),
+        truck_numbers: truckMap[inv.id] ? [...truckMap[inv.id]] : [],
       })))
     } else {
       setInvoices([])

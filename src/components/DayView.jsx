@@ -1,4 +1,4 @@
-import { Fragment } from 'react'
+import { Fragment, useState } from 'react'
 import StatusBadge from './StatusBadge'
 import SelectCell from './SelectCell'
 
@@ -18,6 +18,16 @@ const STATUS_ROUTE_BG = {
 }
 
 export default function DayView({ loads, loading, trucks, trailers, drivers, fleet = [], statusFilter, onEdit, onDelete, onDriverClick, onTruckClick, onTrailerClick }) {
+  // Tracks which multi-load truck groups are expanded. Default: collapsed.
+  const [expanded, setExpanded] = useState(new Set())
+  function toggleExpand(key) {
+    setExpanded(prev => {
+      const next = new Set(prev)
+      next.has(key) ? next.delete(key) : next.add(key)
+      return next
+    })
+  }
+
   const truckOpts = trucks.map(e => ({
     value: e.truckNumber,
     label: e.truckNumber,
@@ -184,12 +194,34 @@ export default function DayView({ loads, loading, trucks, trailers, drivers, fle
     )
   }
 
-  function renderRow(load) {
+  function renderRow(load, extraCount = 0, isExp = false, onToggle = null) {
     if (load._ghost) return renderGhostRow(load)
 
     return (
       <tr key={load.id} className={`row-${load.status}`}>
-        <td><StatusBadge status={load.status} /></td>
+        <td>
+          {extraCount > 0 ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <button
+                title={isExp ? 'Collapse' : `Show ${extraCount} more load${extraCount > 1 ? 's' : ''}`}
+                onClick={onToggle}
+                style={{
+                  background: isExp ? '#F3F4F6' : '#EEF2FF',
+                  border: `1px solid ${isExp ? '#D1D5DB' : '#C7D2FE'}`,
+                  cursor: 'pointer',
+                  fontSize: 10, color: isExp ? '#6B7280' : '#4F46E5',
+                  padding: '1px 5px', lineHeight: 1.4, borderRadius: 4,
+                  fontWeight: 600, whiteSpace: 'nowrap',
+                }}
+              >
+                {isExp ? '▾' : `▸ +${extraCount}`}
+              </button>
+              <StatusBadge status={load.status} />
+            </div>
+          ) : (
+            <StatusBadge status={load.status} />
+          )}
+        </td>
 
         <td>
           <div className="equip-cell">
@@ -405,10 +437,14 @@ export default function DayView({ loads, loading, trucks, trailers, drivers, fle
 
   function renderGroup(group) {
     const [primary, ...rest] = group
+    const fragKey  = primary._ghost ? `ghost_${primary._fleetId}` : primary.id
+    const groupKey = primary.truck_number || fragKey
+    const isExp    = expanded.has(groupKey)
+
     return (
-      <Fragment key={primary._ghost ? `ghost_${primary._fleetId}` : primary.id}>
-        {renderRow(primary)}
-        {rest.map(renderNextRow)}
+      <Fragment key={fragKey}>
+        {renderRow(primary, rest.length, isExp, rest.length > 0 ? () => toggleExpand(groupKey) : null)}
+        {isExp && rest.map(renderNextRow)}
       </Fragment>
     )
   }

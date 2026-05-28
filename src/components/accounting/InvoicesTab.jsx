@@ -301,8 +301,9 @@ export default function InvoicesTab({ company }) {
                         <th style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('invoice_number')}>Invoice #{sortIcon('invoice_number')}</th>
                         <th style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('created_at')}>Date{sortIcon('created_at')}</th>
                         <th style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('bill_to_name')}>Broker{sortIcon('bill_to_name')}</th>
-                        <th style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('company')}>Company{sortIcon('company')}</th>
                         <th>Load #s</th>
+                        <th>Trucks</th>
+                        <th style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('company')}>Co.{sortIcon('company')}</th>
                         <th style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('total')}>Total{sortIcon('total')}</th>
                         <th></th>
                       </tr>
@@ -319,12 +320,19 @@ export default function InvoicesTab({ company }) {
                             {inv.is_archived && <span style={{ marginLeft: 6, fontSize: 10, color: '#9CA3AF', background: '#F3F4F6', borderRadius: 4, padding: '1px 5px' }}>VOIDED</span>}
                           </td>
                           <td>{inv.created_at ? new Date(inv.created_at).toLocaleDateString() : '—'}</td>
-                          <td>{inv.bill_to_name || '—'}</td>
-                          <td>{inv.company === 'carat' ? 'Carat' : inv.company === 'pro_freight' ? 'Pro Freight' : inv.company || '—'}</td>
+                          <td><strong>{inv.bill_to_name || '—'}</strong></td>
                           <td style={{ fontSize: 12, color: '#6B7280' }}>
                             {(inv.load_numbers || []).length > 0
                               ? inv.load_numbers.join(', ')
                               : '—'}
+                          </td>
+                          <td style={{ fontSize: 12, color: '#374151', fontWeight: 500 }}>
+                            {(inv.truck_numbers || []).length > 0
+                              ? inv.truck_numbers.join(', ')
+                              : '—'}
+                          </td>
+                          <td style={{ fontSize: 12, color: '#9CA3AF' }}>
+                            {inv.company === 'carat' ? 'Carat' : inv.company === 'pro_freight' ? 'Pro' : inv.company || '—'}
                           </td>
                           <td className="acct-price">{inv.total ? fmt(inv.total) : '—'}</td>
                           <td style={{ display: 'flex', gap: 4, alignItems: 'center' }}>

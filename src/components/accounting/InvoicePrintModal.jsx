@@ -39,7 +39,17 @@ export default function InvoicePrintModal({ loads, existingInvoice, company: com
 
   const loadsTotal  = loads.reduce((s, l) => s + (Number(l.price) || 0), 0)
   const extrasTotal = extras.reduce((s, e) => s + (Number(e.amount) || 0), 0)
-  const total       = loadsTotal + extrasTotal
+  const computedTotal = loadsTotal + extrasTotal
+
+  // For existing invoices allow manually overriding the total — critical when loads
+  // aren't linked (invoice shows $0) so the correct amount can be entered/restored.
+  const [totalOverride, setTotalOverride] = useState(
+    isExisting ? String(existingInvoice?.total ?? '') : null
+  )
+  // Use the override when editing an existing invoice; otherwise use computed.
+  const total = isExisting && totalOverride !== null && totalOverride !== ''
+    ? Number(totalOverride)
+    : computedTotal
 
   // Auto-fill address from broker picker
   function handleBrokerChange(b) {
@@ -160,6 +170,35 @@ ${cssLinks}
                 <input value={notes} onChange={e => setNotes(e.target.value)} placeholder="e.g. Net 30" />
               </div>
             </div>
+
+            {/* Invoice total override (existing invoices) */}
+            {isExisting && (
+              <div style={{ marginTop: 12, padding: '10px 14px', background: loads.length === 0 ? '#FEF2F2' : '#F9FAFB', border: `1px solid ${loads.length === 0 ? '#FCA5A5' : '#E5E7EB'}`, borderRadius: 8 }}>
+                {loads.length === 0 && (
+                  <div style={{ fontSize: 12, color: '#DC2626', fontWeight: 600, marginBottom: 8 }}>
+                    ⚠ No loads are linked to this invoice — the amount was loaded from the saved total. Edit below if needed.
+                  </div>
+                )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#374151', whiteSpace: 'nowrap' }}>
+                    Invoice Total ($)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={totalOverride ?? ''}
+                    onChange={e => setTotalOverride(e.target.value)}
+                    placeholder={String(computedTotal)}
+                    style={{ width: 140, fontSize: 13, padding: '4px 8px', border: `1px solid ${loads.length === 0 ? '#FCA5A5' : '#D1D5DB'}`, borderRadius: 6 }}
+                  />
+                  {loads.length > 0 && (
+                    <span style={{ fontSize: 11, color: '#9CA3AF' }}>
+                      Computed from loads: {fmt(computedTotal)}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Extra charges */}
             <div style={{ marginTop: 16 }}>
