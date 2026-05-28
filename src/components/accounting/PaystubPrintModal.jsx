@@ -158,8 +158,22 @@ ${cssLinks}
                     : (l.load_number || '—')
 
                   // Multi-stop: if stops array has more than 1 pickup OR more than 1 delivery
-                  const stops = (l.stops || []).filter(s => s.location || s.date)
-                  const isMultiStop = stops.length > 2
+                  const rawStops = (l.stops || []).filter(s => s.location || s.date)
+                  const isMultiStop = rawStops.length > 2
+
+                  // Sort stops chronologically so pickups always appear before deliveries
+                  // on the paystub (e.g. PU→DEL→PU stored order becomes PU→PU→DEL).
+                  // Within the same date, pickups sort before deliveries.
+                  const stops = isMultiStop
+                    ? [...rawStops].sort((a, b) => {
+                        const da = a.date || ''
+                        const db = b.date || ''
+                        if (da !== db) return da < db ? -1 : 1
+                        if (a.type === 'pickup'   && b.type === 'delivery') return -1
+                        if (a.type === 'delivery' && b.type === 'pickup')   return  1
+                        return 0
+                      })
+                    : rawStops
 
                   if (isMultiStop) {
                     return stops.map((stop, si) => {
