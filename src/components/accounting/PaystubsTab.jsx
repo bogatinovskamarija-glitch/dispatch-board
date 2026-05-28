@@ -70,13 +70,16 @@ export default function PaystubsTab({ drivers, company }) {
   }
 
   // Edit mode — pre-populate the generate form with a historical paystub
-  const [editingPaystubId, setEditingPaystubId] = useState(null)
+  const [editingPaystubId,   setEditingPaystubId]   = useState(null)
+  // Loads that already belong to the paystub being edited (already marked paid)
+  const [editingBaseLoads,   setEditingBaseLoads]   = useState([])
 
   function openEditMode(ps, psLoads) {
     setDriverName(ps.driver_name)
     setStartDate(ps.start_date)
     setEndDate(ps.end_date)
     setLoads(psLoads)
+    setEditingBaseLoads(psLoads)
     setLoadPay(ps.load_pay || {})
     setAdditions((ps.additions || []).length ? ps.additions : [{ ...BLANK_LINE }])
     setDeductions((ps.deductions || []).length ? ps.deductions : [{ ...BLANK_LINE }])
@@ -93,6 +96,7 @@ export default function PaystubsTab({ drivers, company }) {
 
   function cancelEdit() {
     setEditingPaystubId(null)
+    setEditingBaseLoads([])
     setLoads([])
     setLoaded(false)
     setLoadPay({})
@@ -161,41 +165,61 @@ export default function PaystubsTab({ drivers, company }) {
     setError(null)
     setLoaded(false)
     try {
-      const data = await fetchDriverLoads(driverName, startDate, endDate, dateField, profile?.profile_type)
-      setLoads(data)
-      // Initialize pay per load
-      const init = {}
-      data.forEach(l => {
-        if (isOO) {
-          // Owner operator: gross = load price
-          init[l.id] = { amount: String(l.price || ''), emptyMiles: String(l.empty_miles || '') }
-        } else if (isPerMile) {
-          const miles = l.total_miles || 0
-          const empty = l.empty_miles || 0
-          const rate  = profile?.pay_rate || 0
-          if (l.flat_rate_pay && l.flat_rate_amount) {
-            // Dispatch pre-agreed a flat rate for this load — use it directly
-            init[l.id] = { miles: String(miles), emptyMiles: String(empty || ''), rate: String(rate), payType: 'flat', amount: String(l.flat_rate_amount) }
-          } else {
-            // Company driver per mile: auto-calc (loaded + empty) * rate
-            init[l.id] = { miles: String(miles), emptyMiles: String(empty || ''), rate: String(rate), amount: String(((miles + empty) * rate).toFixed(2)) }
-          }
-        } else {
-          // Flat rate or no profile: blank
-          init[l.id] = { amount: '', emptyMiles: String(l.empty_miles || '') }
+      // fetchDriverLoads only returns unpaid loads; in edit mode we must also
+      // keep the already-paid loads from the paystub being edited.
+      const freshData = await fetchDriverLoads(driverName, startDate, endDate, dateField, profile?.profile_type)
+
+      let finalLoads
+      let initPay
+
+      if (editingPaystubId && editingBaseLoads.length > 0) {
+        // ── Edit mode: merge base (already-paid) loads + new unpaid loads ──
+        const baseIds     = new Set(editingBaseLoads.map(l => l.id))
+        const onlyNewLoads = freshData.filter(l => !baseIds.has(l.id))
+        finalLoads = [...editingBaseLoads, ...onlyNewLoads]
+
+        // Keep existing loadPay for base loads; init pay only for truly new ones
+        initPay = { ...loadPay }
+        onlyNewLoads.forEach(l => {
+          initPay[l.id] = initLoadPayEntry(l)
+        })
+      } else {
+        // ── Normal mode: full replace ──
+        finalLoads = freshData
+        initPay = {}
+        freshData.forEach(l => { initPay[l.id] = initLoadPayEntry(l) })
+
+        // Pre-populate deductions only when not editing (don't overwrite user's data)
+        if (profile) {
+          setDeductions(defaultDeductions(profile.profile_type))
+          if (isOO) setCommissionPct(profile.commission_pct ?? 15)
         }
-      })
-      setLoadPay(init)
-      // Pre-populate deductions
-      if (profile) {
-        setDeductions(defaultDeductions(profile.profile_type))
-        if (isOO) setCommissionPct(profile.commission_pct ?? 15)
       }
+
+      setLoads(finalLoads)
+      setLoadPay(initPay)
       setLoaded(true)
     } catch (e) {
       setError(e.message)
     } finally {
       setLoading(false)
+    }
+  }
+
+  // Helper: build the initial pay entry for a single load
+  function initLoadPayEntry(l) {
+    if (isOO) {
+      return { amount: String(l.price || ''), emptyMiles: String(l.empty_miles || '') }
+    } else if (isPerMile) {
+      const miles = l.total_miles || 0
+      const empty = l.empty_miles || 0
+      const rate  = profile?.pay_rate || 0
+      if (l.flat_rate_pay && l.flat_rate_amount) {
+        return { miles: String(miles), emptyMiles: String(empty || ''), rate: String(rate), payType: 'flat', amount: String(l.flat_rate_amount) }
+      }
+      return { miles: String(miles), emptyMiles: String(empty || ''), rate: String(rate), amount: String(((miles + empty) * rate).toFixed(2)) }
+    } else {
+      return { amount: '', emptyMiles: String(l.empty_miles || '') }
     }
   }
 
@@ -282,8 +306,12 @@ export default function PaystubsTab({ drivers, company }) {
       fuel_text:      (isOO && fuelText) ? fuelText : null,
     }
     if (editingPaystubId) {
-      await updatePaystub(editingPaystubId, paystubData)
+      // Only pass loads that are NEW (not already in the original paystub)
+      const baseIds    = new Set(editingBaseLoads.map(l => l.id))
+      const newLoadIds = loads.filter(l => !baseIds.has(l.id)).map(l => l.id)
+      await updatePaystub(editingPaystubId, paystubData, newLoadIds)
       setEditingPaystubId(null)
+      setEditingBaseLoads([])
     } else {
       await createPaystub(paystubData, loads.map(l => l.id))
     }

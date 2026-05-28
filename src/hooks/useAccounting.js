@@ -294,13 +294,22 @@ export async function fetchPaystubLoads(paystubId) {
   return data ?? []
 }
 
-// ── Update an existing paystub record ────────────────────────────────────
-export async function updatePaystub(id, paystubData) {
+// ── Update an existing paystub record (optionally link new loads to it) ──
+export async function updatePaystub(id, paystubData, newLoadIds = []) {
   const { error } = await supabase
     .from('paystubs')
     .update(paystubData)
     .eq('id', id)
   if (error) throw new Error(error.message)
+
+  // Mark any newly-added loads as paid and link them to this paystub
+  if (newLoadIds.length > 0) {
+    const { error: loadErr } = await supabase
+      .from('loads')
+      .update({ paid_at: new Date().toISOString(), paystub_id: id })
+      .in('id', newLoadIds)
+    if (loadErr) throw new Error(loadErr.message)
+  }
 }
 
 // ── Save paystub + mark loads as paid ─────────────────────────────────────
