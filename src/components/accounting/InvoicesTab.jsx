@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { usePendingInvoices, useInvoiceHistory, useArchivedInvoiceLoads, createInvoice, fetchInvoiceLoads, archiveLoad, unarchiveLoad, archiveInvoice } from '../../hooks/useAccounting'
+import { usePendingInvoices, useInvoiceHistory, useArchivedInvoiceLoads, createInvoice, fetchInvoiceLoads, archiveLoad, unarchiveLoad, archiveInvoice, unarchiveInvoice } from '../../hooks/useAccounting'
 import InvoicePrintModal from './InvoicePrintModal'
 
 const fmt = n => '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2 })
@@ -145,6 +145,16 @@ export default function InvoicesTab({ company }) {
     if (!window.confirm('Archive (void) this invoice? It will be marked as archived.')) return
     try {
       await archiveInvoice(id)
+      await refetchHist()
+    } catch (err) {
+      alert('Error: ' + err.message)
+    }
+  }
+
+  async function handleUnarchiveInvoice(e, id) {
+    e.stopPropagation()
+    try {
+      await unarchiveInvoice(id)
       await refetchHist()
     } catch (err) {
       alert('Error: ' + err.message)
@@ -428,6 +438,14 @@ export default function InvoicesTab({ company }) {
                                 onClick={e => handleArchiveInvoice(e, inv.id)}
                                 style={{ color: '#9CA3AF', padding: '2px 6px' }}
                               >🗄</button>
+                            )}
+                            {inv.is_archived && (
+                              <button
+                                className="btn btn-ghost btn-xs"
+                                title="Restore — remove the VOIDED mark"
+                                onClick={e => handleUnarchiveInvoice(e, inv.id)}
+                                style={{ color: '#2563EB', padding: '2px 8px', fontWeight: 600 }}
+                              >↩ Restore</button>
                             )}
                           </td>
                         </tr>

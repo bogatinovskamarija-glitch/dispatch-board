@@ -271,6 +271,15 @@ export async function archiveInvoice(id) {
   if (error) throw new Error(error.message)
 }
 
+// ── Un-archive an invoice (restore voided invoice) ────────────────────────
+export async function unarchiveInvoice(id) {
+  const { error } = await supabase
+    .from('invoices')
+    .update({ is_archived: false })
+    .eq('id', id)
+  if (error) throw new Error(error.message)
+}
+
 // ── Find loads by load number (for manual re-linking to invoices) ─────────
 export async function findLoadsByNumbers(loadNumbers, company) {
   let q = supabase
