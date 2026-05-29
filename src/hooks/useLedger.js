@@ -98,15 +98,14 @@ export async function deleteLedgerEntry(id) {
 }
 
 // ── Paystub integration ──────────────────────────────────────────────────
-// Fetch unapplied entries for a driver in a date range
-export async function fetchDriverLedgerEntries(driverName, from, to) {
+// Fetch ALL unapplied entries for a driver (no date restriction —
+// entries from any previous week show until applied to a paystub)
+export async function fetchDriverLedgerEntries(driverName) {
   try {
     const { data, error } = await supabase
       .from('ledger_entries')
       .select('*')
       .eq('driver_name', driverName)
-      .gte('date', from)
-      .lte('date', to)
       .is('applied_at', null)
       .order('date', { ascending: true })
     if (error) throw error
@@ -115,6 +114,31 @@ export async function fetchDriverLedgerEntries(driverName, from, to) {
     console.warn('Could not fetch ledger entries for paystub:', e.message)
     return []
   }
+}
+
+// Outstanding entries from weeks before `beforeDate` (drives the reminder banner)
+export function useOutstandingLedgerEntries(beforeDate, company = 'all') {
+  const [entries, setEntries] = useState([])
+
+  const fetch = useCallback(async () => {
+    try {
+      let q = supabase
+        .from('ledger_entries')
+        .select('*')
+        .lt('date', beforeDate)
+        .is('applied_at', null)
+        .order('date', { ascending: true })
+      if (company !== 'all') q = q.eq('company', company)
+      const { data, error } = await q
+      if (error) throw error
+      setEntries(data ?? [])
+    } catch (e) {
+      setEntries([])
+    }
+  }, [beforeDate, company])
+
+  useEffect(() => { fetch() }, [fetch])
+  return { entries, refetch: fetch }
 }
 
 // Stamp entries as applied once the paystub is saved

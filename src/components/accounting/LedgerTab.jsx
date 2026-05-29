@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { useLedgerEntries, addLedgerEntry, deleteLedgerEntry, EXPENSE_CONFIG, EXPENSE_GROUPS } from '../../hooks/useLedger'
+import { useLedgerEntries, useOutstandingLedgerEntries, addLedgerEntry, updateLedgerEntry, deleteLedgerEntry, EXPENSE_CONFIG, EXPENSE_GROUPS } from '../../hooks/useLedger'
 import { useDriverProfiles } from '../../hooks/useDriverProfiles'
 
 const fmt = n => '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2 })
@@ -41,9 +41,12 @@ export default function LedgerTab({ company }) {
   const [saving,        setSaving]        = useState(false)
   const [newEntry,      setNewEntry]      = useState({ ...BLANK_ENTRY })
   const [deleteConfirm, setDeleteConfirm] = useState(null)
+  const [editId,        setEditId]        = useState(null)
+  const [editData,      setEditData]      = useState({})
 
   const week = getWeekBounds(weekOffset)
   const { entries, loading, dbMissing, refetch } = useLedgerEntries(week.from, week.to, company, driverFilter === 'all' ? '' : driverFilter)
+  const { entries: outstanding } = useOutstandingLedgerEntries(week.from, company)
   const { profiles } = useDriverProfiles()
 
   const driverNames = useMemo(() =>
@@ -89,6 +92,32 @@ export default function LedgerTab({ company }) {
       alert('Error: ' + err.message)
     } finally {
       setDeleteConfirm(null)
+      if (editId === id) setEditId(null)
+    }
+  }
+
+  function startEdit(e) {
+    setEditId(e.id)
+    setEditData({
+      date:        e.date,
+      driver_name: e.driver_name,
+      type:        e.type,
+      description: e.description,
+      amount:      String(e.amount),
+    })
+  }
+
+  async function saveEdit() {
+    if (!editData.amount) return
+    setSaving(true)
+    try {
+      await updateLedgerEntry(editId, { ...editData, amount: Number(editData.amount) })
+      await refetch()
+      setEditId(null)
+    } catch (err) {
+      alert('Error: ' + err.message)
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -243,6 +272,23 @@ CREATE POLICY "ledger_all" ON public.ledger_entries
         </form>
       )}
 
+      {/* ── Outstanding banner — unapplied entries from previous weeks ── */}
+      {outstanding.length > 0 && (
+        <div style={{ background: '#FFFBEB', border: '1px solid #FCD34D', borderRadius: 8, padding: '10px 14px', marginBottom: 14 }}>
+          <div style={{ fontWeight: 700, color: '#92400E', fontSize: 12, marginBottom: 6 }}>
+            ⚠ {outstanding.length} unapplied entr{outstanding.length === 1 ? 'y' : 'ies'} from previous weeks
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 16px' }}>
+            {outstanding.map(e => (
+              <span key={e.id} style={{ fontSize: 11, color: '#92400E' }}>
+                {e.driver_name} · {EXPENSE_CONFIG[e.type]?.label || e.type} · ${Number(e.amount).toFixed(2)} · <span style={{ color: '#9CA3AF' }}>{e.date}</span>
+              </span>
+            ))}
+          </div>
+          <div style={{ fontSize: 11, color: '#9CA3AF', marginTop: 6 }}>These will appear as checkboxes when generating that driver's next paystub.</div>
+        </div>
+      )}
+
       {/* ── Entries table ────────────────────────────────────────────── */}
       {loading ? (
         <div className="acct-empty">Loading…</div>
@@ -267,7 +313,54 @@ CREATE POLICY "ledger_all" ON public.ledger_entries
           </thead>
           <tbody>
             {entries.map(e => {
-              const cfg = EXPENSE_CONFIG[e.type]
+              const cfg     = EXPENSE_CONFIG[e.type]
+              const isEditing = editId === e.id
+              if (isEditing) return (
+                <tr key={e.id} style={{ background: '#F0F9FF' }}>
+                  <td>
+                    <input type="date" value={editData.date}
+                      onChange={ev => setEditData(d => ({ ...d, date: ev.target.value }))}
+                      style={{ fontSize: 12, padding: '2px 6px', border: '1px solid #7DD3FC', borderRadius: 4, width: 120 }} />
+                  </td>
+                  <td>
+                    <select value={editData.driver_name}
+                      onChange={ev => setEditData(d => ({ ...d, driver_name: ev.target.value }))}
+                      style={{ fontSize: 12, padding: '2px 6px', border: '1px solid #7DD3FC', borderRadius: 4 }}>
+                      {profiles.map(p => <option key={p.driver_name} value={p.driver_name}>{p.driver_name}</option>)}
+                    </select>
+                  </td>
+                  <td>
+                    <select value={editData.type}
+                      onChange={ev => setEditData(d => ({ ...d, type: ev.target.value }))}
+                      style={{ fontSize: 12, padding: '2px 6px', border: '1px solid #7DD3FC', borderRadius: 4 }}>
+                      {EXPENSE_GROUPS.map(g => (
+                        <optgroup key={g.label} label={g.label}>
+                          {g.types.map(t => <option key={t} value={t}>{EXPENSE_CONFIG[t].label}</option>)}
+                        </optgroup>
+                      ))}
+                    </select>
+                  </td>
+                  <td>
+                    <input value={editData.description}
+                      onChange={ev => setEditData(d => ({ ...d, description: ev.target.value }))}
+                      placeholder="Description"
+                      style={{ fontSize: 12, padding: '2px 6px', border: '1px solid #7DD3FC', borderRadius: 4, width: '100%' }} />
+                  </td>
+                  <td style={{ textAlign: 'right' }}>
+                    <input type="number" step="0.01" value={editData.amount}
+                      onChange={ev => setEditData(d => ({ ...d, amount: ev.target.value }))}
+                      style={{ fontSize: 12, padding: '2px 6px', border: '1px solid #7DD3FC', borderRadius: 4, width: 80, textAlign: 'right' }} />
+                  </td>
+                  <td><EffectBadge type={editData.type} /></td>
+                  <td><span style={{ fontSize: 11, color: '#0284C7' }}>Editing…</span></td>
+                  <td>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      <button className="btn btn-primary btn-xs" onClick={saveEdit} disabled={saving}>✓</button>
+                      <button className="btn btn-ghost btn-xs" onClick={() => setEditId(null)}>✕</button>
+                    </div>
+                  </td>
+                </tr>
+              )
               return (
                 <tr key={e.id} style={{ opacity: e.applied_at ? 0.55 : 1 }}>
                   <td style={{ whiteSpace: 'nowrap', fontSize: 12, color: '#6B7280' }}>
@@ -276,10 +369,7 @@ CREATE POLICY "ledger_all" ON public.ledger_entries
                   <td style={{ fontWeight: 600 }}>{e.driver_name}</td>
                   <td>
                     {cfg && (
-                      <span style={{
-                        fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 10,
-                        color: cfg.color, background: cfg.bg, whiteSpace: 'nowrap',
-                      }}>
+                      <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 10, color: cfg.color, background: cfg.bg, whiteSpace: 'nowrap' }}>
                         {cfg.label}
                       </span>
                     )}
@@ -295,19 +385,19 @@ CREATE POLICY "ledger_all" ON public.ledger_entries
                   </td>
                   <td>
                     {!e.applied_at && (
-                      deleteConfirm === e.id ? (
-                        <div style={{ display: 'flex', gap: 4 }}>
-                          <button className="btn btn-ghost btn-xs" style={{ color: '#DC2626' }} onClick={() => handleDelete(e.id)}>✓</button>
-                          <button className="btn btn-ghost btn-xs" onClick={() => setDeleteConfirm(null)}>✕</button>
-                        </div>
-                      ) : (
-                        <button
-                          className="btn btn-ghost btn-xs"
-                          style={{ color: '#9CA3AF' }}
-                          onClick={() => setDeleteConfirm(e.id)}
-                          title="Delete entry"
-                        >✕</button>
-                      )
+                      <div style={{ display: 'flex', gap: 4 }}>
+                        {deleteConfirm === e.id ? (
+                          <>
+                            <button className="btn btn-ghost btn-xs" style={{ color: '#DC2626' }} onClick={() => handleDelete(e.id)}>✓</button>
+                            <button className="btn btn-ghost btn-xs" onClick={() => setDeleteConfirm(null)}>✕</button>
+                          </>
+                        ) : (
+                          <>
+                            <button className="btn btn-ghost btn-xs" style={{ color: '#4F46E5' }} onClick={() => startEdit(e)} title="Edit">✎</button>
+                            <button className="btn btn-ghost btn-xs" style={{ color: '#9CA3AF' }} onClick={() => setDeleteConfirm(e.id)} title="Delete">✕</button>
+                          </>
+                        )}
+                      </div>
                     )}
                   </td>
                 </tr>

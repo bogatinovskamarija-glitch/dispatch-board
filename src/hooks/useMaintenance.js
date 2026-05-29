@@ -320,3 +320,23 @@ export function parseMaintenanceCSV(text, company) {
   const nullAmountCount = records.filter(r => r.amount == null).length
   return { records, skipped, nullAmountCount, diagSamples }
 }
+
+// ── Total maintenance spend for a week ────────────────────────────────────
+export function useWeekMaintenanceTotal(start, end, company = 'all') {
+  const [total, setTotal] = useState(0)
+  useEffect(() => {
+    async function load() {
+      let q = supabase
+        .from('maintenance_records')
+        .select('amount')
+        .gte('date', start)
+        .lte('date', end)
+      if (company !== 'all') q = q.eq('company', company)
+      const { data } = await q
+      setTotal((data ?? []).reduce((s, r) => s + (Number(r.amount) || 0), 0))
+    }
+    load()
+  }, [start, end, company])
+  return total
+}
+

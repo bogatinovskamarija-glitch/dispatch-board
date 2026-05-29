@@ -1130,6 +1130,21 @@ textarea { resize: vertical; min-height: 60px; }
 .guide-chip.green  { background: #F0FDF4; color: #16A34A; border-color: #86EFAC; }
 .guide-qp-demo { display: flex; gap: 6px; margin: 8px 0; flex-wrap: wrap; }
 
+/* ── Paystub ledger checklist ─────────────────────────────────────────── */
+.ledger-checklist {
+  margin: 16px 0;
+  border: 1px solid #E5E7EB;
+  border-radius: 10px;
+  overflow: hidden;
+}
+.ledger-checklist-header {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 10px 14px;
+  background: #F9FAFB;
+  border-bottom: 1px solid #E5E7EB;
+  font-weight: 700; font-size: 13px; color: #374151;
+}
+
 /* ── Ledger Tab ───────────────────────────────────────────────────────── */
 .ledger-topbar {
   display: flex; align-items: center; justify-content: space-between;

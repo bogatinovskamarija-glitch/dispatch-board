@@ -1,6 +1,8 @@
 import { useState, useMemo } from 'react'
 import { useWeeklySummary, useWeekPaystubs, getThursdayWeek } from '../../hooks/useWeeklySummary'
 import { useDriverProfiles } from '../../hooks/useDriverProfiles'
+import { useLedgerEntries, EXPENSE_CONFIG } from '../../hooks/useLedger'
+import { useWeekMaintenanceTotal } from '../../hooks/useMaintenance'
 
 const fmt    = n => '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2 })
 const fmtNum = n => Number(n).toLocaleString('en-US')
@@ -102,6 +104,8 @@ export default function WeeklySummaryTab({ company }) {
   const { loads, loading }        = useWeeklySummary(start, end, company)
   const { paystubs: weekPaystubs } = useWeekPaystubs(start, end, company)
   const { profiles }               = useDriverProfiles()
+  const { entries: ledgerEntries } = useLedgerEntries(start, end, company)
+  const maintenanceTotal           = useWeekMaintenanceTotal(start, end, company)
 
   // Map driver name → total grand_total paid this week (a driver could have 2 paystubs)
   const paystubByDriver = useMemo(() => {
@@ -112,14 +116,26 @@ export default function WeeklySummaryTab({ company }) {
     return map
   }, [weekPaystubs])
 
+  // ── Per-driver ledger expenses (deductions this week) ────────────────────
+  const driverExpenses = useMemo(() => {
+    const map = {}
+    for (const e of ledgerEntries) {
+      const cfg = EXPENSE_CONFIG[e.type]
+      if (!cfg?.deduction) continue
+      map[e.driver_name] = (map[e.driver_name] || 0) + Number(e.amount)
+    }
+    return map
+  }, [ledgerEntries])
+
   // ── Per-driver payroll rows ───────────────────────────────────────────────
   const driverRows = useMemo(() => {
     const map = {}
     for (const load of loads) {
       const name = load.driver_name || '(No Driver)'
-      if (!map[name]) map[name] = { name, loads: [], gross: 0, payroll: 0, hasProfile: false, missingPay: false }
+      if (!map[name]) map[name] = { name, loads: [], gross: 0, payroll: 0, miles: 0, hasProfile: false, missingPay: false }
       map[name].loads.push(load)
       map[name].gross += Number(load.price) || 0
+      map[name].miles += Number(load.total_miles) || 0
 
       const profile = profiles.find(p => p.driver_name === name)
       if (profile) {
@@ -135,9 +151,10 @@ export default function WeeklySummaryTab({ company }) {
         ...r,
         payroll:  r.hasProfile && !r.missingPay ? r.payroll : (r.hasProfile ? r.payroll : null),
         net:      r.hasProfile && !r.missingPay ? r.gross - r.payroll : null,
+        expenses: driverExpenses[r.name] || 0,
       }))
       .sort((a, b) => b.gross - a.gross)
-  }, [loads, profiles])
+  }, [loads, profiles, driverExpenses])
 
   // ── Top-line metrics ──────────────────────────────────────────────────────
   const totalRevenue   = loads.reduce((s, l) => s + (Number(l.price) || 0), 0)
@@ -146,6 +163,8 @@ export default function WeeklySummaryTab({ company }) {
   const pendingLoads   = loads.filter(l => !l.invoiced_at)
   const pendingRevenue = pendingLoads.reduce((s, l) => s + (Number(l.price) || 0), 0)
   const totalPayroll   = driverRows.reduce((s, r) => s + (r.payroll ?? 0), 0)
+  const totalExpenses  = driverRows.reduce((s, r) => s + r.expenses, 0)
+  const totalMiles     = driverRows.reduce((s, r) => s + r.miles, 0)
   const knownPayroll   = driverRows.some(r => r.payroll != null)
 
   // ── Top brokers ────────────────────────────────────────────────────────────
@@ -218,6 +237,27 @@ export default function WeeklySummaryTab({ company }) {
                 <div className="summary-card-sub">{((totalPayroll / totalRevenue) * 100 || 0).toFixed(0)}% payroll ratio</div>
               </div>
             )}
+            {totalMiles > 0 && (
+              <div className="summary-card" style={{ borderLeft: '4px solid #8B5CF6' }}>
+                <div className="summary-card-label">Total Miles</div>
+                <div className="summary-card-value" style={{ color: '#8B5CF6' }}>{fmtNum(totalMiles)}</div>
+                <div className="summary-card-sub">across all loads this week</div>
+              </div>
+            )}
+            {totalExpenses > 0 && (
+              <div className="summary-card" style={{ borderLeft: '4px solid #DC2626' }}>
+                <div className="summary-card-label">Driver Expenses</div>
+                <div className="summary-card-value" style={{ color: '#DC2626' }}>{fmt(totalExpenses)}</div>
+                <div className="summary-card-sub">from weekly ledger</div>
+              </div>
+            )}
+            {maintenanceTotal > 0 && (
+              <div className="summary-card" style={{ borderLeft: '4px solid #9CA3AF' }}>
+                <div className="summary-card-label">Maintenance</div>
+                <div className="summary-card-value" style={{ color: '#6B7280' }}>{fmt(maintenanceTotal)}</div>
+                <div className="summary-card-sub">repair & service spend</div>
+              </div>
+            )}
           </div>
 
           {/* ── Top Brokers ── */}
@@ -254,8 +294,10 @@ export default function WeeklySummaryTab({ company }) {
                   <tr>
                     <th>Driver</th>
                     <th style={{ textAlign: 'center' }}>Loads</th>
+                    <th style={{ textAlign: 'right' }}>Miles</th>
                     <th style={{ textAlign: 'right' }}>Gross Revenue</th>
                     <th style={{ textAlign: 'right' }}>Est. Payroll</th>
+                    <th style={{ textAlign: 'right' }}>Expenses</th>
                     <th style={{ textAlign: 'right' }}>Actual Payroll</th>
                     <th style={{ textAlign: 'right' }}>Net After Payroll</th>
                     <th style={{ textAlign: 'right' }}>Est. Net</th>
@@ -268,9 +310,13 @@ export default function WeeklySummaryTab({ company }) {
                       <tr key={r.name}>
                         <td><strong>{r.name}</strong></td>
                         <td style={{ textAlign: 'center' }}>{r.loads.length}</td>
+                        <td style={{ textAlign: 'right', color: '#8B5CF6', fontWeight: 600 }}>{r.miles > 0 ? fmtNum(r.miles) : '—'}</td>
                         <td style={{ textAlign: 'right', fontWeight: 600, color: '#059669' }}>{fmt(r.gross)}</td>
                         <td style={{ textAlign: 'right', color: '#2563EB' }}>
                           {r.payroll != null ? fmt(r.payroll) : <span style={{ color: '#9CA3AF', fontSize: 11 }}>no profile</span>}
+                        </td>
+                        <td style={{ textAlign: 'right', color: r.expenses > 0 ? '#DC2626' : '#9CA3AF', fontWeight: r.expenses > 0 ? 600 : 400 }}>
+                          {r.expenses > 0 ? fmt(r.expenses) : '—'}
                         </td>
                         <td style={{ textAlign: 'right', fontWeight: 700, color: actual != null ? '#7C3AED' : '#9CA3AF' }}>
                           {actual != null ? fmt(actual) : '—'}
@@ -288,10 +334,12 @@ export default function WeeklySummaryTab({ company }) {
                 <tfoot>
                   <tr style={{ background: '#F3F4F6' }}>
                     <td colSpan={2}><strong>Total</strong></td>
+                    <td style={{ textAlign: 'right', fontWeight: 800, color: '#8B5CF6' }}>{totalMiles > 0 ? fmtNum(totalMiles) : '—'}</td>
                     <td style={{ textAlign: 'right', fontWeight: 800 }}>{fmt(totalRevenue)}</td>
                     <td style={{ textAlign: 'right', fontWeight: 800, color: '#2563EB' }}>
                       {knownPayroll ? fmt(totalPayroll) : '—'}
                     </td>
+                    <td style={{ textAlign: 'right', fontWeight: 800, color: '#DC2626' }}>{totalExpenses > 0 ? fmt(totalExpenses) : '—'}</td>
                     <td style={{ textAlign: 'right', fontWeight: 800, color: '#7C3AED' }}>
                       {Object.keys(paystubByDriver).length > 0
                         ? fmt(Object.values(paystubByDriver).reduce((s, v) => s + v, 0))
@@ -311,6 +359,11 @@ export default function WeeklySummaryTab({ company }) {
               {!knownPayroll && (
                 <div style={{ fontSize: 12, color: '#9CA3AF', marginBottom: 16 }}>
                   ⚠ Add driver profiles in the Paystubs tab to see estimated payroll.
+                </div>
+              )}
+              {maintenanceTotal > 0 && (
+                <div style={{ fontSize: 12, color: '#6B7280', marginBottom: 16 }}>
+                  🔧 Maintenance this week: <strong>{fmt(maintenanceTotal)}</strong>
                 </div>
               )}
 

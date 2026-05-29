@@ -106,7 +106,8 @@ export default function PaystubsTab({ drivers, company }) {
     setFuelTotal('')
     setFuelText('')
     setDriverName('')
-    setLedgerEntryIds([])
+    setPendingLedger([])
+    setSelectedLedgerIds(new Set())
     setPsTab('history')
   }
 
@@ -147,8 +148,9 @@ export default function PaystubsTab({ drivers, company }) {
   // Commission % (for owner operators — shown above deductions)
   const [commissionPct, setCommissionPct] = useState(15)
 
-  // Ledger entry IDs loaded for this paystub (to mark applied on save)
-  const [ledgerEntryIds, setLedgerEntryIds] = useState([])
+  // Pending ledger entries for this driver (checklist)
+  const [pendingLedger,    setPendingLedger]    = useState([])
+  const [selectedLedgerIds, setSelectedLedgerIds] = useState(new Set())
 
   // Fuel transactions (owner operators only)
   const [fuelTotal,       setFuelTotal]       = useState('')
@@ -194,32 +196,15 @@ export default function PaystubsTab({ drivers, company }) {
         initPay = {}
         freshData.forEach(l => { initPay[l.id] = initLoadPayEntry(l) })
 
-        // Fetch ledger entries and auto-populate additions / deductions
-        const ledger = await fetchDriverLedgerEntries(driverName, startDate, endDate)
-        setLedgerEntryIds(ledger.map(e => e.id))
+        // Fetch ALL unapplied ledger entries for this driver (any week)
+        const ledger = await fetchDriverLedgerEntries(driverName)
+        setPendingLedger(ledger)
+        setSelectedLedgerIds(new Set(ledger.map(e => e.id))) // all checked by default
 
-        const ledgerAdds = []
-        const ledgerDeds = []
-        for (const entry of ledger) {
-          const cfg = EXPENSE_CONFIG[entry.type]
-          if (!cfg) continue
-          const label  = cfg.label + (entry.description ? ` — ${entry.description}` : '')
-          const amount = String(Number(entry.amount).toFixed(2))
-          const balance = entry.date   // date as reference on paystub
-          if (cfg.addition)  ledgerAdds.push({ label, amount, balance })
-          if (cfg.deduction) ledgerDeds.push({ label, amount, balance })
-        }
-
-        // Additions: ledger-sourced additions (user can add more manually)
-        setAdditions(ledgerAdds.length > 0 ? [...ledgerAdds, { ...BLANK_LINE }] : [{ ...BLANK_LINE }])
-
-        // Deductions: default template + ledger-sourced deductions
+        // Pre-populate deductions with the default template only
         if (profile) {
-          const defaults = defaultDeductions(profile.profile_type)
-          setDeductions(ledgerDeds.length > 0 ? [...defaults, ...ledgerDeds] : defaults)
+          setDeductions(defaultDeductions(profile.profile_type))
           if (isOO) setCommissionPct(profile.commission_pct ?? 15)
-        } else {
-          setDeductions(ledgerDeds.length > 0 ? [...ledgerDeds, { ...BLANK_LINE }] : [{ ...BLANK_LINE }])
         }
       }
 
@@ -338,19 +323,39 @@ export default function PaystubsTab({ drivers, company }) {
       load_pay:       loadPay,
       fuel_text:      (isOO && fuelText) ? fuelText : null,
     }
+    // Build ledger contributions from checked entries
+    const checkedEntries = pendingLedger.filter(e => selectedLedgerIds.has(e.id))
+    const ledgerAdds = []
+    const ledgerDeds = []
+    for (const entry of checkedEntries) {
+      const cfg = EXPENSE_CONFIG[entry.type]
+      if (!cfg) continue
+      const label  = cfg.label + (entry.description ? ` — ${entry.description}` : '')
+      const amount = String(Number(entry.amount).toFixed(2))
+      const balance = entry.date
+      if (cfg.addition)  ledgerAdds.push({ label, amount, balance })
+      if (cfg.deduction) ledgerDeds.push({ label, amount, balance })
+    }
+
+    // Merge ledger entries into additions/deductions for the saved paystub
+    const finalData = {
+      ...paystubData,
+      additions:  [...paystubData.additions,  ...ledgerAdds],
+      deductions: [...paystubData.deductions, ...ledgerDeds],
+    }
+
     if (editingPaystubId) {
-      // Only pass loads that are NEW (not already in the original paystub)
       const baseIds    = new Set(editingBaseLoads.map(l => l.id))
       const newLoadIds = loads.filter(l => !baseIds.has(l.id)).map(l => l.id)
-      await updatePaystub(editingPaystubId, paystubData, newLoadIds)
+      await updatePaystub(editingPaystubId, finalData, newLoadIds)
       setEditingPaystubId(null)
       setEditingBaseLoads([])
     } else {
-      const savedPaystub = await createPaystub(paystubData, loads.map(l => l.id))
-      // Mark ledger entries as applied so they won't appear in future paystubs
-      await markLedgerEntriesApplied(ledgerEntryIds, savedPaystub.id)
-      setLedgerEntryIds([])
+      const savedPaystub = await createPaystub(finalData, loads.map(l => l.id))
+      await markLedgerEntriesApplied([...selectedLedgerIds], savedPaystub.id)
     }
+    setPendingLedger([])
+    setSelectedLedgerIds(new Set())
     await refreshHistory()
     setShowPrint(false)
     // Reset form
@@ -796,6 +801,72 @@ export default function PaystubsTab({ drivers, company }) {
               </tr>
             </tfoot>
           </table>
+
+          {/* ── Pending Ledger Entries (checklist) ── */}
+          {pendingLedger.length > 0 && (
+            <div className="ledger-checklist">
+              <div className="ledger-checklist-header">
+                <span>📒 Pending Expenses from Ledger</span>
+                <span style={{ fontSize: 11, color: '#6B7280', fontWeight: 400 }}>
+                  Check what to include in this paystub — unchecked items stay pending for next time
+                </span>
+                <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+                  <button className="btn btn-ghost btn-xs" onClick={() => setSelectedLedgerIds(new Set(pendingLedger.map(e => e.id)))}>All</button>
+                  <button className="btn btn-ghost btn-xs" onClick={() => setSelectedLedgerIds(new Set())}>None</button>
+                </div>
+              </div>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                <thead>
+                  <tr style={{ color: '#9CA3AF', borderBottom: '1px solid #E5E7EB' }}>
+                    <th style={{ width: 28, padding: '4px 8px' }}></th>
+                    <th style={{ padding: '4px 8px', textAlign: 'left', fontWeight: 500 }}>Date</th>
+                    <th style={{ padding: '4px 8px', textAlign: 'left', fontWeight: 500 }}>Type</th>
+                    <th style={{ padding: '4px 8px', textAlign: 'left', fontWeight: 500 }}>Description</th>
+                    <th style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 500 }}>Amount</th>
+                    <th style={{ padding: '4px 8px', textAlign: 'left', fontWeight: 500 }}>Effect</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pendingLedger.map(e => {
+                    const cfg     = EXPENSE_CONFIG[e.type]
+                    const checked = selectedLedgerIds.has(e.id)
+                    const isOldWeek = e.date < startDate
+                    return (
+                      <tr key={e.id} style={{ opacity: checked ? 1 : 0.45, borderBottom: '1px solid #F3F4F6', background: isOldWeek ? '#FFFBEB' : 'transparent' }}>
+                        <td style={{ padding: '6px 8px' }}>
+                          <input type="checkbox" checked={checked} onChange={() => {
+                            setSelectedLedgerIds(prev => {
+                              const next = new Set(prev)
+                              next.has(e.id) ? next.delete(e.id) : next.add(e.id)
+                              return next
+                            })
+                          }} />
+                        </td>
+                        <td style={{ padding: '6px 8px', color: isOldWeek ? '#D97706' : '#6B7280', whiteSpace: 'nowrap' }}>
+                          {e.date}{isOldWeek && <span style={{ marginLeft: 4, fontSize: 10, background: '#FEF3C7', color: '#D97706', padding: '1px 5px', borderRadius: 6, fontWeight: 700 }}>prev week</span>}
+                        </td>
+                        <td style={{ padding: '6px 8px' }}>
+                          {cfg && <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10, color: cfg.color, background: cfg.bg }}>{cfg.label}</span>}
+                        </td>
+                        <td style={{ padding: '6px 8px', color: '#6B7280' }}>{e.description || '—'}</td>
+                        <td style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 700 }}>${Number(e.amount).toFixed(2)}</td>
+                        <td style={{ padding: '6px 8px' }}>
+                          {cfg?.deduction && cfg?.addition && <span className="ledger-badge ledger-badge-both">± Both</span>}
+                          {cfg?.deduction && !cfg?.addition && <span className="ledger-badge ledger-badge-ded">− Ded.</span>}
+                          {!cfg?.deduction && cfg?.addition && <span className="ledger-badge ledger-badge-add">+ Add.</span>}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+              {selectedLedgerIds.size > 0 && (
+                <div style={{ padding: '6px 8px', fontSize: 11, color: '#6B7280', borderTop: '1px solid #E5E7EB' }}>
+                  {selectedLedgerIds.size} of {pendingLedger.length} selected — will be applied and appear on the paystub
+                </div>
+              )}
+            </div>
+          )}
 
           {/* ── Additions & Deductions ── */}
           <div className="adddeds-grid">
