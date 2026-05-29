@@ -3,6 +3,7 @@ import InvoicesTab from './accounting/InvoicesTab'
 import PaystubsTab from './accounting/PaystubsTab'
 import WeeklySummaryTab from './accounting/WeeklySummaryTab'
 import LedgerTab from './accounting/LedgerTab'
+import FuelTab   from './accounting/FuelTab'
 import { useCompanySettings } from '../hooks/useSettings'
 
 function CompanySettingsModal({ onClose }) {
@@ -95,6 +96,9 @@ export default function AccountingView({ onClose, drivers }) {
             <button className={tab === 'ledger' ? 'active' : ''} onClick={() => setTab('ledger')}>
               📒 Ledger
             </button>
+            <button className={tab === 'fuel' ? 'active' : ''} onClick={() => setTab('fuel')}>
+              ⛽ Fuel
+            </button>
             <button className={tab === 'summary' ? 'active' : ''} onClick={() => setTab('summary')}>
               Weekly Summary
             </button>
@@ -123,6 +127,7 @@ export default function AccountingView({ onClose, drivers }) {
         {tab === 'invoices'  && <InvoicesTab company={company} />}
         {tab === 'paystubs'  && <PaystubsTab company={company} drivers={drivers} />}
         {tab === 'ledger'    && <LedgerTab company={company} />}
+        {tab === 'fuel'      && <FuelTab   company={company} />}
         {tab === 'summary'   && <WeeklySummaryTab company={company} />}
       </div>
 

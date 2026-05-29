@@ -1145,6 +1145,34 @@ textarea { resize: vertical; min-height: 60px; }
   font-weight: 700; font-size: 13px; color: #374151;
 }
 
+/* ── Fuel Tab ─────────────────────────────────────────────────────────── */
+.fuel-mapper {
+  background: #F9FAFB; border: 1px solid #E5E7EB; border-radius: 10px;
+  padding: 16px 18px; margin-bottom: 20px;
+}
+.fuel-mapper-title {
+  font-weight: 700; font-size: 13px; color: #374151; margin-bottom: 14px;
+}
+.fuel-mapper-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px;
+}
+.fuel-mapper-field { display: flex; flex-direction: column; gap: 4px; }
+.fuel-mapper-field label { font-size: 11px; font-weight: 600; color: #6B7280; }
+.fuel-mapper-field select { font-size: 12px; }
+
+.fuel-totals {
+  display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 4px;
+}
+.fuel-total-card {
+  background: #fff; border: 1px solid #E5E7EB; border-radius: 10px;
+  padding: 14px 18px; min-width: 120px; flex: 1;
+}
+.fuel-total-label { font-size: 11px; color: #9CA3AF; text-transform: uppercase; letter-spacing: .05em; font-weight: 600; margin-bottom: 4px; }
+.fuel-total-value { font-size: 22px; font-weight: 800; color: #111827; line-height: 1.2; }
+.fuel-total-sub   { font-size: 11px; color: #9CA3AF; margin-top: 2px; }
+
+.fuel-summary-table th, .fuel-summary-table td { font-size: 12px; }
+
 /* ── Ledger Tab ───────────────────────────────────────────────────────── */
 .ledger-topbar {
   display: flex; align-items: center; justify-content: space-between;
