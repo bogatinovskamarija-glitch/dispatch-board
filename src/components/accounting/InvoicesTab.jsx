@@ -1,6 +1,8 @@
 import { useState, useMemo } from 'react'
-import { usePendingInvoices, useInvoiceHistory, useArchivedInvoiceLoads, createInvoice, fetchInvoiceLoads, archiveLoad, unarchiveLoad, archiveInvoice, unarchiveInvoice } from '../../hooks/useAccounting'
+import { usePendingInvoices, useInvoiceHistory, useArchivedInvoiceLoads, createInvoice, fetchInvoiceLoads, archiveLoad, unarchiveLoad, archiveInvoice, unarchiveInvoice, updateLoadField } from '../../hooks/useAccounting'
 import InvoicePrintModal from './InvoicePrintModal'
+import LoadModal from '../LoadModal'
+import { useDrivers, useEquipment } from '../../hooks/useClickUp'
 
 const fmt = n => '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2 })
 
@@ -27,11 +29,14 @@ export default function InvoicesTab({ company }) {
   const { loads, loading, refetch }          = usePendingInvoices(company)
   const { invoices, loading: histLoad, refetch: refetchHist } = useInvoiceHistory(company)
   const { loads: archivedLoads, loading: archLoading, refetch: refetchArchived } = useArchivedInvoiceLoads(company)
+  const { drivers }         = useDrivers()
+  const { trucks, trailers } = useEquipment()
 
   const [selected,       setSelected]       = useState(new Set())
   const [showHistory,    setShowHistory]    = useState(false)
   const [showArchivedLoads, setShowArchivedLoads] = useState(false)
   const [printData,      setPrintData]      = useState(null)  // { loads, invoice? }
+  const [editLoad,       setEditLoad]       = useState(null)  // load being edited
 
   // ── Pending search ─────────────────────────────────────────────────────────
   const [pendingSearch, setPendingSearch] = useState('')
@@ -170,6 +175,13 @@ export default function InvoicesTab({ company }) {
     }
   }
 
+  async function handleLoadEditSave(payload) {
+    const { id, ...fields } = payload
+    await updateLoadField(id, fields)
+    await refetch()
+    await refetchArchived()
+  }
+
   async function handleUnarchiveInvoice(e, id) {
     e.stopPropagation()
     try {
@@ -274,7 +286,13 @@ export default function InvoicesTab({ company }) {
                         : l.pickup_location || l.delivery_location || '—'}
                     </td>
                     <td className="acct-price">{l.price ? fmt(l.price) : '—'}</td>
-                    <td>
+                    <td style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                      <button
+                        className="btn btn-ghost btn-xs"
+                        title="Edit load details"
+                        onClick={e => { e.stopPropagation(); setEditLoad(l) }}
+                        style={{ color: '#4F46E5', padding: '2px 7px', fontWeight: 600 }}
+                      >✎</button>
                       <button
                         className="btn btn-ghost btn-xs"
                         title="Archive load (remove from pending)"
@@ -480,6 +498,18 @@ export default function InvoicesTab({ company }) {
           company={company}
           onCreated={handleCreated}
           onClose={() => setPrintData(null)}
+        />
+      )}
+
+      {editLoad && (
+        <LoadModal
+          load={editLoad}
+          date={editLoad.date}
+          drivers={drivers}
+          trucks={trucks}
+          trailers={trailers}
+          onSave={handleLoadEditSave}
+          onClose={() => setEditLoad(null)}
         />
       )}
     </div>
