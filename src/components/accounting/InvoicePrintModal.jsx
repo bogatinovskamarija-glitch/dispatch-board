@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import BrokerPicker from './BrokerPicker'
 import FactoringPicker from './FactoringPicker'
-import { createInvoice, updateInvoice, peekNextInvoiceNumber, findLoadsByNumbers, relinkLoadsToInvoice } from '../../hooks/useAccounting'
+import { createInvoice, updateInvoice, peekNextInvoiceNumber, findLoadsByNumbers, relinkLoadsToInvoice, updateLoadField } from '../../hooks/useAccounting'
 import { useCompanySettings } from '../../hooks/useSettings'
 
 const LOGOS = { carat: '/logo-carat.png', pro_freight: '/logo-pro-freight.png' }
@@ -35,6 +35,13 @@ export default function InvoicePrintModal({ loads, existingInvoice, company: com
   const [finding,    setFinding]    = useState(false)
   // Open re-link panel by default when no loads are linked
   const [linkOpen,   setLinkOpen]   = useState(Boolean(existingInvoice && loads.length === 0))
+
+  // ── Inline load-number corrections ──────────────────────────────────────
+  // Keyed by load ID; only stores values the user actually changed.
+  const [loadNumEdits, setLoadNumEdits] = useState({})
+  function getLoadNum(l) {
+    return loadNumEdits[l.id] !== undefined ? loadNumEdits[l.id] : (l.load_number || '')
+  }
 
   const invoiceNum = existingInvoice?.invoice_number || '—'
   const isExisting = Boolean(existingInvoice)
@@ -146,6 +153,14 @@ ${cssLinks}
   async function handleMarkInvoiced() {
     setSaving(true)
     try {
+      // Save any corrected load numbers first
+      const changedLoads = allLoads.filter(
+        l => loadNumEdits[l.id] !== undefined && loadNumEdits[l.id] !== (l.load_number || '')
+      )
+      for (const l of changedLoads) {
+        await updateLoadField(l.id, { load_number: loadNumEdits[l.id] })
+      }
+
       const invoiceData = {
         bill_to_name:       broker?.name || '',
         bill_to_address:    billToAddress,
@@ -431,7 +446,15 @@ ${cssLinks}
               <tbody>
                 {allLoads.map(l => (
                   <tr key={l.id}>
-                    <td>{l.load_number || '—'}</td>
+                    <td>
+                      <input
+                        className="inv-inline-edit"
+                        value={getLoadNum(l)}
+                        onChange={e => setLoadNumEdits(prev => ({ ...prev, [l.id]: e.target.value }))}
+                        title="Click to correct load number"
+                        placeholder="—"
+                      />
+                    </td>
                     <td>{l.pickup_date  || l.date || '—'}</td>
                     <td>{l.pickup_location?.split(',')[0]  || '—'}</td>
                     <td>{l.delivery_date || '—'}</td>

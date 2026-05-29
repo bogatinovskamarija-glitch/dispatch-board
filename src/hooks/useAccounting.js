@@ -280,6 +280,15 @@ export async function unarchiveInvoice(id) {
   if (error) throw new Error(error.message)
 }
 
+// ── Update a single field on a load (e.g. correcting load_number from invoice) ──
+export async function updateLoadField(loadId, fields) {
+  const { error } = await supabase
+    .from('loads')
+    .update(fields)
+    .eq('id', loadId)
+  if (error) throw new Error(error.message)
+}
+
 // ── Find loads by load number (for manual re-linking to invoices) ─────────
 export async function findLoadsByNumbers(loadNumbers, company) {
   let q = supabase

@@ -4,6 +4,25 @@ import InvoicePrintModal from './InvoicePrintModal'
 
 const fmt = n => '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2 })
 
+const STATUS_META = {
+  covered:     { label: 'Covered',     color: '#16A34A', bg: '#F0FDF4' },
+  at_pickup:   { label: 'At Pick Up',  color: '#0284C7', bg: '#F0F9FF' },
+  at_delivery: { label: 'At Delivery', color: '#EA580C', bg: '#FFF7ED' },
+  tonu:        { label: 'TONU',        color: '#7C3AED', bg: '#F5F3FF' },
+  empty:       { label: 'Empty',       color: '#CA8A04', bg: '#FEFCE8' },
+  prebooked:   { label: 'Pre-Booked',  color: '#4F46E5', bg: '#EEF2FF' },
+}
+function PendingStatusBadge({ status }) {
+  const m = STATUS_META[status]
+  if (!m) return <span style={{ fontSize: 11, color: '#9CA3AF' }}>{status || '—'}</span>
+  return (
+    <span style={{
+      fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10,
+      color: m.color, background: m.bg, whiteSpace: 'nowrap',
+    }}>{m.label}</span>
+  )
+}
+
 export default function InvoicesTab({ company }) {
   const { loads, loading, refetch }          = usePendingInvoices(company)
   const { invoices, loading: histLoad, refetch: refetchHist } = useInvoiceHistory(company)
@@ -228,7 +247,7 @@ export default function InvoicesTab({ company }) {
                   </th>
                   <th>Broker</th>
                   <th>Load #</th>
-                  <th>Type</th>
+                  <th>Status</th>
                   <th>Truck</th>
                   <th>Pickup</th>
                   <th>Delivery</th>
@@ -245,11 +264,7 @@ export default function InvoicesTab({ company }) {
                     </td>
                     <td><strong>{l.broker || '—'}</strong></td>
                     <td>{l.load_number || '—'}</td>
-                    <td>
-                      {l.status === 'tonu'
-                        ? <span className="tonu-badge">TONU</span>
-                        : <span style={{ color: '#9CA3AF', fontSize: 12 }}>Load</span>}
-                    </td>
+                    <td><PendingStatusBadge status={l.status} /></td>
                     <td>{l.truck_number || '—'}</td>
                     <td>{l.pickup_date  || l.date || '—'}</td>
                     <td>{l.delivery_date || '—'}</td>
