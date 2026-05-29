@@ -2,6 +2,7 @@ import { useState } from 'react'
 import InvoicesTab from './accounting/InvoicesTab'
 import PaystubsTab from './accounting/PaystubsTab'
 import WeeklySummaryTab from './accounting/WeeklySummaryTab'
+import LedgerTab from './accounting/LedgerTab'
 import { useCompanySettings } from '../hooks/useSettings'
 
 function CompanySettingsModal({ onClose }) {
@@ -91,6 +92,9 @@ export default function AccountingView({ onClose, drivers }) {
             <button className={tab === 'paystubs' ? 'active' : ''} onClick={() => setTab('paystubs')}>
               Paystubs
             </button>
+            <button className={tab === 'ledger' ? 'active' : ''} onClick={() => setTab('ledger')}>
+              📒 Ledger
+            </button>
             <button className={tab === 'summary' ? 'active' : ''} onClick={() => setTab('summary')}>
               Weekly Summary
             </button>
@@ -118,6 +122,7 @@ export default function AccountingView({ onClose, drivers }) {
       <div className="acct-body">
         {tab === 'invoices'  && <InvoicesTab company={company} />}
         {tab === 'paystubs'  && <PaystubsTab company={company} drivers={drivers} />}
+        {tab === 'ledger'    && <LedgerTab company={company} />}
         {tab === 'summary'   && <WeeklySummaryTab company={company} />}
       </div>
 

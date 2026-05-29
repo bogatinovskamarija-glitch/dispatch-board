@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import { fetchDriverLoads, createPaystub, updatePaystub, usePaystubHistory, fetchPaystubLoads, useYTDSummary } from '../../hooks/useAccounting'
+import { fetchDriverLedgerEntries, markLedgerEntriesApplied, EXPENSE_CONFIG } from '../../hooks/useLedger'
 import { useDriverProfiles } from '../../hooks/useDriverProfiles'
 import DriversPanel from './DriversPanel'
 import PaystubPrintModal from './PaystubPrintModal'
@@ -105,6 +106,7 @@ export default function PaystubsTab({ drivers, company }) {
     setFuelTotal('')
     setFuelText('')
     setDriverName('')
+    setLedgerEntryIds([])
     setPsTab('history')
   }
 
@@ -144,6 +146,9 @@ export default function PaystubsTab({ drivers, company }) {
 
   // Commission % (for owner operators — shown above deductions)
   const [commissionPct, setCommissionPct] = useState(15)
+
+  // Ledger entry IDs loaded for this paystub (to mark applied on save)
+  const [ledgerEntryIds, setLedgerEntryIds] = useState([])
 
   // Fuel transactions (owner operators only)
   const [fuelTotal,       setFuelTotal]       = useState('')
@@ -189,10 +194,32 @@ export default function PaystubsTab({ drivers, company }) {
         initPay = {}
         freshData.forEach(l => { initPay[l.id] = initLoadPayEntry(l) })
 
-        // Pre-populate deductions only when not editing (don't overwrite user's data)
+        // Fetch ledger entries and auto-populate additions / deductions
+        const ledger = await fetchDriverLedgerEntries(driverName, startDate, endDate)
+        setLedgerEntryIds(ledger.map(e => e.id))
+
+        const ledgerAdds = []
+        const ledgerDeds = []
+        for (const entry of ledger) {
+          const cfg = EXPENSE_CONFIG[entry.type]
+          if (!cfg) continue
+          const label  = cfg.label + (entry.description ? ` — ${entry.description}` : '')
+          const amount = String(Number(entry.amount).toFixed(2))
+          const balance = entry.date   // date as reference on paystub
+          if (cfg.addition)  ledgerAdds.push({ label, amount, balance })
+          if (cfg.deduction) ledgerDeds.push({ label, amount, balance })
+        }
+
+        // Additions: ledger-sourced additions (user can add more manually)
+        setAdditions(ledgerAdds.length > 0 ? [...ledgerAdds, { ...BLANK_LINE }] : [{ ...BLANK_LINE }])
+
+        // Deductions: default template + ledger-sourced deductions
         if (profile) {
-          setDeductions(defaultDeductions(profile.profile_type))
+          const defaults = defaultDeductions(profile.profile_type)
+          setDeductions(ledgerDeds.length > 0 ? [...defaults, ...ledgerDeds] : defaults)
           if (isOO) setCommissionPct(profile.commission_pct ?? 15)
+        } else {
+          setDeductions(ledgerDeds.length > 0 ? [...ledgerDeds, { ...BLANK_LINE }] : [{ ...BLANK_LINE }])
         }
       }
 
@@ -319,7 +346,10 @@ export default function PaystubsTab({ drivers, company }) {
       setEditingPaystubId(null)
       setEditingBaseLoads([])
     } else {
-      await createPaystub(paystubData, loads.map(l => l.id))
+      const savedPaystub = await createPaystub(paystubData, loads.map(l => l.id))
+      // Mark ledger entries as applied so they won't appear in future paystubs
+      await markLedgerEntriesApplied(ledgerEntryIds, savedPaystub.id)
+      setLedgerEntryIds([])
     }
     await refreshHistory()
     setShowPrint(false)
