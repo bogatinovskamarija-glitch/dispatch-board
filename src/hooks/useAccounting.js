@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 
-// Statuses that are valid for invoicing — excludes ghost/non-delivery statuses
-const INVOICEABLE_STATUSES = ['covered', 'at_pickup', 'at_delivery', 'tonu']
+// Statuses that are valid for invoicing — includes 'empty' so dispatched loads
+// that were marked empty before invoicing can still be billed
+const INVOICEABLE_STATUSES = ['covered', 'at_pickup', 'at_delivery', 'tonu', 'empty']
 
 // ── Pending loads (not yet invoiced, have broker + price) ──────────────────
 export function usePendingInvoices(company = 'all') {
@@ -227,6 +228,38 @@ export async function archiveLoad(id) {
     .update({ is_archived: true })
     .eq('id', id)
   if (error) throw new Error(error.message)
+}
+
+// ── Un-archive a load (restore to pending invoices) ───────────────────────
+export async function unarchiveLoad(id) {
+  const { error } = await supabase
+    .from('loads')
+    .update({ is_archived: false })
+    .eq('id', id)
+  if (error) throw new Error(error.message)
+}
+
+// ── Archived loads (pending invoicing, manually archived) ─────────────────
+export function useArchivedInvoiceLoads(company = 'all') {
+  const [loads, setLoads]     = useState([])
+  const [loading, setLoading] = useState(true)
+
+  const fetch = useCallback(async () => {
+    setLoading(true)
+    let q = supabase
+      .from('loads')
+      .select('*')
+      .is('invoiced_at', null)
+      .eq('is_archived', true)
+      .order('delivery_date', { ascending: false })
+    if (company !== 'all') q = q.eq('company', company)
+    const { data } = await q
+    setLoads(data ?? [])
+    setLoading(false)
+  }, [company])
+
+  useEffect(() => { fetch() }, [fetch])
+  return { loads, loading, refetch: fetch }
 }
 
 // ── Archive an invoice (void / mistake) ──────────────────────────────────

@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { usePendingInvoices, useInvoiceHistory, createInvoice, fetchInvoiceLoads, archiveLoad, archiveInvoice } from '../../hooks/useAccounting'
+import { usePendingInvoices, useInvoiceHistory, useArchivedInvoiceLoads, createInvoice, fetchInvoiceLoads, archiveLoad, unarchiveLoad, archiveInvoice } from '../../hooks/useAccounting'
 import InvoicePrintModal from './InvoicePrintModal'
 
 const fmt = n => '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2 })
@@ -7,10 +7,12 @@ const fmt = n => '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits
 export default function InvoicesTab({ company }) {
   const { loads, loading, refetch }          = usePendingInvoices(company)
   const { invoices, loading: histLoad, refetch: refetchHist } = useInvoiceHistory(company)
+  const { loads: archivedLoads, loading: archLoading, refetch: refetchArchived } = useArchivedInvoiceLoads(company)
 
-  const [selected,    setSelected]    = useState(new Set())
-  const [showHistory, setShowHistory] = useState(false)
-  const [printData,   setPrintData]   = useState(null)  // { loads, invoice? }
+  const [selected,       setSelected]       = useState(new Set())
+  const [showHistory,    setShowHistory]    = useState(false)
+  const [showArchivedLoads, setShowArchivedLoads] = useState(false)
+  const [printData,      setPrintData]      = useState(null)  // { loads, invoice? }
 
   // ── Pending search ─────────────────────────────────────────────────────────
   const [pendingSearch, setPendingSearch] = useState('')
@@ -111,6 +113,7 @@ export default function InvoicesTab({ company }) {
     setSelected(new Set())
     setPrintData(null)
     await refetch()
+    await refetchArchived()
     if (showHistory) await refetchHist()
   }
 
@@ -120,6 +123,18 @@ export default function InvoicesTab({ company }) {
     try {
       await archiveLoad(id)
       await refetch()
+      await refetchArchived()
+    } catch (err) {
+      alert('Error: ' + err.message)
+    }
+  }
+
+  async function handleUnarchiveLoad(e, id) {
+    e.stopPropagation()
+    try {
+      await unarchiveLoad(id)
+      await refetch()
+      await refetchArchived()
     } catch (err) {
       alert('Error: ' + err.message)
     }
@@ -154,6 +169,15 @@ export default function InvoicesTab({ company }) {
           {!showHistory && selected.size > 0 && (
             <button className="btn btn-primary" onClick={openNewInvoice}>
               Generate Invoice ({selected.size} load{selected.size !== 1 ? 's' : ''} · {fmt(selTotal)})
+            </button>
+          )}
+          {!showHistory && (
+            <button
+              className={`btn btn-xs ${showArchivedLoads ? 'btn-primary' : 'btn-ghost'}`}
+              onClick={() => setShowArchivedLoads(v => !v)}
+              title="Show loads archived by mistake"
+            >
+              🗄 Archived{archivedLoads.length > 0 ? ` (${archivedLoads.length})` : ''}
             </button>
           )}
           <button className="btn btn-ghost" onClick={() => setShowHistory(h => !h)}>
@@ -239,6 +263,66 @@ export default function InvoicesTab({ company }) {
             </table>
             </>
           )
+      )}
+
+      {/* ── Archived loads panel ── */}
+      {!showHistory && showArchivedLoads && (
+        <div style={{ marginTop: 24 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+            <div style={{ fontWeight: 600, fontSize: 13, color: '#374151' }}>
+              🗄 Archived Loads
+            </div>
+            <span style={{ fontSize: 12, color: '#9CA3AF' }}>
+              These were removed from pending by mistake — click ↩ to restore them.
+            </span>
+          </div>
+          {archLoading
+            ? <div className="acct-empty">Loading…</div>
+            : archivedLoads.length === 0
+              ? <div className="acct-empty">No archived loads.</div>
+              : (
+                <table className="acct-table">
+                  <thead>
+                    <tr>
+                      <th>Broker</th>
+                      <th>Load #</th>
+                      <th>Truck</th>
+                      <th>Pickup</th>
+                      <th>Delivery</th>
+                      <th>Route</th>
+                      <th>Price</th>
+                      <th style={{ width: 60 }} title="Restore load"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {archivedLoads.map(l => (
+                      <tr key={l.id} style={{ opacity: 0.75 }}>
+                        <td><strong>{l.broker || '—'}</strong></td>
+                        <td>{l.load_number || '—'}</td>
+                        <td>{l.truck_number || '—'}</td>
+                        <td>{l.pickup_date  || l.date || '—'}</td>
+                        <td>{l.delivery_date || '—'}</td>
+                        <td className="acct-route">
+                          {l.pickup_location && l.delivery_location
+                            ? `${l.pickup_location.split(',')[0]} → ${l.delivery_location.split(',')[0]}`
+                            : l.pickup_location || l.delivery_location || '—'}
+                        </td>
+                        <td className="acct-price">{l.price ? fmt(l.price) : '—'}</td>
+                        <td>
+                          <button
+                            className="btn btn-ghost btn-xs"
+                            title="Restore — move back to pending invoices"
+                            onClick={e => handleUnarchiveLoad(e, l.id)}
+                            style={{ color: '#2563EB', padding: '2px 8px', fontWeight: 600 }}
+                          >↩ Restore</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )
+          }
+        </div>
       )}
 
       {/* ── History ── */}
