@@ -251,13 +251,13 @@ export default function WeeklySummaryTab({ company }) {
                 <div className="summary-card-sub">from weekly ledger</div>
               </div>
             )}
-            {maintenanceTotal > 0 && (
-              <div className="summary-card" style={{ borderLeft: '4px solid #9CA3AF' }}>
-                <div className="summary-card-label">Maintenance</div>
-                <div className="summary-card-value" style={{ color: '#6B7280' }}>{fmt(maintenanceTotal)}</div>
-                <div className="summary-card-sub">repair & service spend</div>
+            <div className="summary-card" style={{ borderLeft: '4px solid #9CA3AF' }}>
+              <div className="summary-card-label">Maintenance</div>
+              <div className="summary-card-value" style={{ color: maintenanceTotal > 0 ? '#6B7280' : '#D1D5DB' }}>
+                {fmt(maintenanceTotal)}
               </div>
-            )}
+              <div className="summary-card-sub">{maintenanceTotal > 0 ? 'repair & service spend' : 'no records this week'}</div>
+            </div>
           </div>
 
           {/* ── Top Brokers ── */}
@@ -361,11 +361,10 @@ export default function WeeklySummaryTab({ company }) {
                   ⚠ Add driver profiles in the Paystubs tab to see estimated payroll.
                 </div>
               )}
-              {maintenanceTotal > 0 && (
-                <div style={{ fontSize: 12, color: '#6B7280', marginBottom: 16 }}>
-                  🔧 Maintenance this week: <strong>{fmt(maintenanceTotal)}</strong>
-                </div>
-              )}
+              <div style={{ fontSize: 12, color: '#6B7280', marginBottom: 16 }}>
+                🔧 Maintenance this week: <strong>{fmt(maintenanceTotal)}</strong>
+                {maintenanceTotal === 0 && <span style={{ color: '#9CA3AF', fontWeight: 400 }}> — no records entered yet</span>}
+              </div>
 
               {/* ── Bar chart ── */}
               <div className="summary-section-title" style={{ marginTop: 24 }}>Gross vs. Payroll — by Driver</div>

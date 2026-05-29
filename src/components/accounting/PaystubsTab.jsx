@@ -108,6 +108,7 @@ export default function PaystubsTab({ drivers, company }) {
     setDriverName('')
     setPendingLedger([])
     setSelectedLedgerIds(new Set())
+    setStagedLedgerIds(new Set())
     setPsTab('history')
   }
 
@@ -151,6 +152,8 @@ export default function PaystubsTab({ drivers, company }) {
   // Pending ledger entries for this driver (checklist)
   const [pendingLedger,    setPendingLedger]    = useState([])
   const [selectedLedgerIds, setSelectedLedgerIds] = useState(new Set())
+  // IDs that have been "Added to Paystub" — marked applied on save
+  const [stagedLedgerIds,   setStagedLedgerIds]  = useState(new Set())
 
   // Fuel transactions (owner operators only)
   const [fuelTotal,       setFuelTotal]       = useState('')
@@ -276,6 +279,28 @@ export default function PaystubsTab({ drivers, company }) {
     setLoadPay(p => ({ ...p, [id]: { ...p[id], amount } }))
   }
 
+  // ── Move checked ledger entries into the additions/deductions sections ──
+  function handleAddLedgerToPaystub() {
+    const toAdd = pendingLedger.filter(e => selectedLedgerIds.has(e.id))
+    const newAdds = []
+    const newDeds = []
+    for (const entry of toAdd) {
+      const cfg = EXPENSE_CONFIG[entry.type]
+      if (!cfg) continue
+      const label  = cfg.label + (entry.description ? ` — ${entry.description}` : '')
+      const amount = String(Number(entry.amount).toFixed(2))
+      const balance = entry.date
+      if (cfg.addition)  newAdds.push({ label, amount, balance })
+      if (cfg.deduction) newDeds.push({ label, amount, balance })
+    }
+    if (newAdds.length > 0) setAdditions(prev => [...prev.filter(a => a.label || a.amount), ...newAdds, { ...BLANK_LINE }])
+    if (newDeds.length > 0) setDeductions(prev => [...prev, ...newDeds])
+    // Stage IDs and remove from pending checklist
+    setStagedLedgerIds(prev => new Set([...prev, ...selectedLedgerIds]))
+    setPendingLedger(prev => prev.filter(e => !selectedLedgerIds.has(e.id)))
+    setSelectedLedgerIds(new Set())
+  }
+
   // ── Additions / deductions helpers ──────────────────────────────────────
   function updateLine(arr, setArr, idx, field, value) {
     setArr(arr.map((item, i) => i === idx ? { ...item, [field]: value } : item))
@@ -323,39 +348,20 @@ export default function PaystubsTab({ drivers, company }) {
       load_pay:       loadPay,
       fuel_text:      (isOO && fuelText) ? fuelText : null,
     }
-    // Build ledger contributions from checked entries
-    const checkedEntries = pendingLedger.filter(e => selectedLedgerIds.has(e.id))
-    const ledgerAdds = []
-    const ledgerDeds = []
-    for (const entry of checkedEntries) {
-      const cfg = EXPENSE_CONFIG[entry.type]
-      if (!cfg) continue
-      const label  = cfg.label + (entry.description ? ` — ${entry.description}` : '')
-      const amount = String(Number(entry.amount).toFixed(2))
-      const balance = entry.date
-      if (cfg.addition)  ledgerAdds.push({ label, amount, balance })
-      if (cfg.deduction) ledgerDeds.push({ label, amount, balance })
-    }
-
-    // Merge ledger entries into additions/deductions for the saved paystub
-    const finalData = {
-      ...paystubData,
-      additions:  [...paystubData.additions,  ...ledgerAdds],
-      deductions: [...paystubData.deductions, ...ledgerDeds],
-    }
-
     if (editingPaystubId) {
       const baseIds    = new Set(editingBaseLoads.map(l => l.id))
       const newLoadIds = loads.filter(l => !baseIds.has(l.id)).map(l => l.id)
-      await updatePaystub(editingPaystubId, finalData, newLoadIds)
+      await updatePaystub(editingPaystubId, paystubData, newLoadIds)
       setEditingPaystubId(null)
       setEditingBaseLoads([])
     } else {
-      const savedPaystub = await createPaystub(finalData, loads.map(l => l.id))
-      await markLedgerEntriesApplied([...selectedLedgerIds], savedPaystub.id)
+      const savedPaystub = await createPaystub(paystubData, loads.map(l => l.id))
+      // Mark only staged entries (ones the user clicked "Add to Paystub" for)
+      await markLedgerEntriesApplied([...stagedLedgerIds], savedPaystub.id)
     }
     setPendingLedger([])
     setSelectedLedgerIds(new Set())
+    setStagedLedgerIds(new Set())
     await refreshHistory()
     setShowPrint(false)
     // Reset form
@@ -808,11 +814,18 @@ export default function PaystubsTab({ drivers, company }) {
               <div className="ledger-checklist-header">
                 <span>📒 Pending Expenses from Ledger</span>
                 <span style={{ fontSize: 11, color: '#6B7280', fontWeight: 400 }}>
-                  Check what to include in this paystub — unchecked items stay pending for next time
+                  Check what to include, then click Add
                 </span>
-                <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+                <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
                   <button className="btn btn-ghost btn-xs" onClick={() => setSelectedLedgerIds(new Set(pendingLedger.map(e => e.id)))}>All</button>
                   <button className="btn btn-ghost btn-xs" onClick={() => setSelectedLedgerIds(new Set())}>None</button>
+                  <button
+                    className="btn btn-primary btn-xs"
+                    disabled={selectedLedgerIds.size === 0}
+                    onClick={handleAddLedgerToPaystub}
+                  >
+                    + Add {selectedLedgerIds.size > 0 ? `(${selectedLedgerIds.size})` : ''} to Paystub
+                  </button>
                 </div>
               </div>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
