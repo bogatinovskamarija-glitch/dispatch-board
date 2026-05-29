@@ -49,7 +49,13 @@ export function useLedgerEntries(from, to, company = 'all', driverFilter = '') {
       if (driverFilter)      q = q.eq('driver_name', driverFilter)
       const { data, error } = await q
       if (error) {
-        if (error.code === '42P01') setDbMissing(true)
+        // PostgREST returns "schema cache" message when the table doesn't exist yet
+        const isTableMissing =
+          error.code === '42P01' ||
+          error.message?.includes('schema cache') ||
+          error.message?.includes('does not exist') ||
+          error.message?.includes('ledger_entries')
+        if (isTableMissing) setDbMissing(true)
         else throw error
         setEntries([])
       } else {
@@ -71,7 +77,11 @@ export function useLedgerEntries(from, to, company = 'all', driverFilter = '') {
 export async function addLedgerEntry(entry) {
   const { data, error } = await supabase
     .from('ledger_entries').insert([entry]).select().single()
-  if (error) throw new Error(error.message)
+  if (error) {
+    if (error.message?.includes('schema cache') || error.message?.includes('does not exist'))
+      throw new Error('The ledger table has not been created yet. Please run the SQL setup in your Supabase dashboard, then refresh the page.')
+    throw new Error(error.message)
+  }
   return data
 }
 
