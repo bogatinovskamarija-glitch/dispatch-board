@@ -157,8 +157,9 @@ export default function FuelTab({ company }) {
   const { profiles } = useDriverProfiles()
 
   // Miles + driver-by-truck from loads for the week
-  const [milesMap,     setMilesMap]     = useState({})
-  const [driverByTruck, setDriverByTruck] = useState({})
+  const [milesMap,       setMilesMap]       = useState({})
+  const [milesByDriver,  setMilesByDriver]  = useState({})
+  const [driverByTruck,  setDriverByTruck]  = useState({})
   useEffect(() => {
     const REVENUE = ['covered','at_pickup','at_delivery','tonu','empty','prebooked']
     let q = supabase.from('loads').select('truck_number, total_miles, driver_name')
@@ -166,13 +167,19 @@ export default function FuelTab({ company }) {
       .or(`and(pickup_date.gte.${week.from},pickup_date.lte.${week.to}),and(pickup_date.is.null,date.gte.${week.from},date.lte.${week.to})`)
     if (company !== 'all') q = q.eq('company', company)
     q.then(({ data }) => {
-      const mi = {}, dr = {}
+      const mi = {}, miDrv = {}, dr = {}
       for (const l of (data ?? [])) {
         if (!l.truck_number) continue
-        mi[l.truck_number] = (mi[l.truck_number] || 0) + (Number(l.total_miles) || 0)
-        if (l.driver_name) dr[l.truck_number] = l.driver_name
+        const miles = Number(l.total_miles) || 0
+        mi[l.truck_number] = (mi[l.truck_number] || 0) + miles
+        if (l.driver_name) {
+          dr[l.truck_number] = l.driver_name
+          // also index by driver name so we can match even when driver swapped trucks
+          miDrv[l.driver_name.toLowerCase().trim()] = (miDrv[l.driver_name.toLowerCase().trim()] || 0) + miles
+        }
       }
       setMilesMap(mi)
+      setMilesByDriver(miDrv)
       setDriverByTruck(dr)
     })
   }, [week.from, week.to, company])
@@ -338,12 +345,21 @@ export default function FuelTab({ company }) {
       else if (cat === 'ULSR') map[key].reefer += g   // reefer unit diesel → separate
       if (!map[key].driver || map[key].driver === '—') map[key].driver = driverByTruck[t.truck_number] || '—'
     }
-    return Object.values(map).sort((a,b) => b.amount - a.amount).map(r => ({
-      ...r,
-      miles: milesMap[r.truck] || 0,
-      mpg:   r.diesel > 0 && milesMap[r.truck] > 0 ? milesMap[r.truck] / r.diesel : null,
-    }))
-  }, [transactions, milesMap, driverByTruck])
+    return Object.values(map).sort((a,b) => b.amount - a.amount).map(r => {
+      // Try truck number first, fall back to driver name (handles driver swapping trucks)
+      const miles = milesMap[r.truck] || milesByDriver[r.driver?.toLowerCase().trim()] || 0
+      // OO charge = policy + rebate per non-DEF transaction
+      const ooCharge = r.txns
+        .filter(t => !String(t.fuel_category || '').toUpperCase().includes('DEF'))
+        .reduce((s, t) => s + Number(t.amount) + Number(t.rebate_amount || 0), 0)
+      return {
+        ...r,
+        miles,
+        mpg:      r.diesel > 0 && miles > 0 ? miles / r.diesel : null,
+        ooCharge,
+      }
+    })
+  }, [transactions, milesMap, milesByDriver, driverByTruck])
 
   const totRetail  = summary.reduce((s,r) => s + r.retail,  0)
   const totAmount  = summary.reduce((s,r) => s + r.amount,  0)
@@ -590,20 +606,25 @@ export default function FuelTab({ company }) {
                     <td style={{ textAlign: 'right', fontSize: 12, color: '#6B7280' }}>
                       {cpm ? cpm.toFixed(1) + '¢' : '—'}
                     </td>
-                    <td>
+                    <td style={{ whiteSpace: 'nowrap' }}>
                       {isOO && (
-                        <button
-                          className="btn btn-ghost btn-xs"
-                          style={{ color: '#4F46E5', whiteSpace: 'nowrap' }}
-                          title="Copy formatted fuel report for OO paystub"
-                          onClick={() => {
-                            const text = buildOOReport(r)
-                            navigator.clipboard.writeText(text).then(
-                              () => alert(`Copied fuel report for ${r.driver} (${r.count} transactions)`),
-                              () => prompt('Copy this:', text)
-                            )
-                          }}
-                        >📋 Copy for paystub</button>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+                          <div style={{ fontSize: 11, color: '#374151', fontWeight: 700 }}>
+                            OO charge: <span style={{ color: '#DC2626' }}>{fmt$(r.ooCharge)}</span>
+                          </div>
+                          <button
+                            className="btn btn-ghost btn-xs"
+                            style={{ color: '#4F46E5' }}
+                            title="Copy formatted fuel report for OO paystub"
+                            onClick={() => {
+                              const text = buildOOReport(r)
+                              navigator.clipboard.writeText(text).then(
+                                () => alert(`Copied fuel report for ${r.driver} (${r.count} transactions)`),
+                                () => prompt('Copy this:', text)
+                              )
+                            }}
+                          >📋 Copy for paystub</button>
+                        </div>
                       )}
                     </td>
                   </tr>
