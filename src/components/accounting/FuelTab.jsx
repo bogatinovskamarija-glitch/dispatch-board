@@ -569,7 +569,7 @@ export default function FuelTab({ company }) {
                 <th style={{ textAlign: 'right' }}>Fillups</th>
                 <th style={{ textAlign: 'right' }}>Diesel Gal</th>
                 <th style={{ textAlign: 'right' }}>Reefer Gal</th>
-                <th style={{ textAlign: 'right' }}>Retail</th>
+                <th style={{ textAlign: 'right' }}>Retail / OO Charge</th>
                 <th style={{ textAlign: 'right' }}>Policy Amt</th>
                 <th style={{ textAlign: 'right' }}>Rebate</th>
                 <th style={{ textAlign: 'right' }}>Miles</th>
@@ -594,7 +594,9 @@ export default function FuelTab({ company }) {
                     <td style={{ textAlign: 'right', color: '#6B7280' }}>{r.count}</td>
                     <td style={{ textAlign: 'right', fontWeight: 600 }}>{r.diesel.toFixed(3)}</td>
                     <td style={{ textAlign: 'right', color: '#6B7280' }}>{r.reefer > 0 ? r.reefer.toFixed(3) : '—'}</td>
-                    <td style={{ textAlign: 'right', color: '#9CA3AF' }}>{hasRetail ? fmt$(r.retail) : '—'}</td>
+                    <td style={{ textAlign: 'right', color: isOO ? '#DC2626' : '#9CA3AF', fontWeight: isOO ? 700 : 400 }}>
+                      {isOO ? fmt$(r.ooCharge) : hasRetail ? fmt$(r.retail) : '—'}
+                    </td>
                     <td style={{ textAlign: 'right', fontWeight: 700, color: '#DC2626' }}>{fmt$(r.amount)}</td>
                     <td style={{ textAlign: 'right', color: '#059669' }}>{r.rebate > 0 ? `-${fmt$(r.rebate)}` : '—'}</td>
                     <td style={{ textAlign: 'right', color: r.miles > 0 ? '#8B5CF6' : '#D1D5DB', fontWeight: r.miles > 0 ? 600 : 400 }}>
