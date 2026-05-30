@@ -358,9 +358,9 @@ export default function FuelTab({ company }) {
     return r.txns
       .filter(t => !String(t.fuel_category || '').toUpperCase().includes('DEF'))
       .map(t => {
-        // OOs are charged the policy amount — company keeps the rebate
-        const charge = Number(t.amount).toFixed(2)
-        return [t.transaction_date, t.location, `${Number(t.gallons).toFixed(3)} gal`, `$${charge}`].filter(Boolean).join('  ')
+        // OO is charged policy price + rebate (rebate belongs to company, not OO)
+        const charge = (Number(t.amount) + Number(t.rebate_amount || 0)).toFixed(2)
+        return [t.transaction_date, t.location, `${String(t.fuel_category || '').toUpperCase()}`, `${Number(t.gallons).toFixed(3)} gal`, `$${charge}`].filter(Boolean).join('  ')
       }).join('\n')
   }
 
