@@ -300,6 +300,23 @@ export default function FuelTab({ company }) {
     return parseEFSRows(preview.rows, week.from, company === 'all' ? 'carat' : company).length
   }, [preview, week.from, company])
 
+  // Fuzzy driver name match — handles minor typos like "Wiliams" vs "Williams"
+  function findProfile(driverName) {
+    if (!driverName) return null
+    const norm = s => (s || '').toLowerCase().trim()
+    const exact = profiles.find(p => norm(p.driver_name) === norm(driverName))
+    if (exact) return exact
+    // Fallback: first name exact + first 3 chars of last name
+    const parts  = norm(driverName).split(' ')
+    const first  = parts[0]
+    const last3  = (parts[parts.length - 1] || '').slice(0, 3)
+    if (!first || !last3) return null
+    return profiles.find(p => {
+      const pp = norm(p.driver_name).split(' ')
+      return pp[0] === first && (pp[pp.length - 1] || '').slice(0, 3) === last3
+    }) || null
+  }
+
   // ── Summary ──────────────────────────────────────────────────────────────
   const summary = useMemo(() => {
     const map = {}
@@ -307,37 +324,34 @@ export default function FuelTab({ company }) {
       const key = t.truck_number || t.driver_name || 'Unknown'
       if (!map[key]) map[key] = {
         truck: t.truck_number || '—', driver: t.driver_name || driverByTruck[t.truck_number] || '—',
-        gallons: 0, diesel: 0, retail: 0, amount: 0, rebate: 0, count: 0, txns: [],
+        gallons: 0, diesel: 0, reefer: 0, retail: 0, amount: 0, rebate: 0, count: 0, txns: [],
       }
-      const g = Number(t.gallons) || 0
-      map[key].gallons  += g
-      map[key].retail   += Number(t.raw_row?.retail_amount ?? t.amount) || 0
-      map[key].amount   += Number(t.amount) || 0
-      map[key].rebate   += Number(t.rebate_amount) || 0
+      const g   = Number(t.gallons) || 0
+      const cat = String(t.fuel_category || '').toUpperCase()
+      map[key].gallons += g
+      map[key].retail  += Number(t.raw_row?.retail_amount ?? t.amount) || 0
+      map[key].amount  += Number(t.amount) || 0
+      map[key].rebate  += Number(t.rebate_amount) || 0
       map[key].count++
       map[key].txns.push(t)
-      // Only count diesel gallons (ULSD/ULSR) for MPG — not DEF
-      if (!String(t.fuel_category || '').toUpperCase().includes('DEF')) map[key].diesel += g
+      if (cat === 'ULSD')      map[key].diesel += g   // truck engine diesel only → MPG
+      else if (cat === 'ULSR') map[key].reefer += g   // reefer unit diesel → separate
       if (!map[key].driver || map[key].driver === '—') map[key].driver = driverByTruck[t.truck_number] || '—'
     }
     return Object.values(map).sort((a,b) => b.amount - a.amount).map(r => ({
       ...r,
-      cardSavings: r.retail - r.amount,
-      net:         r.amount - r.rebate,
-      miles:       milesMap[r.truck] || 0,
-      mpg:         r.diesel > 0 && milesMap[r.truck] > 0 ? milesMap[r.truck] / r.diesel : null,
+      miles: milesMap[r.truck] || 0,
+      mpg:   r.diesel > 0 && milesMap[r.truck] > 0 ? milesMap[r.truck] / r.diesel : null,
     }))
   }, [transactions, milesMap, driverByTruck])
 
-  const totGallons    = summary.reduce((s,r) => s + r.gallons,    0)
-  const totRetail     = summary.reduce((s,r) => s + r.retail,     0)
-  const totAmount     = summary.reduce((s,r) => s + r.amount,     0)
-  const totCardSavings= totRetail - totAmount
-  const totRebate     = summary.reduce((s,r) => s + r.rebate,     0)
-  const totNet        = totAmount - totRebate
-  const totMiles      = summary.reduce((s,r) => s + r.miles,      0)
-  const totDiesel     = summary.reduce((s,r) => s + r.diesel,     0)
-  const fleetMPG      = totDiesel > 0 && totMiles > 0 ? totMiles / totDiesel : null
+  const totRetail  = summary.reduce((s,r) => s + r.retail,  0)
+  const totAmount  = summary.reduce((s,r) => s + r.amount,  0)
+  const totRebate  = summary.reduce((s,r) => s + r.rebate,  0)
+  const totMiles   = summary.reduce((s,r) => s + r.miles,   0)
+  const totDiesel  = summary.reduce((s,r) => s + r.diesel,  0)
+  const totReefer  = summary.reduce((s,r) => s + r.reefer,  0)
+  const fleetMPG   = totDiesel > 0 && totMiles > 0 ? totMiles / totDiesel : null
 
   // Format fuel report for OO paystub
   function buildOOReport(r) {
@@ -485,28 +499,28 @@ export default function FuelTab({ company }) {
           {/* Stat cards */}
           <div className="fuel-totals">
             <div className="fuel-total-card">
-              <div className="fuel-total-label">Total Gallons</div>
-              <div className="fuel-total-value">{fmtG(totGallons)}</div>
-              <div className="fuel-total-sub">{transactions.length} transactions</div>
+              <div className="fuel-total-label">Diesel Gallons</div>
+              <div className="fuel-total-value">{fmtG(totDiesel)}</div>
+              <div className="fuel-total-sub">truck engine (ULSD)</div>
             </div>
+            {totReefer > 0 && (
+              <div className="fuel-total-card">
+                <div className="fuel-total-label">Reefer Gallons</div>
+                <div className="fuel-total-value" style={{ color: '#6B7280' }}>{fmtG(totReefer)}</div>
+                <div className="fuel-total-sub">reefer unit (ULSR)</div>
+              </div>
+            )}
             {totRetail > totAmount && (
               <div className="fuel-total-card">
                 <div className="fuel-total-label">Retail Price</div>
-                <div className="fuel-total-value" style={{ color: '#6B7280' }}>{fmt$(totRetail)}</div>
+                <div className="fuel-total-value" style={{ color: '#9CA3AF' }}>{fmt$(totRetail)}</div>
                 <div className="fuel-total-sub">without fuel card</div>
               </div>
             )}
-            {totRetail > totAmount && (
-              <div className="fuel-total-card" style={{ borderLeft: '4px solid #059669' }}>
-                <div className="fuel-total-label">Card Savings</div>
-                <div className="fuel-total-value" style={{ color: '#059669' }}>-{fmt$(totCardSavings)}</div>
-                <div className="fuel-total-sub">policy rate discount</div>
-              </div>
-            )}
-            <div className="fuel-total-card">
+            <div className="fuel-total-card" style={{ borderLeft: '4px solid #DC2626' }}>
               <div className="fuel-total-label">Policy Amount</div>
               <div className="fuel-total-value" style={{ color: '#DC2626' }}>{fmt$(totAmount)}</div>
-              <div className="fuel-total-sub">at-pump price (pre-rebate)</div>
+              <div className="fuel-total-sub">what we pay (after card)</div>
             </div>
             {totRebate > 0 && (
               <div className="fuel-total-card" style={{ borderLeft: '4px solid #059669' }}>
@@ -515,11 +529,6 @@ export default function FuelTab({ company }) {
                 <div className="fuel-total-sub">additional rebate</div>
               </div>
             )}
-            <div className="fuel-total-card" style={{ borderLeft: '4px solid #DC2626' }}>
-              <div className="fuel-total-label">Net Cost</div>
-              <div className="fuel-total-value" style={{ color: '#DC2626' }}>{fmt$(totNet)}</div>
-              <div className="fuel-total-sub">after all savings</div>
-            </div>
             <div className="fuel-total-card">
               <div className="fuel-total-label">Total Miles</div>
               <div className="fuel-total-value" style={{ color: '#8B5CF6' }}>{totMiles > 0 ? fmtMi(totMiles) : '—'}</div>
@@ -529,7 +538,7 @@ export default function FuelTab({ company }) {
               <div className="fuel-total-card" style={{ borderLeft: '4px solid #059669' }}>
                 <div className="fuel-total-label">Fleet MPG</div>
                 <div className="fuel-total-value" style={{ color: '#059669' }}>{fleetMPG.toFixed(2)}</div>
-                <div className="fuel-total-sub">diesel gallons only</div>
+                <div className="fuel-total-sub">diesel miles per gallon</div>
               </div>
             )}
           </div>
@@ -542,12 +551,11 @@ export default function FuelTab({ company }) {
                 <th>Truck</th>
                 <th>Driver</th>
                 <th style={{ textAlign: 'right' }}>Fillups</th>
-                <th style={{ textAlign: 'right' }}>Gallons</th>
+                <th style={{ textAlign: 'right' }}>Diesel Gal</th>
+                <th style={{ textAlign: 'right' }}>Reefer Gal</th>
                 <th style={{ textAlign: 'right' }}>Retail</th>
-                <th style={{ textAlign: 'right' }}>Card Savings</th>
                 <th style={{ textAlign: 'right' }}>Policy Amt</th>
                 <th style={{ textAlign: 'right' }}>Rebate</th>
-                <th style={{ textAlign: 'right' }}>Net Cost</th>
                 <th style={{ textAlign: 'right' }}>Miles</th>
                 <th style={{ textAlign: 'right' }}>MPG</th>
                 <th style={{ textAlign: 'right' }}>¢/mile</th>
@@ -556,9 +564,9 @@ export default function FuelTab({ company }) {
             </thead>
             <tbody>
               {summary.map(r => {
-                const profile   = profiles.find(p => p.driver_name === r.driver)
-                const isOO      = profile?.profile_type === 'owner_operator'
-                const cpm       = r.miles > 0 ? (r.net / r.miles * 100) : null
+                const profile = findProfile(r.driver)
+                const isOO    = profile?.profile_type === 'owner_operator'
+                const cpm     = r.miles > 0 ? (r.amount / r.miles * 100) : null
                 const hasRetail = r.retail > r.amount
                 return (
                   <tr key={r.truck}>
@@ -568,12 +576,11 @@ export default function FuelTab({ company }) {
                       {isOO && <span style={{ marginLeft: 6, fontSize: 10, background: '#EEF2FF', color: '#4F46E5', padding: '1px 6px', borderRadius: 8, fontWeight: 700 }}>OO</span>}
                     </td>
                     <td style={{ textAlign: 'right', color: '#6B7280' }}>{r.count}</td>
-                    <td style={{ textAlign: 'right', fontWeight: 600 }}>{r.gallons.toFixed(3)}</td>
+                    <td style={{ textAlign: 'right', fontWeight: 600 }}>{r.diesel.toFixed(3)}</td>
+                    <td style={{ textAlign: 'right', color: '#6B7280' }}>{r.reefer > 0 ? r.reefer.toFixed(3) : '—'}</td>
                     <td style={{ textAlign: 'right', color: '#9CA3AF' }}>{hasRetail ? fmt$(r.retail) : '—'}</td>
-                    <td style={{ textAlign: 'right', color: '#059669' }}>{hasRetail ? `-${fmt$(r.cardSavings)}` : '—'}</td>
-                    <td style={{ textAlign: 'right', color: '#6B7280' }}>{fmt$(r.amount)}</td>
+                    <td style={{ textAlign: 'right', fontWeight: 700, color: '#DC2626' }}>{fmt$(r.amount)}</td>
                     <td style={{ textAlign: 'right', color: '#059669' }}>{r.rebate > 0 ? `-${fmt$(r.rebate)}` : '—'}</td>
-                    <td style={{ textAlign: 'right', fontWeight: 700, color: '#DC2626' }}>{fmt$(r.net)}</td>
                     <td style={{ textAlign: 'right', color: r.miles > 0 ? '#8B5CF6' : '#D1D5DB', fontWeight: r.miles > 0 ? 600 : 400 }}>
                       {r.miles > 0 ? fmtMi(r.miles) : '—'}
                     </td>
@@ -607,12 +614,11 @@ export default function FuelTab({ company }) {
               <tr style={{ background: '#F3F4F6' }}>
                 <td colSpan={2}><strong>Total</strong></td>
                 <td style={{ textAlign: 'right', fontWeight: 700 }}>{transactions.length}</td>
-                <td style={{ textAlign: 'right', fontWeight: 800 }}>{totGallons.toFixed(3)}</td>
+                <td style={{ textAlign: 'right', fontWeight: 800 }}>{totDiesel.toFixed(3)}</td>
+                <td style={{ textAlign: 'right', color: '#6B7280', fontWeight: 600 }}>{totReefer > 0 ? totReefer.toFixed(3) : '—'}</td>
                 <td style={{ textAlign: 'right', color: '#9CA3AF', fontWeight: 600 }}>{totRetail > totAmount ? fmt$(totRetail) : '—'}</td>
-                <td style={{ textAlign: 'right', color: '#059669', fontWeight: 700 }}>{totRetail > totAmount ? `-${fmt$(totCardSavings)}` : '—'}</td>
-                <td style={{ textAlign: 'right', color: '#6B7280', fontWeight: 600 }}>{fmt$(totAmount)}</td>
+                <td style={{ textAlign: 'right', fontWeight: 800, color: '#DC2626' }}>{fmt$(totAmount)}</td>
                 <td style={{ textAlign: 'right', color: '#059669', fontWeight: 700 }}>{totRebate > 0 ? `-${fmt$(totRebate)}` : '—'}</td>
-                <td style={{ textAlign: 'right', fontWeight: 800, color: '#DC2626' }}>{fmt$(totNet)}</td>
                 <td style={{ textAlign: 'right', fontWeight: 800, color: '#8B5CF6' }}>{totMiles > 0 ? fmtMi(totMiles) : '—'}</td>
                 <td style={{ textAlign: 'right', fontWeight: 800, color: '#059669' }}>{fleetMPG ? fleetMPG.toFixed(2) : '—'}</td>
                 <td colSpan={2}></td>
