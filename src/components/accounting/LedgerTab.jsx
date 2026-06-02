@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react'
 import { useLedgerEntries, useOutstandingLedgerEntries, addLedgerEntry, updateLedgerEntry, deleteLedgerEntry, EXPENSE_CONFIG, EXPENSE_GROUPS } from '../../hooks/useLedger'
 import { useDriverProfiles } from '../../hooks/useDriverProfiles'
-const fmt = n => '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2 })
+const fmt     = n => '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2 })
+const isoDate = d => [d.getFullYear(), String(d.getMonth()+1).padStart(2,'0'), String(d.getDate()).padStart(2,'0')].join('-')
 
 // Week runs Thu–Wed to match company accounting period.
 // Uses local date math only — no UTC conversion — to avoid timezone shifts.
