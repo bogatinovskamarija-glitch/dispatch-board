@@ -1,18 +1,19 @@
 import { useState, useMemo } from 'react'
 import { useLedgerEntries, useOutstandingLedgerEntries, addLedgerEntry, updateLedgerEntry, deleteLedgerEntry, EXPENSE_CONFIG, EXPENSE_GROUPS } from '../../hooks/useLedger'
 import { useDriverProfiles } from '../../hooks/useDriverProfiles'
+import { getThursdayWeek } from '../../hooks/useWeeklySummary'
 
 const fmt = n => '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2 })
 const isoDate = d => d.toISOString().split('T')[0]
 
+// Week runs Thu–Wed to match company accounting period
 function getWeekBounds(offset = 0) {
-  const today = new Date()
-  const day   = today.getDay()
-  const mon   = new Date(today)
-  mon.setDate(today.getDate() - (day === 0 ? 6 : day - 1) + offset * 7)
-  const sun = new Date(mon)
-  sun.setDate(mon.getDate() + 6)
-  return { from: isoDate(mon), to: isoDate(sun) }
+  const base = getThursdayWeek()
+  // Shift by offset weeks from the current Thu anchor
+  const anchor = new Date(base.start + 'T12:00:00')
+  anchor.setDate(anchor.getDate() + offset * 7)
+  const { start, end } = getThursdayWeek(anchor.toISOString().split('T')[0])
+  return { from: start, to: end }
 }
 
 function fmtRange(from, to) {
