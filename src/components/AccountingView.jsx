@@ -2,6 +2,7 @@ import { useState } from 'react'
 import InvoicesTab from './accounting/InvoicesTab'
 import PaystubsTab from './accounting/PaystubsTab'
 import WeeklySummaryTab from './accounting/WeeklySummaryTab'
+import MonthlySummaryTab from './accounting/MonthlySummaryTab'
 import LedgerTab from './accounting/LedgerTab'
 import FuelTab   from './accounting/FuelTab'
 import { useCompanySettings } from '../hooks/useSettings'
@@ -102,6 +103,9 @@ export default function AccountingView({ onClose, drivers }) {
             <button className={tab === 'summary' ? 'active' : ''} onClick={() => setTab('summary')}>
               Weekly Summary
             </button>
+            <button className={tab === 'monthly' ? 'active' : ''} onClick={() => setTab('monthly')}>
+              Monthly Overview
+            </button>
           </div>
         </div>
 
@@ -129,6 +133,7 @@ export default function AccountingView({ onClose, drivers }) {
         {tab === 'ledger'    && <LedgerTab company={company} />}
         {tab === 'fuel'      && <FuelTab   company={company} />}
         {tab === 'summary'   && <WeeklySummaryTab company={company} />}
+        {tab === 'monthly'   && <MonthlySummaryTab company={company} />}
       </div>
 
       {settings && <CompanySettingsModal onClose={() => setSettings(false)} />}
