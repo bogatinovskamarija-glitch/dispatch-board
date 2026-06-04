@@ -1,6 +1,19 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 
+// Ghost / not-yet-picked-up statuses that should NOT get an auto pickup_date
+const NO_AUTO_PICKUP = ['home', 'broken', 'no_driver', 'prebooked']
+
+// Automatically set pickup_date = date when a real load is saved without a pickup_date.
+// This ensures the weekly accounting summary can always find the load by pickup date.
+// Dispatch only needs to fill in the dispatch date — pickup_date is kept in sync automatically.
+function autoPickupDate(payload) {
+  if (payload.pickup_date) return payload               // already set — leave it alone
+  if (NO_AUTO_PICKUP.includes(payload.status)) return payload  // ghost/prebooked — don't set
+  if (!payload.date) return payload                     // no dispatch date — can't infer
+  return { ...payload, pickup_date: payload.date }      // mirror dispatch date → pickup date
+}
+
 export function useLoads(date, company) {
   const [loads, setLoads]     = useState([])
   const [loading, setLoading] = useState(true)
@@ -27,14 +40,16 @@ export function useLoads(date, company) {
   useEffect(() => { fetchLoads() }, [fetchLoads])
 
   async function createLoad(payload) {
-    const { data, error } = await supabase.from('loads').insert([payload]).select().single()
+    const enriched = autoPickupDate(payload)
+    const { data, error } = await supabase.from('loads').insert([enriched]).select().single()
     if (error) throw new Error(error.message)
     setLoads(prev => [...prev, data])
     return data
   }
 
   async function updateLoad(id, payload) {
-    const { data, error } = await supabase.from('loads').update(payload).eq('id', id).select().single()
+    const enriched = autoPickupDate(payload)
+    const { data, error } = await supabase.from('loads').update(enriched).eq('id', id).select().single()
     if (error) throw new Error(error.message)
     setLoads(prev => prev.map(l => l.id === id ? data : l))
     return data
