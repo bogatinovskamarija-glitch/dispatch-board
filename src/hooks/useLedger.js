@@ -19,6 +19,7 @@ export const EXPENSE_CONFIG = {
   // Reimbursables — addition only (extra pay owed to driver)
   detention:    { label: 'Detention',    deduction: false, addition: true,  color: '#059669', bg: '#ECFDF5', group: 'reimbursable' },
   lumper:       { label: 'Lumper',       deduction: false, addition: true,  color: '#059669', bg: '#ECFDF5', group: 'reimbursable' },
+  redelivery:   { label: 'Redelivery',   deduction: false, addition: true,  color: '#059669', bg: '#ECFDF5', group: 'reimbursable' },
   bonus:        { label: 'Bonus',        deduction: false, addition: true,  color: '#059669', bg: '#ECFDF5', group: 'reimbursable' },
   tonu:         { label: 'TONU',         deduction: false, addition: true,  color: '#7C3AED', bg: '#F5F3FF', group: 'reimbursable' },
 }
@@ -26,7 +27,7 @@ export const EXPENSE_CONFIG = {
 export const EXPENSE_GROUPS = [
   { label: 'Advances — Deduction only',          types: ['cash_advance', 'zelle'] },
   { label: 'Expenses — Deducted + Reimbursed',   types: ['parking', 'washout', 'fuel', 'ifta', 'maintenance', 'tolls', 'other'] },
-  { label: 'Reimbursables — Addition only',       types: ['detention', 'lumper', 'bonus', 'tonu'] },
+  { label: 'Reimbursables — Addition only',       types: ['detention', 'lumper', 'washout', 'redelivery', 'bonus', 'tonu'] },
 ]
 
 // ── Hooks ────────────────────────────────────────────────────────────────
