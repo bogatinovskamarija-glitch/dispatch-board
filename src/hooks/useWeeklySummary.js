@@ -70,6 +70,19 @@ export function useWeeklySummary(startDate, endDate, company) {
       // The ONLY exclusions are the ghost/truck-marker entries that are not real
       // loads: 'home', 'broken', 'no_driver'. These are added to show truck
       // availability on the board, not actual revenue loads.
+      // RULE — pickup_date is the source of truth:
+      //
+      // Condition A: load HAS a pickup_date in the Thu–Wed window
+      //   → Always count, even if status is still 'prebooked'.
+      //     A pickup_date proves the driver physically picked up the load.
+      //
+      // Condition B: load has NO pickup_date, dispatch date is in range,
+      //              AND status is NOT 'prebooked'
+      //   → Count it — dispatcher entered dates but forgot pickup_date.
+      //     Active/completed status confirms it actually ran.
+      //
+      // Prebooked + no pickup_date = future booking, not yet executed → EXCLUDED.
+      // Ghost entries (home, broken, no_driver) excluded by outer .in() filter.
       const REAL_LOAD_STATUSES = ['covered', 'at_pickup', 'at_delivery', 'tonu', 'empty', 'prebooked']
       let q = supabase
         .from('loads')
@@ -77,7 +90,7 @@ export function useWeeklySummary(startDate, endDate, company) {
         .in('status', REAL_LOAD_STATUSES)
         .or(
           `and(pickup_date.gte.${startDate},pickup_date.lte.${endDate}),` +
-          `and(pickup_date.is.null,date.gte.${startDate},date.lte.${endDate})`
+          `and(pickup_date.is.null,status.neq.prebooked,date.gte.${startDate},date.lte.${endDate})`
         )
         .order('pickup_date', { ascending: true })
 
