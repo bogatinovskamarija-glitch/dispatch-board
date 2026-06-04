@@ -235,7 +235,9 @@ export default function FuelTab({ company }) {
         const rawLines = text.trim().split(/\r?\n/)
         const line1 = (rawLines[1] || '').toLowerCase()
         const { headers, rows } = parseCSV(text)
-        if (rawLines.length >= 3 && line1.includes('driver name') && line1.includes(',unit,')) {
+        // Check for EFS sub-header row — works for both quoted and unquoted CSVs
+        // "driver name" + "driver id" are unique to EFS format
+        if (rawLines.length >= 3 && line1.includes('driver name') && line1.includes('driver id')) {
           // Reconstruct as [groupLabels, subHeaders, ...data] for parseEFSRows
           setPreview({ rows: [headers, rows[0], ...rows.slice(1)], format: 'efs' })
         } else {
