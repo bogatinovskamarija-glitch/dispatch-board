@@ -1,8 +1,9 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useWeeklySummary, useWeekPaystubs, getThursdayWeek } from '../../hooks/useWeeklySummary'
 import { useDriverProfiles } from '../../hooks/useDriverProfiles'
 import { useLedgerEntries, EXPENSE_CONFIG } from '../../hooks/useLedger'
 import { useWeekMaintenanceTotal } from '../../hooks/useMaintenance'
+import { supabase } from '../../lib/supabase'
 
 const fmt    = n => '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2 })
 const fmtNum = n => Number(n).toLocaleString('en-US')
@@ -107,6 +108,27 @@ export default function WeeklySummaryTab({ company }) {
   const { entries: ledgerEntries } = useLedgerEntries(start, end, company)
   const maintenanceTotal           = useWeekMaintenanceTotal(start, end, company)
 
+  // Fuel policy amount per driver for the week (from fuel_transactions)
+  const [fuelByDriver, setFuelByDriver] = useState({})
+  useEffect(() => {
+    if (!start || !end) return
+    let q = supabase
+      .from('fuel_transactions')
+      .select('driver_name, amount')
+      .gte('transaction_date', start)
+      .lte('transaction_date', end)
+    if (company && company !== 'all') q = q.eq('company', company)
+    q.then(({ data }) => {
+      const map = {}
+      for (const t of (data ?? [])) {
+        const name = (t.driver_name || '').trim()
+        if (!name) continue
+        map[name.toLowerCase()] = (map[name.toLowerCase()] || 0) + (Number(t.amount) || 0)
+      }
+      setFuelByDriver(map)
+    })
+  }, [start, end, company])
+
   // Map driver name → total grand_total paid this week (a driver could have 2 paystubs)
   const paystubByDriver = useMemo(() => {
     const map = {}
@@ -152,9 +174,10 @@ export default function WeeklySummaryTab({ company }) {
         payroll:  r.hasProfile && !r.missingPay ? r.payroll : (r.hasProfile ? r.payroll : null),
         net:      r.hasProfile && !r.missingPay ? r.gross - r.payroll : null,
         expenses: driverExpenses[r.name] || 0,
+        fuel:     fuelByDriver[r.name.toLowerCase()] || 0,
       }))
       .sort((a, b) => b.gross - a.gross)
-  }, [loads, profiles, driverExpenses])
+  }, [loads, profiles, driverExpenses, fuelByDriver])
 
   // ── Top-line metrics ──────────────────────────────────────────────────────
   const totalRevenue   = loads.reduce((s, l) => s + (Number(l.price) || 0), 0)
@@ -300,7 +323,7 @@ export default function WeeklySummaryTab({ company }) {
                     <th style={{ textAlign: 'right' }}>Expenses</th>
                     <th style={{ textAlign: 'right' }}>Actual Payroll</th>
                     <th style={{ textAlign: 'right' }}>Net After Payroll</th>
-                    <th style={{ textAlign: 'right' }}>Est. Net</th>
+                    <th style={{ textAlign: 'right' }}>Fuel Cost</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -324,8 +347,8 @@ export default function WeeklySummaryTab({ company }) {
                         <td style={{ textAlign: 'right', fontWeight: 700, color: actual != null ? '#059669' : '#9CA3AF' }}>
                           {actual != null ? fmt(r.gross - actual) : '—'}
                         </td>
-                        <td style={{ textAlign: 'right', fontWeight: 700, color: r.net == null ? '#9CA3AF' : r.net >= 0 ? '#111827' : '#DC2626' }}>
-                          {r.net != null ? fmt(r.net) : '—'}
+                        <td style={{ textAlign: 'right', fontWeight: 700, color: r.fuel > 0 ? '#DC2626' : '#9CA3AF' }}>
+                          {r.fuel > 0 ? fmt(r.fuel) : '—'}
                         </td>
                       </tr>
                     )
@@ -350,8 +373,8 @@ export default function WeeklySummaryTab({ company }) {
                         ? fmt(totalRevenue - Object.values(paystubByDriver).reduce((s, v) => s + v, 0))
                         : '—'}
                     </td>
-                    <td style={{ textAlign: 'right', fontWeight: 800, color: '#F59E0B' }}>
-                      {knownPayroll ? fmt(totalRevenue - totalPayroll) : '—'}
+                    <td style={{ textAlign: 'right', fontWeight: 800, color: '#DC2626' }}>
+                      {driverRows.some(r => r.fuel > 0) ? fmt(driverRows.reduce((s,r) => s + r.fuel, 0)) : '—'}
                     </td>
                   </tr>
                 </tfoot>
