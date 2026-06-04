@@ -99,7 +99,8 @@ function PayrollChart({ rows }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function WeeklySummaryTab({ company }) {
-  const [anchor, setAnchor] = useState(() => getThursdayWeek().start)
+  const [anchor,          setAnchor]          = useState(() => getThursdayWeek().start)
+  const [expandedDriver,  setExpandedDriver]  = useState(null)
   const { start, end } = getThursdayWeek(anchor)
 
   const { loads, loading }        = useWeeklySummary(start, end, company)
@@ -330,8 +331,17 @@ export default function WeeklySummaryTab({ company }) {
                   {driverRows.map(r => {
                     const actual = paystubByDriver[r.name]
                     return (
-                      <tr key={r.name}>
-                        <td><strong>{r.name}</strong></td>
+                      <>
+                      <tr key={r.name}
+                        style={{ cursor: 'pointer' }}
+                        onClick={() => setExpandedDriver(prev => prev === r.name ? null : r.name)}
+                      >
+                        <td>
+                          <strong>{r.name}</strong>
+                          <span style={{ marginLeft: 6, fontSize: 11, color: '#9CA3AF' }}>
+                            {expandedDriver === r.name ? '▾' : '▸'}
+                          </span>
+                        </td>
                         <td style={{ textAlign: 'center' }}>{r.loads.length}</td>
                         <td style={{ textAlign: 'right', color: '#8B5CF6', fontWeight: 600 }}>{r.miles > 0 ? fmtNum(r.miles) : '—'}</td>
                         <td style={{ textAlign: 'right', fontWeight: 600, color: '#059669' }}>{fmt(r.gross)}</td>
@@ -351,6 +361,47 @@ export default function WeeklySummaryTab({ company }) {
                           {r.fuel > 0 ? fmt(r.fuel) : '—'}
                         </td>
                       </tr>
+                      {expandedDriver === r.name && (
+                        <tr key={r.name + '_loads'}>
+                          <td colSpan={9} style={{ padding: 0, background: '#F9FAFB' }}>
+                            <table style={{ width: '100%', fontSize: 11, borderCollapse: 'collapse' }}>
+                              <thead>
+                                <tr style={{ background: '#F3F4F6' }}>
+                                  <th style={{ padding: '4px 12px', textAlign: 'left', color: '#6B7280' }}>Load #</th>
+                                  <th style={{ padding: '4px 8px', color: '#6B7280' }}>Status</th>
+                                  <th style={{ padding: '4px 8px', color: '#6B7280' }}>Pickup Date</th>
+                                  <th style={{ padding: '4px 8px', color: '#6B7280' }}>Dispatch Date</th>
+                                  <th style={{ padding: '4px 8px', color: '#6B7280' }}>Route</th>
+                                  <th style={{ padding: '4px 8px', textAlign: 'right', color: '#6B7280' }}>Miles</th>
+                                  <th style={{ padding: '4px 8px', textAlign: 'right', color: '#6B7280' }}>Revenue</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {r.loads.map(l => (
+                                  <tr key={l.id} style={{ borderTop: '1px solid #E5E7EB', background: !l.pickup_date ? '#FFFBEB' : undefined }}>
+                                    <td style={{ padding: '4px 12px', fontWeight: 600 }}>{l.load_number || '—'}</td>
+                                    <td style={{ padding: '4px 8px' }}>
+                                      <span style={{ fontSize: 10, padding: '1px 5px', borderRadius: 4, background: '#E5E7EB', color: '#374151' }}>{l.status}</span>
+                                    </td>
+                                    <td style={{ padding: '4px 8px', color: l.pickup_date ? '#111827' : '#DC2626', fontWeight: l.pickup_date ? 400 : 600 }}>
+                                      {l.pickup_date || '⚠ no pickup date'}
+                                    </td>
+                                    <td style={{ padding: '4px 8px', color: '#9CA3AF' }}>{l.date || '—'}</td>
+                                    <td style={{ padding: '4px 8px', color: '#374151' }}>
+                                      {l.pickup_location && l.delivery_location
+                                        ? `${l.pickup_location.split(',')[0]} → ${l.delivery_location.split(',')[0]}`
+                                        : '—'}
+                                    </td>
+                                    <td style={{ padding: '4px 8px', textAlign: 'right', color: '#8B5CF6' }}>{l.total_miles || '—'}</td>
+                                    <td style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 600, color: '#059669' }}>{l.price ? fmt(l.price) : '—'}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </td>
+                        </tr>
+                      )}
+                      </>
                     )
                   })}
                 </tbody>
