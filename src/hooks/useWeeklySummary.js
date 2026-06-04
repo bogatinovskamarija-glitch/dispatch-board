@@ -58,22 +58,23 @@ export function useWeeklySummary(startDate, endDate, company) {
 
     async function fetch() {
       // ── Which loads count toward this week's revenue / miles? ───────────────
-      // Rule: a load is "this week's" when its pickup date (or dispatch date if
-      // pickup was not entered) falls within the Thu–Wed accounting window.
+      // Rule: the DATE determines which week a load belongs to — not the status.
+      // A load is in this week if its pickup_date falls within the Thu–Wed window.
+      // If pickup_date wasn't entered (dispatcher forgot), fall back to dispatch
+      // date (the `date` column).
       //
-      // IMPORTANT: 'prebooked' is intentionally excluded. A pre-booked load has
-      // not been picked up yet — it has no revenue, no real miles, and no driver
-      // pay. Including it inflates every metric. It will appear in the correct
-      // week's summary once the dispatcher marks it covered/at_pickup and enters
-      // an actual pickup date.
+      // Status is intentionally NOT used to filter loads — dispatchers sometimes
+      // forget to update status (e.g. still says prebooked when it's actually
+      // covered). The dates are always reliable; status is secondary.
       //
-      // 'empty' IS included — an empty repositioning run has real miles and can
-      // affect driver pay even though price = 0.
-      const EXECUTED_STATUSES = ['covered', 'at_pickup', 'at_delivery', 'tonu', 'empty']
+      // The ONLY exclusions are the ghost/truck-marker entries that are not real
+      // loads: 'home', 'broken', 'no_driver'. These are added to show truck
+      // availability on the board, not actual revenue loads.
+      const REAL_LOAD_STATUSES = ['covered', 'at_pickup', 'at_delivery', 'tonu', 'empty', 'prebooked']
       let q = supabase
         .from('loads')
         .select('id, load_number, company, price, status, date, pickup_date, delivery_date, pickup_location, delivery_location, driver_name, truck_number, invoiced_at, broker, total_miles, empty_miles')
-        .in('status', EXECUTED_STATUSES)
+        .in('status', REAL_LOAD_STATUSES)
         .or(
           `and(pickup_date.gte.${startDate},pickup_date.lte.${endDate}),` +
           `and(pickup_date.is.null,date.gte.${startDate},date.lte.${endDate})`
