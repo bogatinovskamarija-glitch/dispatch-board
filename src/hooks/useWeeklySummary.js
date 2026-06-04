@@ -57,18 +57,20 @@ export function useWeeklySummary(startDate, endDate, company) {
     setLoading(true)
 
     async function fetch() {
-      // A load "belongs" to this week when its pickup date (or dispatch date if no
-      // pickup date is set) falls within the Thursday–Wednesday window.
-      // This prevents old open loads with no delivery_date from appearing in every week.
-      // Only include revenue-generating statuses — exclude home/broken/no_driver
-      // ghost entries that have no revenue and would inflate load counts
+      // A load "belongs" to this accounting week when its PICKUP DATE falls within
+      // the Thursday–Wednesday window (startDate–endDate).
+      // We do NOT fall back to dispatch date for loads with no pickup_date — a load
+      // with no pickup_date hasn't been picked up yet and hasn't generated revenue.
+      // Prebooked loads are still shown so dispatchers can see the full picture,
+      // but they need a pickup_date entered to count toward miles/revenue.
       const REVENUE_STATUSES = ['covered','at_pickup','at_delivery','tonu','empty','prebooked']
       let q = supabase
         .from('loads')
         .select('id, load_number, company, price, status, date, pickup_date, delivery_date, pickup_location, delivery_location, driver_name, truck_number, invoiced_at, broker, total_miles, empty_miles')
         .in('status', REVENUE_STATUSES)
-        .or(`and(pickup_date.gte.${startDate},pickup_date.lte.${endDate}),and(pickup_date.is.null,date.gte.${startDate},date.lte.${endDate})`)
-        .order('date', { ascending: true })
+        .gte('pickup_date', startDate)
+        .lte('pickup_date', endDate)
+        .order('pickup_date', { ascending: true })
 
       if (company && company !== 'all') q = q.eq('company', company)
 
