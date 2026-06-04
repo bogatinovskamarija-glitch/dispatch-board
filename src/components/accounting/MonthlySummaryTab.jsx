@@ -19,7 +19,7 @@ const C = {
 }
 
 const MONTHLY_SESSION_KEY = 'monthly_unlocked'
-const MONTHLY_PASSWORD    = import.meta.env.VITE_MONTHLY_PASSWORD || 'carat2026'
+const MONTHLY_PASSWORD    = import.meta.env.VITE_MONTHLY_PASSWORD || '08192021'
 
 function formatRange(start, end) {
   const o = { month: 'short', day: 'numeric' }
