@@ -406,7 +406,9 @@ export default function WeeklySummaryTab({ company }) {
               <thead>
                 <tr>
                   <th>Load #</th>
-                  <th>Date</th>
+                  <th>Status</th>
+                  <th>Pickup Date</th>
+                  <th>Dispatch Date</th>
                   <th>Driver</th>
                   <th>Truck</th>
                   <th>Route</th>
@@ -417,9 +419,17 @@ export default function WeeklySummaryTab({ company }) {
               </thead>
               <tbody>
                 {loads.map(l => (
-                  <tr key={l.id}>
+                  <tr key={l.id} style={{ background: !l.pickup_date ? '#FFFBEB' : undefined }}>
                     <td>{l.load_number || '—'}</td>
-                    <td>{l.pickup_date || l.date || '—'}</td>
+                    <td>
+                      <span style={{ fontSize: 11, padding: '1px 6px', borderRadius: 6, background: '#F3F4F6', color: '#374151', fontWeight: 600 }}>
+                        {l.status}
+                      </span>
+                    </td>
+                    <td style={{ color: l.pickup_date ? '#111827' : '#DC2626', fontWeight: l.pickup_date ? 400 : 700 }}>
+                      {l.pickup_date || '⚠ missing'}
+                    </td>
+                    <td style={{ color: '#9CA3AF', fontSize: 12 }}>{l.date || '—'}</td>
                     <td>{l.driver_name || '—'}</td>
                     <td>{l.truck_number || '—'}</td>
                     <td className="acct-route">
