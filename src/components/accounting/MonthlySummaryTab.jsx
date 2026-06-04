@@ -108,26 +108,26 @@ function ModalCol({ title, state, onChange }) {
 }
 
 // ── Insurance edit modal ──────────────────────────────────────────────────────
-function InsuranceModal({ monthIdx, year, entries, onSave, onClose }) {
+function InsuranceModal({ monthIdx, year, getEntry, onSave, onClose }) {
   const month = monthIdx + 1
-  const ce = entries.find(e => e.company === 'carat'       && e.month === month)
-  const pe = entries.find(e => e.company === 'pro_freight' && e.month === month)
 
-  const [caratAmt,   setCaratAmt]   = useState(ce ? String(ce.amount) : '')
-  const [proAmt,     setProAmt]     = useState(pe ? String(pe.amount) : '')
-  const [caratNotes, setCaratNotes] = useState(ce?.notes ?? '')
-  const [proNotes,   setProNotes]   = useState(pe?.notes ?? '')
-  const [saving,     setSaving]     = useState(false)
-  const [err,        setErr]        = useState('')
+  const initAmt   = (company, type) => { const e = getEntry(company, month, type); return e ? String(e.amount) : '' }
+  const initNotes = (company, type) => getEntry(company, month, type)?.notes ?? ''
+
+  const [caratLiabAmt,   setCaratLiabAmt]   = useState(() => initAmt('carat', 'liability'))
+  const [caratLiabNotes, setCaratLiabNotes] = useState(() => initNotes('carat', 'liability'))
+  const [caratCargoAmt,  setCaratCargoAmt]  = useState(() => initAmt('carat', 'cargo'))
+  const [caratCargoNotes,setCaratCargoNotes]= useState(() => initNotes('carat', 'cargo'))
+  const [proAmt,         setProAmt]         = useState(() => initAmt('pro_freight', 'liability'))
+  const [proNotes,       setProNotes]       = useState(() => initNotes('pro_freight', 'liability'))
+  const [saving,         setSaving]         = useState(false)
+  const [err,            setErr]            = useState('')
 
   async function handleSave() {
     setSaving(true)
     setErr('')
     try {
-      await onSave(month, {
-        carat:       { amount: caratAmt, notes: caratNotes },
-        pro_freight: { amount: proAmt,   notes: proNotes   },
-      })
+      await onSave(month, caratLiabAmt, caratLiabNotes, caratCargoAmt, caratCargoNotes, proAmt, proNotes)
       onClose()
     } catch (e) {
       setErr(e.message)
@@ -135,36 +135,62 @@ function InsuranceModal({ monthIdx, year, entries, onSave, onClose }) {
     }
   }
 
+  const AmtField = ({ label, val, onChange, notes, onNotesChange }) => (
+    <div style={{ marginBottom: 14 }}>
+      <div style={{ fontSize: 11, fontWeight: 600, color: '#6B7280', marginBottom: 6 }}>{label}</div>
+      <div className="form-group" style={{ marginBottom: 4 }}>
+        <label style={{ fontSize: 11 }}>Amount ($)</label>
+        <input type="number" min="0" step="0.01" placeholder="0.00" value={val} onChange={e => onChange(e.target.value)} />
+      </div>
+      <div className="form-group" style={{ marginBottom: 0 }}>
+        <label style={{ fontSize: 11 }}>Notes (optional)</label>
+        <input placeholder="policy #, provider…" value={notes} onChange={e => onNotesChange(e.target.value)} />
+      </div>
+    </div>
+  )
+
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="modal" style={{ maxWidth: 480 }}>
+      <div className="modal" style={{ maxWidth: 560 }}>
         <div className="modal-header">
           <div className="modal-title">Insurance — {MONTHS_FULL[monthIdx]} {year}</div>
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
         <div className="modal-body">
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+
+            {/* Carat: liability + cargo */}
             <div>
-              <div style={{ fontWeight: 700, marginBottom: 10, color: '#374151', fontSize: 13 }}>Carat Expedited</div>
-              <div className="form-group">
-                <label style={{ fontSize: 12 }}>Amount ($)</label>
-                <input type="number" min="0" step="0.01" placeholder="0.00" value={caratAmt} onChange={e => setCaratAmt(e.target.value)} />
+              <div style={{ fontWeight: 700, marginBottom: 12, color: '#374151', fontSize: 13, borderBottom: '1px solid #E5E7EB', paddingBottom: 6 }}>
+                Carat Expedited
               </div>
-              <div className="form-group">
-                <label style={{ fontSize: 12 }}>Notes (optional)</label>
-                <input placeholder="e.g. policy #, provider" value={caratNotes} onChange={e => setCaratNotes(e.target.value)} />
-              </div>
+              <AmtField
+                label="Liability"
+                val={caratLiabAmt}   onChange={setCaratLiabAmt}
+                notes={caratLiabNotes} onNotesChange={setCaratLiabNotes}
+              />
+              <AmtField
+                label="Cargo"
+                val={caratCargoAmt}   onChange={setCaratCargoAmt}
+                notes={caratCargoNotes} onNotesChange={setCaratCargoNotes}
+              />
+              {(Number(caratLiabAmt)||0) + (Number(caratCargoAmt)||0) > 0 && (
+                <div style={{ fontSize: 11, color: '#6B7280', textAlign: 'right', marginTop: 4 }}>
+                  Total: <strong style={{ color: '#DC2626' }}>${((Number(caratLiabAmt)||0) + (Number(caratCargoAmt)||0)).toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
+                </div>
+              )}
             </div>
+
+            {/* Pro Freight: liability only */}
             <div>
-              <div style={{ fontWeight: 700, marginBottom: 10, color: '#374151', fontSize: 13 }}>Pro Freight</div>
-              <div className="form-group">
-                <label style={{ fontSize: 12 }}>Amount ($)</label>
-                <input type="number" min="0" step="0.01" placeholder="0.00" value={proAmt} onChange={e => setProAmt(e.target.value)} />
+              <div style={{ fontWeight: 700, marginBottom: 12, color: '#374151', fontSize: 13, borderBottom: '1px solid #E5E7EB', paddingBottom: 6 }}>
+                Pro Freight
               </div>
-              <div className="form-group">
-                <label style={{ fontSize: 12 }}>Notes (optional)</label>
-                <input placeholder="e.g. policy #, provider" value={proNotes} onChange={e => setProNotes(e.target.value)} />
-              </div>
+              <AmtField
+                label="Liability"
+                val={proAmt}   onChange={setProAmt}
+                notes={proNotes} onNotesChange={setProNotes}
+              />
             </div>
           </div>
           {err && <div style={{ color: '#DC2626', fontSize: 12, marginTop: 8 }}>Error: {err}</div>}
@@ -486,7 +512,7 @@ export default function MonthlySummaryTab({ company }) {
   const [editManMonth, setEditManMonth] = useState(null)
 
   const { months, loading }          = useMonthlyAccountingSummary(year, company)
-  const { entries: insEntries, getAmount, setAmount } = useInsurance(year)
+  const { entries: insEntries, getAmount, getEntry, setAmount } = useInsurance(year)
   const { entries: manEntries, getManual, getRawEntries, saveMonth } = useMonthlyManual(year)
 
   const monthsEnriched = useMemo(() =>
@@ -515,10 +541,11 @@ export default function MonthlySummaryTab({ company }) {
 
   const pct = (num, den) => den > 0 ? ((num / den) * 100).toFixed(1) + '% of gross' : '—'
 
-  async function handleSaveInsurance(month, data) {
+  async function handleSaveInsurance(month, caratLiabAmt, caratLiabNotes, caratCargoAmt, caratCargoNotes, proAmt, proNotes) {
     await Promise.all([
-      setAmount('carat',       month, data.carat.amount,       data.carat.notes),
-      setAmount('pro_freight', month, data.pro_freight.amount, data.pro_freight.notes),
+      setAmount('carat',       month, caratLiabAmt,  caratLiabNotes,  'liability'),
+      setAmount('carat',       month, caratCargoAmt, caratCargoNotes, 'cargo'),
+      setAmount('pro_freight', month, proAmt,        proNotes,        'liability'),
     ])
   }
 
@@ -652,7 +679,7 @@ export default function MonthlySummaryTab({ company }) {
         <InsuranceModal
           monthIdx={editInsMonth}
           year={year}
-          entries={insEntries}
+          getEntry={getEntry}
           onSave={handleSaveInsurance}
           onClose={() => setEditInsMonth(null)}
         />
