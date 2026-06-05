@@ -292,33 +292,168 @@ function IconBtn({ title, icon, onClick, active }) {
   )
 }
 
-// ── Bar chart ─────────────────────────────────────────────────────────────────
+// ── Print / PDF report ────────────────────────────────────────────────────────
+function printReport(year, monthsEnriched, totals, company) {
+  const companyLabel = company === 'all' ? 'All Companies' : company === 'carat' ? 'Carat Expedited' : 'Pro Freight'
+  const generated = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+
+  const rows = monthsEnriched.map((m, i) => {
+    const gross = m.gross + m.manual.gross
+    const payroll = m.payroll + m.manual.payroll
+    const fuel = m.fuel + m.manual.fuel
+    const maint = m.maintenance
+    const ins = m.insurance
+    const miles = m.miles + m.manual.miles
+    const expenses = payroll + fuel + maint + ins
+    const net = gross - expenses
+    const hasAny = gross > 0 || expenses > 0
+
+    const cell = (val, color) => val > 0 ? `<td style="color:${color};font-weight:600">${fmtFull(val)}</td>` : `<td style="color:#9CA3AF">—</td>`
+    const netColor = net >= 0 ? '#059669' : '#DC2626'
+
+    return `<tr style="${!hasAny ? 'color:#ccc' : ''}">
+      <td style="font-weight:700;color:#111">${MONTHS_FULL[i]}</td>
+      ${cell(gross,   '#059669')}
+      ${cell(payroll, '#2563EB')}
+      ${cell(fuel,    '#D97706')}
+      ${cell(maint,   '#6B7280')}
+      ${cell(ins,     '#DC2626')}
+      <td style="font-weight:700;color:${netColor}">${fmtFull(net)}</td>
+      <td style="color:#8B5CF6">${miles > 0 ? fmtMiles(miles) : '—'}</td>
+    </tr>`
+  }).join('')
+
+  const totalNet = totals.gross - totals.payroll - totals.fuel - totals.maintenance - totals.insurance
+  const netColor = totalNet >= 0 ? '#059669' : '#DC2626'
+
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Monthly Overview ${year} — ${companyLabel}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, Helvetica, sans-serif; font-size: 12px; color: #111827; padding: 32px 40px; }
+    header { margin-bottom: 24px; border-bottom: 2px solid #E5E7EB; padding-bottom: 16px; }
+    h1 { font-size: 20px; font-weight: 800; margin-bottom: 4px; }
+    .meta { font-size: 12px; color: #6B7280; }
+    table { width: 100%; border-collapse: collapse; margin-top: 4px; }
+    th { background: #F3F4F6; padding: 8px 10px; text-align: right; font-size: 11px; font-weight: 700; border-bottom: 2px solid #D1D5DB; white-space: nowrap; }
+    th:first-child { text-align: left; }
+    td { padding: 7px 10px; text-align: right; border-bottom: 1px solid #F3F4F6; font-size: 12px; }
+    td:first-child { text-align: left; }
+    .total-row td { background: #F3F4F6; font-weight: 800; font-size: 13px; border-top: 2px solid #D1D5DB; border-bottom: none; padding: 10px; }
+    .legend { display: flex; gap: 20px; margin-top: 20px; font-size: 11px; color: #6B7280; flex-wrap: wrap; }
+    .legend span { display: flex; align-items: center; gap: 5px; }
+    .dot { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+    @media print {
+      body { padding: 16px 20px; }
+      @page { margin: 1cm; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Annual Overview — ${year}</h1>
+    <div class="meta">${companyLabel} &nbsp;·&nbsp; Generated ${generated}</div>
+  </header>
+  <table>
+    <thead>
+      <tr>
+        <th>Month</th>
+        <th style="color:#059669">Gross</th>
+        <th style="color:#2563EB">Payroll</th>
+        <th style="color:#D97706">Fuel</th>
+        <th style="color:#6B7280">Maintenance</th>
+        <th style="color:#DC2626">Insurance</th>
+        <th style="color:#059669">Operating Net</th>
+        <th style="color:#8B5CF6">Miles</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rows}
+      <tr class="total-row">
+        <td>Year Total</td>
+        <td style="color:#059669">${fmtFull(totals.gross)}</td>
+        <td style="color:#2563EB">${fmtFull(totals.payroll)}</td>
+        <td style="color:#D97706">${fmtFull(totals.fuel)}</td>
+        <td style="color:#6B7280">${fmtFull(totals.maintenance)}</td>
+        <td style="color:#DC2626">${fmtFull(totals.insurance)}</td>
+        <td style="color:${netColor}">${fmtFull(totalNet)}</td>
+        <td style="color:#8B5CF6">${fmtMiles(totals.miles)}</td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="legend">
+    <span><span class="dot" style="background:#059669"></span>Gross Revenue</span>
+    <span><span class="dot" style="background:#2563EB"></span>Payroll</span>
+    <span><span class="dot" style="background:#D97706"></span>Fuel</span>
+    <span><span class="dot" style="background:#6B7280"></span>Maintenance</span>
+    <span><span class="dot" style="background:#DC2626"></span>Insurance</span>
+    <span><span class="dot" style="background:#059669"></span>Operating Net = Gross − Payroll − Fuel − Maint − Insurance</span>
+  </div>
+</body>
+</html>`
+
+  const w = window.open('', '_blank')
+  w.document.write(html)
+  w.document.close()
+  w.focus()
+  setTimeout(() => w.print(), 400)
+}
+
+// ── Expenses + Net chart ──────────────────────────────────────────────────────
+// Left bar per month = stacked expenses (payroll, fuel, maintenance, insurance)
+// Right bar = Operating Net (green if positive, red if negative)
 function MonthlyChart({ months }) {
-  const W = 920, LEFT = 72, RIGHT = 20, TOP = 28, BOT = 30, PLOT_H = 200
+  const W = 920, LEFT = 72, RIGHT = 20, TOP = 32, BOT = 30, PLOT_H = 210
   const PLOT_W = W - LEFT - RIGHT
   const SVG_H  = TOP + PLOT_H + BOT
   const MONTH_W = PLOT_W / 12
-  const BAR_W = 10, GAP = 2
-  const GROUP_W = 5 * BAR_W + 4 * GAP
+
+  const EXPENSE_W = 20, NET_W = 14, GAP = 5
+  const GROUP_W = EXPENSE_W + GAP + NET_W
   const GROUP_X = (MONTH_W - GROUP_W) / 2
-  const maxVal = Math.max(...months.map(m => m.gross), 1)
+
+  // Per-month computed values
+  const data = months.map(m => {
+    const payroll = m.payroll + (m.manual?.payroll || 0)
+    const fuel    = m.fuel    + (m.manual?.fuel    || 0)
+    const maint   = m.maintenance
+    const ins     = m.insurance
+    const gross   = m.gross   + (m.manual?.gross   || 0)
+    const expenses = payroll + fuel + maint + ins
+    const net = gross - expenses
+    return { payroll, fuel, maint, ins, expenses, net }
+  })
+
+  const maxVal = Math.max(
+    ...data.map(d => d.expenses),
+    ...data.map(d => Math.abs(d.net)),
+    1
+  )
   const gridPcts = [0, 0.25, 0.5, 0.75, 1]
-  const bars = [
-    { key: 'gross',       color: C.gross,       label: 'Gross' },
-    { key: 'payroll',     color: C.payroll,     label: 'Payroll' },
-    { key: 'fuel',        color: C.fuel,        label: 'Fuel' },
-    { key: 'maintenance', color: C.maintenance, label: 'Maintenance' },
-    { key: 'insurance',   color: C.insurance,   label: 'Insurance' },
+
+  // Legend items
+  const legend = [
+    { color: C.payroll,     label: 'Payroll' },
+    { color: C.fuel,        label: 'Fuel' },
+    { color: C.maintenance, label: 'Maintenance' },
+    { color: C.insurance,   label: 'Insurance' },
+    { color: C.gross,       label: 'Operating Net' },
   ]
 
   return (
     <svg width="100%" viewBox={`0 0 ${W} ${SVG_H}`} style={{ fontFamily: 'Arial, sans-serif', display: 'block' }}>
-      {bars.map((b, i) => (
-        <g key={b.key} transform={`translate(${LEFT + i * 138}, 6)`}>
-          <rect width={10} height={10} fill={b.color} rx={2} y={2} />
-          <text x={14} y={11} fontSize={10} fill="#374151">{b.label}</text>
+      {/* Legend */}
+      {legend.map((l, i) => (
+        <g key={l.label} transform={`translate(${LEFT + i * 142}, 8)`}>
+          <rect width={10} height={10} fill={l.color} rx={2} y={2} />
+          <text x={14} y={11} fontSize={10} fill="#374151">{l.label}</text>
         </g>
       ))}
+
+      {/* Grid lines */}
       {gridPcts.map((f, i) => {
         const y = TOP + PLOT_H - f * PLOT_H
         return (
@@ -328,21 +463,64 @@ function MonthlyChart({ months }) {
           </g>
         )
       })}
-      {months.map((m, mi) => {
+
+      {/* Bars per month */}
+      {data.map((d, mi) => {
         const ox = LEFT + mi * MONTH_W + GROUP_X
+        const baseline = TOP + PLOT_H
+
+        // Stacked expense bar segments (bottom to top: payroll, fuel, maint, ins)
+        const segments = [
+          { val: d.payroll, color: C.payroll },
+          { val: d.fuel,    color: C.fuel },
+          { val: d.maint,   color: C.maintenance },
+          { val: d.ins,     color: C.insurance },
+        ]
+        let stackY = baseline
+        const expBars = segments.map((seg, si) => {
+          if (seg.val <= 0) return null
+          const bh = Math.max((seg.val / maxVal) * PLOT_H, 1)
+          stackY -= bh
+          return <rect key={si} x={ox} y={stackY} width={EXPENSE_W} height={bh} fill={seg.color} />
+        }).filter(Boolean).reverse() // draw bottom-up
+
+        // Net bar
+        const netAbs = Math.abs(d.net)
+        const netBH  = netAbs > 0 ? Math.max((netAbs / maxVal) * PLOT_H, 2) : 0
+        const netColor = d.net >= 0 ? C.gross : '#EF4444'
+        const netY = d.net >= 0 ? baseline - netBH : baseline
+        const netBar = netBH > 0
+          ? <rect x={ox + EXPENSE_W + GAP} y={netY} width={NET_W} height={netBH} fill={netColor} rx={2} />
+          : null
+
         return (
           <g key={mi}>
-            {bars.map((b, bi) => {
-              const val = m[b.key] || 0
-              const bh  = val > 0 ? Math.max((val / maxVal) * PLOT_H, 2) : 0
-              return <rect key={b.key} x={ox + bi * (BAR_W + GAP)} y={TOP + PLOT_H - bh} width={BAR_W} height={bh} fill={b.color} rx={2} />
-            })}
-            <text x={LEFT + mi * MONTH_W + MONTH_W / 2} y={TOP + PLOT_H + 16} textAnchor="middle" fontSize={10} fill="#374151" fontWeight="600">
+            {/* Redraw stacked segments in correct order */}
+            {(() => {
+              let y = baseline
+              return segments.map((seg, si) => {
+                if (seg.val <= 0) return null
+                const bh = Math.max((seg.val / maxVal) * PLOT_H, 1)
+                y -= bh
+                return <rect key={si} x={ox} y={y} width={EXPENSE_W} height={bh} fill={seg.color} />
+              })
+            })()}
+
+            {netBar}
+
+            {/* Month label */}
+            <text
+              x={LEFT + mi * MONTH_W + MONTH_W / 2}
+              y={TOP + PLOT_H + 16}
+              textAnchor="middle" fontSize={10} fill="#374151" fontWeight="600"
+            >
               {MONTHS[mi]}
             </text>
           </g>
         )
       })}
+
+      {/* Axes */}
       <line x1={LEFT} y1={TOP}          x2={LEFT}          y2={TOP + PLOT_H} stroke="#D1D5DB" strokeWidth={1} />
       <line x1={LEFT} y1={TOP + PLOT_H} x2={LEFT + PLOT_W} y2={TOP + PLOT_H} stroke="#D1D5DB" strokeWidth={1} />
     </svg>
@@ -562,7 +740,14 @@ export default function MonthlySummaryTab({ company }) {
         <button className="btn btn-ghost" onClick={() => { setYear(y => y + 1); setExpanded(null) }} disabled={year >= currentYear}>{year + 1} ›</button>
         <button
           className="btn btn-ghost btn-xs"
-          style={{ marginLeft: 12, color: '#9CA3AF', fontSize: 11 }}
+          style={{ marginLeft: 12, fontSize: 12 }}
+          onClick={() => printReport(year, monthsEnriched, totals, company)}
+        >
+          📄 Print / PDF
+        </button>
+        <button
+          className="btn btn-ghost btn-xs"
+          style={{ marginLeft: 8, color: '#9CA3AF', fontSize: 11 }}
           onClick={() => { sessionStorage.removeItem(MONTHLY_SESSION_KEY); setUnlocked(false) }}
         >
           🔒 Lock
