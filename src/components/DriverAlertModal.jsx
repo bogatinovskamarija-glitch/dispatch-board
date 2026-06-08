@@ -130,13 +130,13 @@ export default function DriverAlertModal({ driver, existing, onSave, onClear, on
         <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', margin: '14px 0 8px' }}>
           Expires
         </label>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'flex-start' }}>
           {[
             { value: 'none',  label: 'Until cleared manually' },
             { value: 'today', label: 'End of today' },
             { value: 'date',  label: 'Pick a date' },
           ].map(opt => (
-            <div key={opt.value} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div key={opt.value} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <input
                 type="radio"
                 name="expiry"
