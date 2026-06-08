@@ -1,6 +1,8 @@
 import { Fragment, useState } from 'react'
 import StatusBadge from './StatusBadge'
 import SelectCell from './SelectCell'
+import { useDriverNotes } from '../hooks/useDriverNotes'
+import DriverAlertModal from './DriverAlertModal'
 
 const fmt = n => n ? '$' + Number(n).toLocaleString('en-US') : '—'
 const dpm = (price, miles) =>
@@ -20,13 +22,51 @@ const STATUS_ROUTE_BG = {
 export default function DayView({ loads, loading, trucks, trailers, drivers, fleet = [], statusFilter, onEdit, onDelete, onDirectSave, onDriverClick, onTruckClick, onTrailerClick }) {
   // Tracks which multi-load truck groups are manually COLLAPSED.
   // Empty set = all groups open by default so dispatch sees everything on load.
-  const [collapsed, setCollapsed] = useState(new Set())
+  const [collapsed,   setCollapsed]   = useState(new Set())
+  const [alertDriver, setAlertDriver] = useState(null)  // { name, clickupId, company } | null
+
+  const { getNote, saveNote, clearNote } = useDriverNotes()
+
   function toggleExpand(key) {
     setCollapsed(prev => {
       const next = new Set(prev)
       next.has(key) ? next.delete(key) : next.add(key)
       return next
     })
+  }
+
+  function formatExpiry(expiresAt) {
+    const today = new Date().toISOString().split('T')[0]
+    if (expiresAt === today) return 'expires today'
+    const d = new Date(expiresAt + 'T00:00:00')
+    return 'exp ' + d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  }
+
+  function AlertBadge({ name, clickupId, company }) {
+    const dn = getNote(name)
+    return (
+      <button
+        onClick={e => { e.stopPropagation(); setAlertDriver({ name, clickupId, company }) }}
+        style={{
+          display: 'block', width: '100%', marginTop: 3, textAlign: 'left',
+          cursor: 'pointer',
+          background: dn ? '#FEF2F2' : 'transparent',
+          border: dn ? '1px solid #FECACA' : '1px dashed #FCA5A5',
+          borderRadius: 4, padding: '2px 6px',
+          fontSize: 10, color: dn ? '#B91C1C' : '#FCA5A5', lineHeight: 1.4,
+        }}
+        title={dn ? 'Edit safety alert' : 'Add safety alert'}
+      >
+        {dn ? (
+          <>
+            <span>⚠ {dn.note.length > 38 ? dn.note.slice(0, 38) + '…' : dn.note}</span>
+            {dn.expires_at && <div style={{ fontSize: 9, marginTop: 1 }}>{formatExpiry(dn.expires_at)}</div>}
+          </>
+        ) : (
+          <span>+ alert</span>
+        )}
+      </button>
+    )
   }
 
   const truckOpts = trucks.map(e => ({
@@ -175,6 +215,9 @@ export default function DayView({ loads, loading, trucks, trailers, drivers, fle
               <span style={{ color: '#9CA3AF', fontStyle: 'italic', fontSize: 12 }}>No driver</span>
             )}
             {entry.phone && <div className="driver-phone">{entry.phone}</div>}
+            {entry.driver_name && (
+              <AlertBadge name={entry.driver_name} clickupId={entry.driver_clickup_id} company={entry.company} />
+            )}
           </div>
         </td>
 
@@ -292,6 +335,9 @@ export default function DayView({ loads, loading, trucks, trailers, drivers, fle
               <span style={{ color: '#9CA3AF', fontStyle: 'italic', fontSize: 12 }}>No driver</span>
             )}
             {load.phone && <div className="driver-phone">{load.phone}</div>}
+            {load.driver_name && (
+              <AlertBadge name={load.driver_name} clickupId={load.driver_clickup_id} company={load.company} />
+            )}
           </div>
         </td>
 
@@ -473,6 +519,7 @@ export default function DayView({ loads, loading, trucks, trailers, drivers, fle
   }
 
   return (
+    <Fragment>
     <div className="table-wrap">
       <table>
         <thead>
@@ -488,7 +535,7 @@ export default function DayView({ loads, loading, trucks, trailers, drivers, fle
             <th>Miles</th>
             <th>Revenue</th>
             <th>$/Mile</th>
-            <th>Safety Notes</th>
+            <th>Load Notes</th>
             <th>Notes</th>
             <th></th>
           </tr>
@@ -518,5 +565,16 @@ export default function DayView({ loads, loading, trucks, trailers, drivers, fle
         </tbody>
       </table>
     </div>
+
+    {alertDriver && (
+      <DriverAlertModal
+        driver={alertDriver}
+        existing={getNote(alertDriver.name)}
+        onSave={saveNote}
+        onClear={clearNote}
+        onClose={() => setAlertDriver(null)}
+      />
+    )}
+    </Fragment>
   )
 }
