@@ -130,31 +130,32 @@ export default function DriverAlertModal({ driver, existing, onSave, onClear, on
         <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', margin: '14px 0 8px' }}>
           Expires
         </label>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {[
             { value: 'none',  label: 'Until cleared manually' },
             { value: 'today', label: 'End of today' },
             { value: 'date',  label: 'Pick a date' },
           ].map(opt => (
-            <label key={opt.value} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: '#111' }}>
+            <label key={opt.value} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: '#111', whiteSpace: 'nowrap' }}>
               <input
                 type="radio"
                 name="expiry"
                 value={opt.value}
                 checked={expiry === opt.value}
                 onChange={() => setExpiry(opt.value)}
-                style={{ accentColor: '#DC2626' }}
+                style={{ accentColor: '#DC2626', flexShrink: 0 }}
               />
-              {opt.label}
-              {opt.value === 'date' && expiry === 'date' && (
+              <span style={{ minWidth: 140 }}>{opt.label}</span>
+              {opt.value === 'date' && (
                 <input
                   type="date"
                   value={pickDate}
                   min={new Date().toISOString().split('T')[0]}
-                  onChange={e => setPickDate(e.target.value)}
+                  onChange={e => { setExpiry('date'); setPickDate(e.target.value) }}
                   style={{
-                    marginLeft: 6, padding: '2px 6px', border: '1px solid #D1D5DB',
-                    borderRadius: 4, fontSize: 12, outline: 'none',
+                    padding: '3px 8px', border: '1px solid #D1D5DB',
+                    borderRadius: 5, fontSize: 12, outline: 'none',
+                    opacity: expiry === 'date' ? 1 : 0.4,
                   }}
                 />
               )}
