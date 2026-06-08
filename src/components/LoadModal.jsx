@@ -445,10 +445,6 @@ export default function LoadModal({ load, date, drivers, trucks, trailers, onSav
               <div className="form-section-title">Notes</div>
               <div className="form-grid">
                 <div className="form-group">
-                  <label>Load Notes</label>
-                  <textarea placeholder="Notes specific to this load…" value={form.safety_notes} onChange={e => set('safety_notes', e.target.value)} />
-                </div>
-                <div className="form-group">
                   <label>Notes</label>
                   <textarea placeholder="General notes, updates…" value={form.notes} onChange={e => set('notes', e.target.value)} />
                 </div>
