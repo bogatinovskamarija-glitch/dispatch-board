@@ -130,22 +130,27 @@ export default function DriverAlertModal({ driver, existing, onSave, onClear, on
         <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', margin: '14px 0 8px' }}>
           Expires
         </label>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {[
             { value: 'none',  label: 'Until cleared manually' },
             { value: 'today', label: 'End of today' },
             { value: 'date',  label: 'Pick a date' },
           ].map(opt => (
-            <label key={opt.value} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: '#111', whiteSpace: 'nowrap' }}>
+            <div key={opt.value} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <input
                 type="radio"
                 name="expiry"
                 value={opt.value}
                 checked={expiry === opt.value}
                 onChange={() => setExpiry(opt.value)}
-                style={{ accentColor: '#DC2626', flexShrink: 0 }}
+                style={{ accentColor: '#DC2626', width: 16, height: 16, cursor: 'pointer', flexShrink: 0 }}
               />
-              <span style={{ minWidth: 140 }}>{opt.label}</span>
+              <span
+                onClick={() => setExpiry(opt.value)}
+                style={{ fontSize: 13, color: '#111', cursor: 'pointer', userSelect: 'none' }}
+              >
+                {opt.label}
+              </span>
               {opt.value === 'date' && (
                 <input
                   type="date"
@@ -155,11 +160,11 @@ export default function DriverAlertModal({ driver, existing, onSave, onClear, on
                   style={{
                     padding: '3px 8px', border: '1px solid #D1D5DB',
                     borderRadius: 5, fontSize: 12, outline: 'none',
-                    opacity: expiry === 'date' ? 1 : 0.4,
+                    opacity: expiry === 'date' ? 1 : 0.5,
                   }}
                 />
               )}
-            </label>
+            </div>
           ))}
         </div>
 
