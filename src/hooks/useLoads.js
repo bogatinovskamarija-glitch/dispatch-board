@@ -87,5 +87,5 @@ export function useWeekLoads(weekStart, weekEnd, company) {
     fetch()
   }, [weekStart, weekEnd, company])
 
-  return { loads, loading }
+  return { loads, loading, refetch: fetch }
 }

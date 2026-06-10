@@ -44,7 +44,7 @@ export default function App() {
   const weekEnd   = addDays(weekStart, 6)
 
   const { loads, loading, createLoad, updateLoad, deleteLoad } = useLoads(format(currentDay), company)
-  const { loads: weekLoads, loading: weekLoading } = useWeekLoads(format(weekStart), format(weekEnd), company)
+  const { loads: weekLoads, loading: weekLoading, refetch: refetchWeek } = useWeekLoads(format(weekStart), format(weekEnd), company)
   const { drivers } = useDrivers()
   const { trucks, trailers } = useEquipment()
   const { fleet, addFleetEntry, updateFleetEntry, removeFleetEntry } = useFleet()
@@ -52,11 +52,11 @@ export default function App() {
   async function handleSave(payload) {
     if (payload.id) await updateLoad(payload.id, payload)
     else await createLoad(payload)
+    refetchWeek()
   }
 
   async function handleDelete(id) {
     const load = loads.find(l => l.id === id)
-    // Protect invoiced / paystubbed loads — can't delete them, only archive
     const NON_REVENUE = ['home', 'empty', 'broken', 'no_driver']
     const isNonRevenue = NON_REVENUE.includes(load?.status)
     if (!isNonRevenue && (load?.invoiced_at || load?.paystub_id)) {
@@ -68,11 +68,12 @@ export default function App() {
     }
     if (!window.confirm('Delete this load? This cannot be undone.')) return
     await deleteLoad(id)
+    refetchWeek()
   }
 
-  // Quick status change from DayView ghost rows (At Home / No Driver / etc.)
   async function handleDirectSave(prefill) {
     await createLoad({ ...prefill, date: format(currentDay) })
+    refetchWeek()
   }
 
   function shiftDay(n)  { setDay(d => addDays(d, n)) }
@@ -116,20 +117,17 @@ export default function App() {
             <button onClick={() => isDay ? shiftDay(-1) : shiftWeek(-1)}>&#8249;</button>
             <span className="date-label">{dateLabel}</span>
             <button onClick={() => isDay ? shiftDay(1) : shiftWeek(1)}>&#8250;</button>
-            <label title="Jump to any date" style={{ display: 'flex', alignItems: 'center', marginLeft: 8, cursor: 'pointer' }}>
-              <span style={{
-                fontSize: 12, padding: '3px 10px', borderRadius: 6,
+            <input
+              type="date"
+              value={format(currentDay)}
+              onChange={e => { if (e.target.value) setDay(new Date(e.target.value + 'T00:00:00')) }}
+              title="Jump to any date"
+              style={{
+                marginLeft: 10, padding: '3px 8px', borderRadius: 6,
                 border: '1px solid #D1D5DB', background: '#F9FAFB',
-                color: '#374151', cursor: 'pointer', whiteSpace: 'nowrap',
-                userSelect: 'none',
-              }}>📅 Go to date</span>
-              <input
-                type="date"
-                value={format(currentDay)}
-                onChange={e => { if (e.target.value) setDay(new Date(e.target.value + 'T00:00:00')) }}
-                style={{ position: 'absolute', opacity: 0, pointerEvents: 'none', width: 1, height: 1 }}
-              />
-            </label>
+                fontSize: 12, color: '#374151', cursor: 'pointer', outline: 'none',
+              }}
+            />
           </div>
           <div className="view-toggle">
             <button className={isDay ? 'active' : ''} onClick={() => setView('day')}>Day</button>
