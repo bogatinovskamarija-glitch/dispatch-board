@@ -129,10 +129,15 @@ export default function WeekView({ loads, loading, weekStart, today, onLoadClick
   const todayColIndex = days.findIndex(d => isSameDay(d, today))
 
   // ── Build truck rows ──
-  // Driver names come from loads (historical truth) — fleet roster only provides
-  // truck structure (equipment type, trailer) and surfaces trucks with zero loads.
+  // Driver names come from loads (historical truth) — use the most recent load
+  // per truck so today's booking overrides an earlier load from the same week.
   const loadDriverMap = new Map()
-  for (const l of loads) {
+  const loadsSortedDesc = [...loads].sort((a, b) => {
+    const da = a.pickup_date || a.date || ''
+    const db = b.pickup_date || b.date || ''
+    return db < da ? -1 : db > da ? 1 : 0
+  })
+  for (const l of loadsSortedDesc) {
     if (l.truck_number && l.driver_name && !loadDriverMap.has(l.truck_number)) {
       loadDriverMap.set(l.truck_number, l.driver_name)
     }
