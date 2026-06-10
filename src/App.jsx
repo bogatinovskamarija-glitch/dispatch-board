@@ -114,7 +114,15 @@ export default function App() {
         <div className="topbar-center">
           <div className="date-nav">
             <button onClick={() => isDay ? shiftDay(-1) : shiftWeek(-1)}>&#8249;</button>
-            <span className="date-label">{dateLabel}</span>
+            <label style={{ position: 'relative', cursor: 'pointer' }} title="Jump to date">
+              <span className="date-label">{dateLabel}</span>
+              <input
+                type="date"
+                value={format(currentDay)}
+                onChange={e => { if (e.target.value) setDay(new Date(e.target.value + 'T00:00:00')) }}
+                style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', width: '100%' }}
+              />
+            </label>
             <button onClick={() => isDay ? shiftDay(1) : shiftWeek(1)}>&#8250;</button>
           </div>
           <div className="view-toggle">

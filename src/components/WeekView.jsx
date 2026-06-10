@@ -129,10 +129,23 @@ export default function WeekView({ loads, loading, weekStart, today, onLoadClick
   const todayColIndex = days.findIndex(d => isSameDay(d, today))
 
   // ── Build truck rows ──
+  // Driver names come from loads (historical truth) — fleet roster only provides
+  // truck structure (equipment type, trailer) and surfaces trucks with zero loads.
+  const loadDriverMap = new Map()
+  for (const l of loads) {
+    if (l.truck_number && l.driver_name && !loadDriverMap.has(l.truck_number)) {
+      loadDriverMap.set(l.truck_number, l.driver_name)
+    }
+  }
+
   let caratRows, proRows
   if (fleet.length > 0) {
-    caratRows = fleet.filter(e => e.company === 'carat')
-    proRows   = fleet.filter(e => e.company === 'pro_freight')
+    const applyHistoricalDriver = e => ({
+      ...e,
+      driver_name: loadDriverMap.get(e.truck_number) ?? e.driver_name,
+    })
+    caratRows = fleet.filter(e => e.company === 'carat').map(applyHistoricalDriver)
+    proRows   = fleet.filter(e => e.company === 'pro_freight').map(applyHistoricalDriver)
   } else {
     const truckMap = new Map()
     for (const l of loads) {
