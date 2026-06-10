@@ -114,16 +114,22 @@ export default function App() {
         <div className="topbar-center">
           <div className="date-nav">
             <button onClick={() => isDay ? shiftDay(-1) : shiftWeek(-1)}>&#8249;</button>
-            <label style={{ position: 'relative', cursor: 'pointer' }} title="Jump to date">
-              <span className="date-label">{dateLabel}</span>
+            <span className="date-label">{dateLabel}</span>
+            <button onClick={() => isDay ? shiftDay(1) : shiftWeek(1)}>&#8250;</button>
+            <label title="Jump to any date" style={{ display: 'flex', alignItems: 'center', marginLeft: 8, cursor: 'pointer' }}>
+              <span style={{
+                fontSize: 12, padding: '3px 10px', borderRadius: 6,
+                border: '1px solid #D1D5DB', background: '#F9FAFB',
+                color: '#374151', cursor: 'pointer', whiteSpace: 'nowrap',
+                userSelect: 'none',
+              }}>📅 Go to date</span>
               <input
                 type="date"
                 value={format(currentDay)}
                 onChange={e => { if (e.target.value) setDay(new Date(e.target.value + 'T00:00:00')) }}
-                style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', width: '100%' }}
+                style={{ position: 'absolute', opacity: 0, pointerEvents: 'none', width: 1, height: 1 }}
               />
             </label>
-            <button onClick={() => isDay ? shiftDay(1) : shiftWeek(1)}>&#8250;</button>
           </div>
           <div className="view-toggle">
             <button className={isDay ? 'active' : ''} onClick={() => setView('day')}>Day</button>
