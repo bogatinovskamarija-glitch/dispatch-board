@@ -48,8 +48,10 @@ export function useMonthlyAccountingSummary(year, company) {
         supabase
           .from('loads')
           .select('id,price,total_miles,pickup_date,date,company,status')
-          .gte('date', from)
-          .lte('date', to),
+          // Mirror the weekly hook: pickup_date is the source of truth;
+          // fall back to date only when pickup_date is null.
+          // Filtering by date alone misses pre-booked loads (entry date ≠ pickup date).
+          .or(`and(pickup_date.gte.${from},pickup_date.lte.${to}),and(pickup_date.is.null,date.gte.${from},date.lte.${to})`),
         supabase
           .from('paystubs')
           .select('id,grand_total,start_date,company')
