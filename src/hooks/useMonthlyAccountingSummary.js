@@ -84,7 +84,7 @@ export function useMonthlyAccountingSummary(year, company) {
   }, [year, company])
 
   const months = useMemo(() => {
-    const NON_REVENUE = new Set(['empty', 'home', 'broken', 'no_driver'])
+    const NON_REVENUE = new Set(['home', 'broken', 'no_driver'])
 
     const result = Array.from({ length: 12 }, () => ({
       gross: 0, payroll: 0, fuel: 0, maintenance: 0, miles: 0,
