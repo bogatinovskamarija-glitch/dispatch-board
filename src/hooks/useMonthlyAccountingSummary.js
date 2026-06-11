@@ -51,22 +51,27 @@ export function useMonthlyAccountingSummary(year, company) {
           // Mirror the weekly hook: pickup_date is the source of truth;
           // fall back to date only when pickup_date is null.
           // Filtering by date alone misses pre-booked loads (entry date ≠ pickup date).
-          .or(`and(pickup_date.gte.${from},pickup_date.lte.${to}),and(pickup_date.is.null,date.gte.${from},date.lte.${to})`),
+          .or(`and(pickup_date.gte.${from},pickup_date.lte.${to}),and(pickup_date.is.null,date.gte.${from},date.lte.${to})`)
+          // Override Supabase's default 1000-row cap — a full year can easily exceed it
+          .limit(10000),
         supabase
           .from('paystubs')
           .select('id,grand_total,start_date,company')
           .gte('start_date', from)
-          .lte('start_date', to),
+          .lte('start_date', to)
+          .limit(5000),
         supabase
           .from('fuel_transactions')
           .select('id,amount,transaction_date,company')
           .gte('transaction_date', from)
-          .lte('transaction_date', to),
+          .lte('transaction_date', to)
+          .limit(5000),
         supabase
           .from('maintenance_records')
           .select('id,amount,date,company')
           .gte('date', from)
-          .lte('date', to),
+          .lte('date', to)
+          .limit(5000),
       ])
       setLoads(loadsRes.data ?? [])
       setPaystubs(paystubsRes.data ?? [])
