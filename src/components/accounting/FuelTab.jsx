@@ -338,9 +338,12 @@ export default function FuelTab({ company }) {
       const g   = Number(t.gallons) || 0
       const cat = String(t.fuel_category || '').toUpperCase()
       map[key].gallons += g
-      map[key].retail  += Number(t.raw_row?.retail_amount ?? t.amount) || 0
-      map[key].amount  += Number(t.amount) || 0
-      map[key].rebate  += Number(t.rebate_amount) || 0
+      const tRetail = Number(t.raw_row?.retail_amount) || 0
+      const tPolicy = Number(t.amount) || 0
+      map[key].retail  += tRetail || tPolicy
+      map[key].amount  += tPolicy
+      // Rebate = policy discount (retail − policy) + any additional EFS rebate
+      map[key].rebate  += (tRetail > tPolicy ? tRetail - tPolicy : 0) + (Number(t.rebate_amount) || 0)
       map[key].count++
       map[key].txns.push(t)
       if (cat === 'ULSD')       map[key].diesel += g   // truck engine diesel → MPG
@@ -351,10 +354,13 @@ export default function FuelTab({ company }) {
     return Object.values(map).sort((a,b) => b.amount - a.amount).map(r => {
       // Try truck number first, fall back to driver name (handles driver swapping trucks)
       const miles = milesMap[r.truck] || milesByDriver[r.driver?.toLowerCase().trim()] || 0
-      // OO charge = policy + rebate per non-DEF transaction
+      // OO charge = retail price (pre-rebate) — OO doesn't benefit from the policy discount
       const ooCharge = r.txns
         .filter(t => !String(t.fuel_category || '').toUpperCase().includes('DEF'))
-        .reduce((s, t) => s + Number(t.amount) + Number(t.rebate_amount || 0), 0)
+        .reduce((s, t) => {
+          const retail = Number(t.raw_row?.retail_amount) || 0
+          return s + (retail > 0 ? retail : Number(t.amount) + Number(t.rebate_amount || 0))
+        }, 0)
       return {
         ...r,
         miles,
@@ -378,8 +384,9 @@ export default function FuelTab({ company }) {
     return r.txns
       .filter(t => !String(t.fuel_category || '').toUpperCase().includes('DEF'))
       .map(t => {
-        // OO is charged policy price + rebate (rebate belongs to company, not OO)
-        const charge = (Number(t.amount) + Number(t.rebate_amount || 0)).toFixed(2)
+        // OO is charged retail price — they don't benefit from the company's policy discount
+        const retail = Number(t.raw_row?.retail_amount) || 0
+        const charge = (retail > 0 ? retail : Number(t.amount) + Number(t.rebate_amount || 0)).toFixed(2)
         return [t.transaction_date, t.location, `${String(t.fuel_category || '').toUpperCase()}`, `${Number(t.gallons).toFixed(3)} gal`, `$${charge}`].filter(Boolean).join('  ')
       }).join('\n')
   }
