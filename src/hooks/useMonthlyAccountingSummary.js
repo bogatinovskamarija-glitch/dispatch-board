@@ -98,7 +98,10 @@ export function useMonthlyAccountingSummary(year, company) {
       if (NON_REVENUE.has(l.status)) continue
       const dateStr = l.pickup_date || l.date
       if (!dateStr) continue
-      const m = monthOf(dateStr)
+      // Use the Thursday week-start to assign loads to months so that weeks
+      // spanning a month boundary stay whole — matching the weekly summary view.
+      const weekStart = getWeekStart(dateStr)
+      const m = monthOf(weekStart)
       if (m == null) continue
       const price = Number(l.price) || 0
       const miles = Number(l.total_miles) || 0
