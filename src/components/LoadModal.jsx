@@ -124,7 +124,7 @@ export default function LoadModal({ load, date, drivers, trucks, trailers, onSav
         if (!form.price)                 missing.push(form.status === 'tonu' ? 'TONU Amount' : 'Price')
         if (!form.broker?.trim())        missing.push('Broker')
         if (form.status !== 'tonu') {
-          if (!form.total_miles)         missing.push('Total Miles')
+          if (!form.total_miles)         missing.push('Loaded Miles')
           if (form.empty_miles === '' || form.empty_miles === null || form.empty_miles === undefined)
                                          missing.push('Empty Miles')
         }
@@ -373,7 +373,7 @@ export default function LoadModal({ load, date, drivers, trucks, trailers, onSav
                   <>
                     <div className="form-group">
                       <label>
-                        Total Miles
+                        Loaded Miles
                         {ACTIVE_STATUSES.includes(form.status) && <span style={{ color: '#DC2626', marginLeft: 2 }}>*</span>}
                       </label>
                       <input type="number" placeholder="1377" value={form.total_miles} onChange={e => set('total_miles', e.target.value)} />
