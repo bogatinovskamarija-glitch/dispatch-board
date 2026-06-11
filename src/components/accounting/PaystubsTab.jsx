@@ -193,6 +193,11 @@ export default function PaystubsTab({ drivers, company }) {
         onlyNewLoads.forEach(l => {
           initPay[l.id] = initLoadPayEntry(l)
         })
+
+        // Also fetch any new pending ledger entries added since the paystub was generated
+        const ledger = await fetchDriverLedgerEntries(driverName)
+        setPendingLedger(ledger)
+        setSelectedLedgerIds(new Set(ledger.map(e => e.id)))
       } else {
         // ── Normal mode: full replace ──
         finalLoads = freshData
@@ -352,6 +357,8 @@ export default function PaystubsTab({ drivers, company }) {
       const baseIds    = new Set(editingBaseLoads.map(l => l.id))
       const newLoadIds = loads.filter(l => !baseIds.has(l.id)).map(l => l.id)
       await updatePaystub(editingPaystubId, paystubData, newLoadIds)
+      // Mark any newly staged ledger entries as applied to this paystub
+      await markLedgerEntriesApplied([...stagedLedgerIds], editingPaystubId)
       setEditingPaystubId(null)
       setEditingBaseLoads([])
     } else {
