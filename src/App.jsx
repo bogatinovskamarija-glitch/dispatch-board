@@ -227,6 +227,7 @@ export default function App() {
           drivers={drivers}
           trucks={trucks}
           trailers={trailers}
+          fleet={fleet}
           onSave={handleSave}
           onClose={() => setModal(null)}
         />

@@ -306,12 +306,14 @@ export default function DayView({ loads, loading, trucks, trailers, drivers, fle
               onChange={v => onEdit({ ...load, trailer_number: v })}
               placeholder="—"
             />
-            {load.trailer_number && (
+            {load.trailer_number ? (
               <button
                 className="equip-info-btn"
                 title="Trailer info"
                 onClick={() => { const t = trailers.find(t => t.trailerNumber === load.trailer_number); if (t) onTrailerClick(t) }}
               >ⓘ</button>
+            ) : !['home', 'broken', 'no_driver'].includes(load.status) && (
+              <span title="Trailer not assigned" style={{ color: '#D97706', fontSize: 13, fontWeight: 700, lineHeight: 1, cursor: 'default' }}>⚠</span>
             )}
           </div>
         </td>

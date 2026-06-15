@@ -36,7 +36,7 @@ function stopsFromLoad(load) {
   ]
 }
 
-export default function LoadModal({ load, date, drivers, trucks, trailers, onSave, onClose }) {
+export default function LoadModal({ load, date, drivers, trucks, trailers, fleet = [], onSave, onClose }) {
   const isEdit = Boolean(load?.id)
   const [form, setForm] = useState(BLANK)
   const [saving, setSaving] = useState(false)
@@ -96,6 +96,7 @@ export default function LoadModal({ load, date, drivers, trucks, trailers, onSav
   function onTruckChange(e) {
     const truckNum = e.target.value
     const truck = trucks.find(t => t.truckNumber === truckNum)
+    const fleetEntry = fleet.find(f => f.truck_number === truckNum)
     if (truck) {
       setForm(f => ({
         ...f,
@@ -103,6 +104,8 @@ export default function LoadModal({ load, date, drivers, trucks, trailers, onSav
         equipment_type: truck.type || f.equipment_type,
         is_tanker: truck.isTanker ?? f.is_tanker,
         company: truck.company || f.company,
+        // Auto-fill trailer from fleet roster; fall back to whatever is already entered
+        trailer_number: fleetEntry?.trailer_number || f.trailer_number || '',
       }))
     } else {
       set('truck_number', truckNum)
