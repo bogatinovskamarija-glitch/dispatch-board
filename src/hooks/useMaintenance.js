@@ -340,3 +340,28 @@ export function useWeekMaintenanceTotal(start, end, company = 'all') {
   return total
 }
 
+
+// ── Maintenance spend for a week broken down by unit_number ───────────────
+export function useWeekMaintenanceByUnit(start, end, company = 'all') {
+  const [byUnit, setByUnit] = useState({})
+  useEffect(() => {
+    async function load() {
+      let q = supabase
+        .from('maintenance_records')
+        .select('unit_number, amount')
+        .gte('date', start)
+        .lte('date', end)
+      if (company !== 'all') q = q.eq('company', company)
+      const { data } = await q
+      const map = {}
+      for (const r of (data ?? [])) {
+        const unit = (r.unit_number || '').trim()
+        if (!unit) continue
+        map[unit] = (map[unit] || 0) + (Number(r.amount) || 0)
+      }
+      setByUnit(map)
+    }
+    load()
+  }, [start, end, company])
+  return byUnit
+}

@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { useWeeklySummary, useWeekPaystubs, getThursdayWeek } from '../../hooks/useWeeklySummary'
 import { useDriverProfiles } from '../../hooks/useDriverProfiles'
 import { useLedgerEntries, EXPENSE_CONFIG } from '../../hooks/useLedger'
-import { useWeekMaintenanceTotal } from '../../hooks/useMaintenance'
+import { useWeekMaintenanceTotal, useWeekMaintenanceByUnit } from '../../hooks/useMaintenance'
 import { supabase } from '../../lib/supabase'
 
 const fmt    = n => '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2 })
@@ -25,71 +25,81 @@ function formatRange(start, end) {
 function estimatePay(load, profile) {
   if (!profile) return null
   if (profile.profile_type === 'owner_operator') {
-    // OO driver receives the load price MINUS the company's commission.
-    // commission_pct is what the company keeps, so the driver gets (1 - pct).
     const pct = (Number(profile.commission_pct) || 15) / 100
     return (Number(load.price) || 0) * (1 - pct)
   }
   if (profile.pay_type === 'per_mile' && profile.pay_rate && load.total_miles) {
     return Number(load.total_miles) * Number(profile.pay_rate)
   }
-  return null // flat rate — can't auto-calc
+  return null
 }
 
-// ── Simple SVG horizontal bar chart ───────────────────────────────────────────
-function PayrollChart({ rows }) {
-  if (!rows.length) return null
-  const maxVal = Math.max(...rows.map(r => Math.max(r.gross, r.payroll ?? 0)), 1)
-  const BAR_H  = 18
-  const GAP    = 6
-  const GROUP  = BAR_H * 2 + GAP + 28  // two bars + gap + label row
-  const LABEL_W = 140
-  const BAR_AREA = 360
-  const SVG_W   = LABEL_W + BAR_AREA + 80
-  const SVG_H   = rows.length * GROUP + 24
+// ── Net Revenue bar chart (one bar per driver) ─────────────────────────────
+function NetChart({ rows, paystubByDriver }) {
+  const data = rows.map(r => {
+    const actual = paystubByDriver[r.name]
+    let net, payNote
+    if (r.isOO) {
+      net = r.payroll != null ? r.gross - r.payroll : null
+      payNote = 'OO commission'
+    } else {
+      const pay = actual ?? r.payroll
+      if (pay != null) {
+        net = r.gross - pay - r.fuel - r.maintenance
+        payNote = actual != null ? 'actual payroll' : 'est. payroll'
+      } else {
+        net = null
+      }
+    }
+    return { name: r.name.split(' ')[0], fullName: r.name, net, payNote, isOO: r.isOO }
+  }).filter(r => r.net != null)
+
+  if (!data.length) return (
+    <div style={{ color: '#9CA3AF', fontSize: 13, padding: '16px 0' }}>
+      Add driver profiles in the Paystubs tab to see net revenue.
+    </div>
+  )
+
+  const maxAbs = Math.max(...data.map(r => Math.abs(r.net)), 1)
+  const BAR_H  = 30
+  const GAP    = 12
+  const LABEL_W = 130
+  const BAR_AREA = 380
+  const SVG_W   = LABEL_W + BAR_AREA + 110
+  const SVG_H   = data.length * (BAR_H + GAP) + 16
 
   return (
     <svg width="100%" viewBox={`0 0 ${SVG_W} ${SVG_H}`} style={{ fontFamily: 'Arial, sans-serif', overflow: 'visible' }}>
-      {/* Legend */}
-      <rect x={LABEL_W} y={2} width={12} height={10} fill="#059669" rx={2} />
-      <text x={LABEL_W + 16} y={11} fontSize={10} fill="#374151">Gross Revenue</text>
-      <rect x={LABEL_W + 110} y={2} width={12} height={10} fill="#2563EB" rx={2} />
-      <text x={LABEL_W + 126} y={11} fontSize={10} fill="#374151">Est. Payroll</text>
-      <rect x={LABEL_W + 222} y={2} width={12} height={10} fill="#F59E0B" rx={2} />
-      <text x={LABEL_W + 238} y={11} fontSize={10} fill="#374151">Net</text>
-
-      {rows.map((r, i) => {
-        const y        = i * GROUP + 22
-        const grossW   = (r.gross / maxVal) * BAR_AREA
-        const payW     = r.payroll != null ? (r.payroll / maxVal) * BAR_AREA : 0
-        const netW     = r.payroll != null ? Math.max((r.net / maxVal) * BAR_AREA, 2) : 0
-        const netColor = r.net >= 0 ? '#F59E0B' : '#DC2626'
-        const shortName = r.name.split(' ')[0]  // first name only to save space
+      {data.map((r, i) => {
+        const y      = i * (BAR_H + GAP) + 8
+        const barW   = Math.max((Math.abs(r.net) / maxAbs) * BAR_AREA, 3)
+        const pos    = r.net >= 0
+        const color  = pos ? '#059669' : '#DC2626'
+        const bgColor = pos ? '#ECFDF5' : '#FEF2F2'
 
         return (
-          <g key={r.name}>
+          <g key={r.fullName}>
+            {/* Background strip */}
+            <rect x={LABEL_W} y={y} width={BAR_AREA} height={BAR_H} fill={bgColor} rx={4} />
+
             {/* Driver name */}
-            <text x={LABEL_W - 6} y={y + BAR_H / 2 + 2} textAnchor="end" fontSize={11} fill="#111827" fontWeight="600">{shortName}</text>
+            <text x={LABEL_W - 8} y={y + BAR_H / 2} textAnchor="end" fontSize={12} fill="#111827" fontWeight="700" dominantBaseline="middle">
+              {r.name}
+            </text>
+            <text x={LABEL_W - 8} y={y + BAR_H / 2 + 14} textAnchor="end" fontSize={9} fill="#9CA3AF">
+              {r.isOO ? 'Owner Op.' : 'Company'}
+            </text>
 
-            {/* Gross bar */}
-            <rect x={LABEL_W} y={y} width={Math.max(grossW, 2)} height={BAR_H} fill="#059669" rx={3} />
-            <text x={LABEL_W + grossW + 4} y={y + BAR_H / 2 + 4} fontSize={9} fill="#059669">{fmt(r.gross)}</text>
+            {/* Net bar */}
+            <rect x={LABEL_W} y={y + 4} width={barW} height={BAR_H - 8} fill={color} rx={3} opacity={0.9} />
 
-            {/* Payroll bar */}
-            {r.payroll != null && (
-              <>
-                <rect x={LABEL_W} y={y + BAR_H + GAP} width={Math.max(payW, 2)} height={BAR_H} fill="#2563EB" rx={3} />
-                <text x={LABEL_W + payW + 4} y={y + BAR_H + GAP + BAR_H / 2 + 4} fontSize={9} fill="#2563EB">{fmt(r.payroll)}</text>
-              </>
-            )}
-            {r.payroll == null && (
-              <text x={LABEL_W + 4} y={y + BAR_H + GAP + BAR_H / 2 + 4} fontSize={9} fill="#9CA3AF">payroll not configured</text>
-            )}
-
-            {/* Net bar (below both, small) */}
-            {r.payroll != null && (
-              <rect x={LABEL_W} y={y + (BAR_H + GAP) * 2 - 4} width={Math.max(netW, 2)} height={4} fill={netColor} rx={2} />
-            )}
+            {/* Value label */}
+            <text x={LABEL_W + barW + 6} y={y + BAR_H / 2} fontSize={11} fill={color} fontWeight="700" dominantBaseline="middle">
+              {fmt(r.net)}
+            </text>
+            <text x={LABEL_W + barW + 6} y={y + BAR_H / 2 + 13} fontSize={8.5} fill="#9CA3AF">
+              {r.payNote}
+            </text>
           </g>
         )
       })}
@@ -108,6 +118,7 @@ export default function WeeklySummaryTab({ company }) {
   const { profiles }               = useDriverProfiles()
   const { entries: ledgerEntries } = useLedgerEntries(start, end, company)
   const maintenanceTotal           = useWeekMaintenanceTotal(start, end, company)
+  const maintenanceByUnit          = useWeekMaintenanceByUnit(start, end, company)
 
   // Fuel policy amount per driver for the week (from fuel_transactions)
   const [fuelByDriver, setFuelByDriver] = useState({})
@@ -130,7 +141,7 @@ export default function WeeklySummaryTab({ company }) {
     })
   }, [start, end, company])
 
-  // Map driver name → total grand_total paid this week (a driver could have 2 paystubs)
+  // Map driver name → total grand_total paid this week
   const paystubByDriver = useMemo(() => {
     const map = {}
     for (const ps of weekPaystubs) {
@@ -139,7 +150,7 @@ export default function WeeklySummaryTab({ company }) {
     return map
   }, [weekPaystubs])
 
-  // ── Per-driver ledger expenses (deductions this week) ────────────────────
+  // ── Per-driver ledger expenses ────────────────────────────────────────────
   const driverExpenses = useMemo(() => {
     const map = {}
     for (const e of ledgerEntries) {
@@ -155,14 +166,17 @@ export default function WeeklySummaryTab({ company }) {
     const map = {}
     for (const load of loads) {
       const name = load.driver_name || '(No Driver)'
-      if (!map[name]) map[name] = { name, loads: [], gross: 0, payroll: 0, miles: 0, hasProfile: false, missingPay: false }
+      if (!map[name]) map[name] = { name, loads: [], gross: 0, payroll: 0, miles: 0, hasProfile: false, missingPay: false, trucks: new Set(), trailers: new Set() }
       map[name].loads.push(load)
       map[name].gross += Number(load.price) || 0
       map[name].miles += Number(load.total_miles) || 0
+      if (load.truck_number)   map[name].trucks.add(load.truck_number)
+      if (load.trailer_number) map[name].trailers.add(load.trailer_number)
 
       const profile = profiles.find(p => p.driver_name === name)
       if (profile) {
         map[name].hasProfile = true
+        map[name].isOO = profile.profile_type === 'owner_operator'
         const pay = estimatePay(load, profile)
         if (pay != null) map[name].payroll += pay
         else map[name].missingPay = true
@@ -170,15 +184,24 @@ export default function WeeklySummaryTab({ company }) {
     }
 
     return Object.values(map)
-      .map(r => ({
-        ...r,
-        payroll:  r.hasProfile && !r.missingPay ? r.payroll : (r.hasProfile ? r.payroll : null),
-        net:      r.hasProfile && !r.missingPay ? r.gross - r.payroll : null,
-        expenses: driverExpenses[r.name] || 0,
-        fuel:     fuelByDriver[r.name.toLowerCase()] || 0,
-      }))
+      .map(r => {
+        const maintenance =
+          [...r.trucks].reduce((s, u) => s + (maintenanceByUnit[u] || 0), 0) +
+          [...r.trailers].reduce((s, u) => s + (maintenanceByUnit[u] || 0), 0)
+        return {
+          ...r,
+          trucks: undefined,
+          trailers: undefined,
+          isOO:        r.isOO || false,
+          payroll:     r.hasProfile && !r.missingPay ? r.payroll : (r.hasProfile ? r.payroll : null),
+          net:         r.hasProfile && !r.missingPay ? r.gross - r.payroll : null,
+          expenses:    driverExpenses[r.name] || 0,
+          fuel:        fuelByDriver[r.name.toLowerCase()] || 0,
+          maintenance,
+        }
+      })
       .sort((a, b) => b.gross - a.gross)
-  }, [loads, profiles, driverExpenses, fuelByDriver])
+  }, [loads, profiles, driverExpenses, fuelByDriver, maintenanceByUnit])
 
   // ── Top-line metrics ──────────────────────────────────────────────────────
   const totalRevenue   = loads.reduce((s, l) => s + (Number(l.price) || 0), 0)
@@ -190,6 +213,7 @@ export default function WeeklySummaryTab({ company }) {
   const totalExpenses  = driverRows.reduce((s, r) => s + r.expenses, 0)
   const totalMiles     = driverRows.reduce((s, r) => s + r.miles, 0)
   const knownPayroll   = driverRows.some(r => r.payroll != null)
+  const totalDriverMaint = driverRows.reduce((s, r) => s + r.maintenance, 0)
 
   // ── Top brokers ────────────────────────────────────────────────────────────
   const brokerStats = useMemo(() => {
@@ -325,6 +349,7 @@ export default function WeeklySummaryTab({ company }) {
                     <th style={{ textAlign: 'right' }}>Actual Payroll</th>
                     <th style={{ textAlign: 'right' }}>Net After Payroll</th>
                     <th style={{ textAlign: 'right' }}>Fuel Cost</th>
+                    <th style={{ textAlign: 'right' }}>Maintenance</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -338,6 +363,7 @@ export default function WeeklySummaryTab({ company }) {
                       >
                         <td>
                           <strong>{r.name}</strong>
+                          {r.isOO && <span style={{ marginLeft: 5, fontSize: 10, color: '#7C3AED', background: '#EDE9FE', borderRadius: 4, padding: '1px 5px', fontWeight: 600 }}>OO</span>}
                           <span style={{ marginLeft: 6, fontSize: 11, color: '#9CA3AF' }}>
                             {expandedDriver === r.name ? '▾' : '▸'}
                           </span>
@@ -360,10 +386,13 @@ export default function WeeklySummaryTab({ company }) {
                         <td style={{ textAlign: 'right', fontWeight: 700, color: r.fuel > 0 ? '#DC2626' : '#9CA3AF' }}>
                           {r.fuel > 0 ? fmt(r.fuel) : '—'}
                         </td>
+                        <td style={{ textAlign: 'right', fontWeight: 700, color: r.maintenance > 0 ? '#92400E' : '#9CA3AF' }}>
+                          {r.maintenance > 0 ? fmt(r.maintenance) : '—'}
+                        </td>
                       </tr>
                       {expandedDriver === r.name && (
                         <tr key={r.name + '_loads'}>
-                          <td colSpan={9} style={{ padding: 0, background: '#F9FAFB' }}>
+                          <td colSpan={10} style={{ padding: 0, background: '#F9FAFB' }}>
                             <table style={{ width: '100%', fontSize: 11, borderCollapse: 'collapse' }}>
                               <thead>
                                 <tr style={{ background: '#F3F4F6' }}>
@@ -427,6 +456,9 @@ export default function WeeklySummaryTab({ company }) {
                     <td style={{ textAlign: 'right', fontWeight: 800, color: '#DC2626' }}>
                       {driverRows.some(r => r.fuel > 0) ? fmt(driverRows.reduce((s,r) => s + r.fuel, 0)) : '—'}
                     </td>
+                    <td style={{ textAlign: 'right', fontWeight: 800, color: '#92400E' }}>
+                      {totalDriverMaint > 0 ? fmt(totalDriverMaint) : '—'}
+                    </td>
                   </tr>
                 </tfoot>
               </table>
@@ -440,10 +472,13 @@ export default function WeeklySummaryTab({ company }) {
                 {maintenanceTotal === 0 && <span style={{ color: '#9CA3AF', fontWeight: 400 }}> — no records entered yet</span>}
               </div>
 
-              {/* ── Bar chart ── */}
-              <div className="summary-section-title" style={{ marginTop: 24 }}>Gross vs. Payroll — by Driver</div>
+              {/* ── Net Revenue chart ── */}
+              <div className="summary-section-title" style={{ marginTop: 24 }}>Net Revenue by Driver</div>
               <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, padding: '16px 20px', marginBottom: 24 }}>
-                <PayrollChart rows={driverRows} />
+                <div style={{ fontSize: 11, color: '#6B7280', marginBottom: 12 }}>
+                  Company drivers: Gross − Payroll − Fuel − Maintenance &nbsp;·&nbsp; Owner Operators: Gross − Commission
+                </div>
+                <NetChart rows={driverRows} paystubByDriver={paystubByDriver} />
               </div>
             </>
           )}
