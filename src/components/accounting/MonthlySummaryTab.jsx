@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import { useMonthlyAccountingSummary } from '../../hooks/useMonthlyAccountingSummary'
 import { useInsurance } from '../../hooks/useInsurance'
 import { useMonthlyManual } from '../../hooks/useMonthlyManual'
+import { useAllTimeSummary } from '../../hooks/useAllTimeSummary'
 
 const fmt      = n => '$' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
 const fmtFull  = n => '$' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -17,7 +18,12 @@ const C = {
   maintenance: '#6B7280',
   insurance:   '#DC2626',
   miles:       '#8B5CF6',
+  net:         '#10B981',
 }
+
+// Shared grid column definition — update here to affect all rows simultaneously
+// month-name(180px) | gross | payroll | fuel | maintenance | insurance(fixed) | miles | units | net/unit
+const COLS = '1fr 1fr 1fr 1fr 1fr 130px 1fr 70px 100px'
 
 const MONTHLY_SESSION_KEY = 'monthly_unlocked'
 const MONTHLY_PASSWORD    = import.meta.env.VITE_MONTHLY_PASSWORD || '08192021'
@@ -88,7 +94,7 @@ function ModalCol({ title, state, onChange }) {
       <input
         type={type}
         min={type === 'number' ? '0' : undefined}
-        step={key === 'miles' ? '1' : '0.01'}
+        step={key === 'miles' || key === 'unit_count' ? '1' : '0.01'}
         placeholder={placeholder}
         value={state[key]}
         onChange={e => onChange(key, e.target.value)}
@@ -98,11 +104,13 @@ function ModalCol({ title, state, onChange }) {
   return (
     <div>
       <div style={{ fontWeight: 700, marginBottom: 10, color: '#374151', fontSize: 13 }}>{title}</div>
-      {field('Gross Revenue ($)', 'gross')}
-      {field('Fuel ($)',          'fuel')}
-      {field('Payroll ($)',       'payroll')}
-      {field('Miles',             'miles')}
-      {field('Notes (optional)',  'notes', 'text', 'e.g. source, remarks')}
+      {field('Gross Revenue ($)',  'gross')}
+      {field('Fuel ($)',           'fuel')}
+      {field('Payroll ($)',        'payroll')}
+      {field('Maintenance ($)',    'maintenance')}
+      {field('Miles',              'miles')}
+      {field('# Units (trucks)',   'unit_count')}
+      {field('Notes (optional)',   'notes', 'text', 'e.g. source, remarks')}
     </div>
   )
 }
@@ -158,39 +166,23 @@ function InsuranceModal({ monthIdx, year, getEntry, onSave, onClose }) {
         </div>
         <div className="modal-body">
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
-
-            {/* Carat: liability + cargo */}
             <div>
               <div style={{ fontWeight: 700, marginBottom: 12, color: '#374151', fontSize: 13, borderBottom: '1px solid #E5E7EB', paddingBottom: 6 }}>
                 Carat Expedited
               </div>
-              <AmtField
-                label="Liability"
-                val={caratLiabAmt}   onChange={setCaratLiabAmt}
-                notes={caratLiabNotes} onNotesChange={setCaratLiabNotes}
-              />
-              <AmtField
-                label="Cargo"
-                val={caratCargoAmt}   onChange={setCaratCargoAmt}
-                notes={caratCargoNotes} onNotesChange={setCaratCargoNotes}
-              />
+              <AmtField label="Liability" val={caratLiabAmt} onChange={setCaratLiabAmt} notes={caratLiabNotes} onNotesChange={setCaratLiabNotes} />
+              <AmtField label="Cargo"     val={caratCargoAmt} onChange={setCaratCargoAmt} notes={caratCargoNotes} onNotesChange={setCaratCargoNotes} />
               {(Number(caratLiabAmt)||0) + (Number(caratCargoAmt)||0) > 0 && (
                 <div style={{ fontSize: 11, color: '#6B7280', textAlign: 'right', marginTop: 4 }}>
                   Total: <strong style={{ color: '#DC2626' }}>${((Number(caratLiabAmt)||0) + (Number(caratCargoAmt)||0)).toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
                 </div>
               )}
             </div>
-
-            {/* Pro Freight: liability only */}
             <div>
               <div style={{ fontWeight: 700, marginBottom: 12, color: '#374151', fontSize: 13, borderBottom: '1px solid #E5E7EB', paddingBottom: 6 }}>
                 Pro Freight
               </div>
-              <AmtField
-                label="Liability"
-                val={proAmt}   onChange={setProAmt}
-                notes={proNotes} onNotesChange={setProNotes}
-              />
+              <AmtField label="Liability" val={proAmt} onChange={setProAmt} notes={proNotes} onNotesChange={setProNotes} />
             </div>
           </div>
           {err && <div style={{ color: '#DC2626', fontSize: 12, marginTop: 8 }}>Error: {err}</div>}
@@ -213,11 +205,13 @@ function ManualDataModal({ monthIdx, year, rawEntries, onSave, onClose }) {
   const pe = rawEntries?.pro_freight || {}
 
   const init = src => ({
-    gross:   src.gross   != null ? String(src.gross)   : '',
-    fuel:    src.fuel    != null ? String(src.fuel)    : '',
-    payroll: src.payroll != null ? String(src.payroll) : '',
-    miles:   src.miles   != null ? String(src.miles)   : '',
-    notes:   src.notes   ?? '',
+    gross:       src.gross       != null ? String(src.gross)       : '',
+    fuel:        src.fuel        != null ? String(src.fuel)        : '',
+    payroll:     src.payroll     != null ? String(src.payroll)     : '',
+    miles:       src.miles       != null ? String(src.miles)       : '',
+    maintenance: src.maintenance != null ? String(src.maintenance) : '',
+    unit_count:  src.unit_count  != null ? String(src.unit_count)  : '',
+    notes:       src.notes ?? '',
   })
 
   const [carat,  setCarat]  = useState(() => init(ce))
@@ -234,8 +228,24 @@ function ManualDataModal({ monthIdx, year, rawEntries, onSave, onClose }) {
     try {
       await onSave(
         month,
-        { gross: Number(carat.gross)||0, fuel: Number(carat.fuel)||0, payroll: Number(carat.payroll)||0, miles: Number(carat.miles)||0, notes: carat.notes },
-        { gross: Number(pro.gross)||0,   fuel: Number(pro.fuel)||0,   payroll: Number(pro.payroll)||0,   miles: Number(pro.miles)||0,   notes: pro.notes   },
+        {
+          gross:       Number(carat.gross)       || 0,
+          fuel:        Number(carat.fuel)        || 0,
+          payroll:     Number(carat.payroll)     || 0,
+          miles:       Number(carat.miles)       || 0,
+          maintenance: Number(carat.maintenance) || 0,
+          unit_count:  carat.unit_count !== '' ? (Number(carat.unit_count) || null) : null,
+          notes:       carat.notes,
+        },
+        {
+          gross:       Number(pro.gross)       || 0,
+          fuel:        Number(pro.fuel)        || 0,
+          payroll:     Number(pro.payroll)     || 0,
+          miles:       Number(pro.miles)       || 0,
+          maintenance: Number(pro.maintenance) || 0,
+          unit_count:  pro.unit_count !== '' ? (Number(pro.unit_count) || null) : null,
+          notes:       pro.notes,
+        },
       )
       onClose()
     } catch (e) {
@@ -246,7 +256,7 @@ function ManualDataModal({ monthIdx, year, rawEntries, onSave, onClose }) {
 
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="modal" style={{ maxWidth: 560 }}>
+      <div className="modal" style={{ maxWidth: 600 }}>
         <div className="modal-header">
           <div className="modal-title">Manual Data — {MONTHS_FULL[monthIdx]} {year}</div>
           <button className="modal-close" onClick={onClose}>✕</button>
@@ -256,8 +266,8 @@ function ManualDataModal({ monthIdx, year, rawEntries, onSave, onClose }) {
             These values are added on top of actual system data. Use for months with missing or incomplete records.
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
-            <ModalCol title="Carat Expedited"  state={carat} onChange={updateCarat} />
-            <ModalCol title="Pro Freight"       state={pro}   onChange={updatePro}   />
+            <ModalCol title="Carat Expedited" state={carat} onChange={updateCarat} />
+            <ModalCol title="Pro Freight"     state={pro}   onChange={updatePro}   />
           </div>
           {err && <div style={{ color: '#DC2626', fontSize: 12, marginTop: 8 }}>Error: {err}</div>}
         </div>
@@ -301,7 +311,7 @@ function printReport(year, monthsEnriched, totals, company) {
     const gross = m.gross + m.manual.gross
     const payroll = m.payroll + m.manual.payroll
     const fuel = m.fuel + m.manual.fuel
-    const maint = m.maintenance
+    const maint = m.maintenance + m.manual.maintenance
     const ins = m.insurance
     const miles = m.miles + m.manual.miles
     const expenses = payroll + fuel + maint + ins
@@ -343,13 +353,7 @@ function printReport(year, monthsEnriched, totals, company) {
     td { padding: 7px 10px; text-align: right; border-bottom: 1px solid #F3F4F6; font-size: 12px; }
     td:first-child { text-align: left; }
     .total-row td { background: #F3F4F6; font-weight: 800; font-size: 13px; border-top: 2px solid #D1D5DB; border-bottom: none; padding: 10px; }
-    .legend { display: flex; gap: 20px; margin-top: 20px; font-size: 11px; color: #6B7280; flex-wrap: wrap; }
-    .legend span { display: flex; align-items: center; gap: 5px; }
-    .dot { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
-    @media print {
-      body { padding: 16px 20px; }
-      @page { margin: 1cm; }
-    }
+    @media print { body { padding: 16px 20px; } @page { margin: 1cm; } }
   </style>
 </head>
 <body>
@@ -384,14 +388,6 @@ function printReport(year, monthsEnriched, totals, company) {
       </tr>
     </tbody>
   </table>
-  <div class="legend">
-    <span><span class="dot" style="background:#059669"></span>Gross Revenue</span>
-    <span><span class="dot" style="background:#2563EB"></span>Payroll</span>
-    <span><span class="dot" style="background:#D97706"></span>Fuel</span>
-    <span><span class="dot" style="background:#6B7280"></span>Maintenance</span>
-    <span><span class="dot" style="background:#DC2626"></span>Insurance</span>
-    <span><span class="dot" style="background:#059669"></span>Operating Net = Gross − Payroll − Fuel − Maint − Insurance</span>
-  </div>
 </body>
 </html>`
 
@@ -402,24 +398,20 @@ function printReport(year, monthsEnriched, totals, company) {
   setTimeout(() => w.print(), 400)
 }
 
-// ── Expenses + Net chart ──────────────────────────────────────────────────────
-// Left bar per month = stacked expenses (payroll, fuel, maintenance, insurance)
-// Right bar = Operating Net (green if positive, red if negative)
+// ── Monthly expenses + net chart ──────────────────────────────────────────────
 function MonthlyChart({ months }) {
   const W = 920, LEFT = 72, RIGHT = 20, TOP = 32, BOT = 30, PLOT_H = 210
   const PLOT_W = W - LEFT - RIGHT
   const SVG_H  = TOP + PLOT_H + BOT
   const MONTH_W = PLOT_W / 12
-
   const EXPENSE_W = 20, NET_W = 14, GAP = 5
   const GROUP_W = EXPENSE_W + GAP + NET_W
   const GROUP_X = (MONTH_W - GROUP_W) / 2
 
-  // Per-month computed values
   const data = months.map(m => {
     const payroll = m.payroll + (m.manual?.payroll || 0)
     const fuel    = m.fuel    + (m.manual?.fuel    || 0)
-    const maint   = m.maintenance
+    const maint   = m.maintenance + (m.manual?.maintenance || 0)
     const ins     = m.insurance
     const gross   = m.gross   + (m.manual?.gross   || 0)
     const expenses = payroll + fuel + maint + ins
@@ -427,14 +419,9 @@ function MonthlyChart({ months }) {
     return { payroll, fuel, maint, ins, expenses, net }
   })
 
-  const maxVal = Math.max(
-    ...data.map(d => d.expenses),
-    ...data.map(d => Math.abs(d.net)),
-    1
-  )
+  const maxVal = Math.max(...data.map(d => d.expenses), ...data.map(d => Math.abs(d.net)), 1)
   const gridPcts = [0, 0.25, 0.5, 0.75, 1]
 
-  // Legend items
   const legend = [
     { color: C.payroll,     label: 'Payroll' },
     { color: C.fuel,        label: 'Fuel' },
@@ -445,15 +432,12 @@ function MonthlyChart({ months }) {
 
   return (
     <svg width="100%" viewBox={`0 0 ${W} ${SVG_H}`} style={{ fontFamily: 'Arial, sans-serif', display: 'block' }}>
-      {/* Legend */}
       {legend.map((l, i) => (
         <g key={l.label} transform={`translate(${LEFT + i * 142}, 8)`}>
           <rect width={10} height={10} fill={l.color} rx={2} y={2} />
           <text x={14} y={11} fontSize={10} fill="#374151">{l.label}</text>
         </g>
       ))}
-
-      {/* Grid lines */}
       {gridPcts.map((f, i) => {
         const y = TOP + PLOT_H - f * PLOT_H
         return (
@@ -463,39 +447,21 @@ function MonthlyChart({ months }) {
           </g>
         )
       })}
-
-      {/* Bars per month */}
       {data.map((d, mi) => {
         const ox = LEFT + mi * MONTH_W + GROUP_X
         const baseline = TOP + PLOT_H
-
-        // Stacked expense bar segments (bottom to top: payroll, fuel, maint, ins)
         const segments = [
           { val: d.payroll, color: C.payroll },
           { val: d.fuel,    color: C.fuel },
           { val: d.maint,   color: C.maintenance },
           { val: d.ins,     color: C.insurance },
         ]
-        let stackY = baseline
-        const expBars = segments.map((seg, si) => {
-          if (seg.val <= 0) return null
-          const bh = Math.max((seg.val / maxVal) * PLOT_H, 1)
-          stackY -= bh
-          return <rect key={si} x={ox} y={stackY} width={EXPENSE_W} height={bh} fill={seg.color} />
-        }).filter(Boolean).reverse() // draw bottom-up
-
-        // Net bar
         const netAbs = Math.abs(d.net)
         const netBH  = netAbs > 0 ? Math.max((netAbs / maxVal) * PLOT_H, 2) : 0
         const netColor = d.net >= 0 ? C.gross : '#EF4444'
         const netY = d.net >= 0 ? baseline - netBH : baseline
-        const netBar = netBH > 0
-          ? <rect x={ox + EXPENSE_W + GAP} y={netY} width={NET_W} height={netBH} fill={netColor} rx={2} />
-          : null
-
         return (
           <g key={mi}>
-            {/* Redraw stacked segments in correct order */}
             {(() => {
               let y = baseline
               return segments.map((seg, si) => {
@@ -505,22 +471,13 @@ function MonthlyChart({ months }) {
                 return <rect key={si} x={ox} y={y} width={EXPENSE_W} height={bh} fill={seg.color} />
               })
             })()}
-
-            {netBar}
-
-            {/* Month label */}
-            <text
-              x={LEFT + mi * MONTH_W + MONTH_W / 2}
-              y={TOP + PLOT_H + 16}
-              textAnchor="middle" fontSize={10} fill="#374151" fontWeight="600"
-            >
+            {netBH > 0 && <rect x={ox + EXPENSE_W + GAP} y={netY} width={NET_W} height={netBH} fill={netColor} rx={2} />}
+            <text x={LEFT + mi * MONTH_W + MONTH_W / 2} y={TOP + PLOT_H + 16} textAnchor="middle" fontSize={10} fill="#374151" fontWeight="600">
               {MONTHS[mi]}
             </text>
           </g>
         )
       })}
-
-      {/* Axes */}
       <line x1={LEFT} y1={TOP}          x2={LEFT}          y2={TOP + PLOT_H} stroke="#D1D5DB" strokeWidth={1} />
       <line x1={LEFT} y1={TOP + PLOT_H} x2={LEFT + PLOT_W} y2={TOP + PLOT_H} stroke="#D1D5DB" strokeWidth={1} />
     </svg>
@@ -549,6 +506,97 @@ function MileageChart({ months }) {
   )
 }
 
+// ── All-time year-over-year chart ─────────────────────────────────────────────
+function AllTimeChart({ data }) {
+  if (!data.length) return null
+  const n = data.length
+  const W = 920, LEFT = 72, RIGHT = 20, TOP = 32, BOT = 44, PLOT_H = 220
+  const PLOT_W = W - LEFT - RIGHT
+  const SVG_H  = TOP + PLOT_H + BOT
+  const YEAR_W = PLOT_W / n
+  const EXP_W  = Math.min(Math.floor(YEAR_W * 0.38), 44)
+  const NET_W  = Math.min(Math.floor(YEAR_W * 0.22), 26)
+  const GAP    = 5
+
+  const maxVal = Math.max(
+    ...data.map(y => y.payroll + y.fuel + y.maintenance + y.insurance),
+    ...data.map(y => Math.abs(y.net)),
+    1
+  )
+
+  const legend = [
+    { color: C.payroll,     label: 'Payroll' },
+    { color: C.fuel,        label: 'Fuel' },
+    { color: C.maintenance, label: 'Maintenance' },
+    { color: C.insurance,   label: 'Insurance' },
+    { color: C.net,         label: 'Net Revenue' },
+  ]
+
+  return (
+    <svg width="100%" viewBox={`0 0 ${W} ${SVG_H}`} style={{ fontFamily: 'Arial, sans-serif', display: 'block' }}>
+      {legend.map((l, i) => (
+        <g key={l.label} transform={`translate(${LEFT + i * 142}, 8)`}>
+          <rect width={10} height={10} fill={l.color} rx={2} y={2} />
+          <text x={14} y={11} fontSize={10} fill="#374151">{l.label}</text>
+        </g>
+      ))}
+
+      {[0, 0.25, 0.5, 0.75, 1].map((f, i) => {
+        const y = TOP + PLOT_H - f * PLOT_H
+        return (
+          <g key={i}>
+            <line x1={LEFT} y1={y} x2={LEFT + PLOT_W} y2={y} stroke="#E5E7EB" strokeWidth={1} />
+            <text x={LEFT - 6} y={y + 4} textAnchor="end" fontSize={9} fill="#9CA3AF">{fmt(f * maxVal)}</text>
+          </g>
+        )
+      })}
+
+      {data.map((d, i) => {
+        const cx     = LEFT + i * YEAR_W + YEAR_W / 2
+        const ox     = cx - (EXP_W + GAP + NET_W) / 2
+        const baseline = TOP + PLOT_H
+        const segments = [
+          { val: d.payroll,     color: C.payroll },
+          { val: d.fuel,        color: C.fuel },
+          { val: d.maintenance, color: C.maintenance },
+          { val: d.insurance,   color: C.insurance },
+        ]
+        const netAbs  = Math.abs(d.net)
+        const netBH   = netAbs > 0 ? Math.max((netAbs / maxVal) * PLOT_H, 2) : 0
+        const netColor = d.net >= 0 ? C.net : '#EF4444'
+        const netY    = d.net >= 0 ? baseline - netBH : baseline
+
+        return (
+          <g key={d.year}>
+            {(() => {
+              let y = baseline
+              return segments.map((seg, si) => {
+                if (seg.val <= 0) return null
+                const bh = Math.max((seg.val / maxVal) * PLOT_H, 1)
+                y -= bh
+                return <rect key={si} x={ox} y={y} width={EXP_W} height={bh} fill={seg.color} />
+              })
+            })()}
+            {netBH > 0 && <rect x={ox + EXP_W + GAP} y={netY} width={NET_W} height={netBH} fill={netColor} rx={2} />}
+            <text x={cx} y={TOP + PLOT_H + 14} textAnchor="middle" fontSize={10} fill="#374151" fontWeight="700">{d.year}</text>
+            {d.units != null && (
+              <text x={cx} y={TOP + PLOT_H + 26} textAnchor="middle" fontSize={8.5} fill="#9CA3AF">{d.units} units</text>
+            )}
+            {d.netPerUnit != null && (
+              <text x={cx} y={TOP + PLOT_H + 38} textAnchor="middle" fontSize={8} fill={d.net >= 0 ? C.net : '#EF4444'} fontWeight="600">
+                {fmt(d.netPerUnit)}/unit
+              </text>
+            )}
+          </g>
+        )
+      })}
+
+      <line x1={LEFT} y1={TOP}          x2={LEFT}          y2={TOP + PLOT_H} stroke="#D1D5DB" strokeWidth={1} />
+      <line x1={LEFT} y1={TOP + PLOT_H} x2={LEFT + PLOT_W} y2={TOP + PLOT_H} stroke="#D1D5DB" strokeWidth={1} />
+    </svg>
+  )
+}
+
 // ── Cell ──────────────────────────────────────────────────────────────────────
 function Cell({ val, color, small }) {
   return (
@@ -564,12 +612,15 @@ function MonthRow({ m, idx, isExpanded, onToggle, insuranceAmt, manual, onEditIn
     gross:       m.gross       + manual.gross,
     payroll:     m.payroll     + manual.payroll,
     fuel:        m.fuel        + manual.fuel,
-    maintenance: m.maintenance,
+    maintenance: m.maintenance + manual.maintenance,
     miles:       m.miles       + manual.miles,
   }
-  const hasManual  = manual.gross > 0 || manual.fuel > 0 || manual.payroll > 0 || manual.miles > 0
-  const hasData    = combined.gross > 0 || combined.payroll > 0 || combined.fuel > 0 || combined.maintenance > 0 || combined.miles > 0 || insuranceAmt > 0
-  const COLS = '1fr 1fr 1fr 1fr 1fr 148px 1fr'
+  const net        = combined.gross - combined.payroll - combined.fuel - combined.maintenance - insuranceAmt
+  const unitCount  = manual.unit_count > 0 ? manual.unit_count : null
+  const netPerUnit = unitCount ? net / unitCount : null
+
+  const hasManual = manual.gross > 0 || manual.fuel > 0 || manual.payroll > 0 || manual.miles > 0 || manual.maintenance > 0 || manual.unit_count > 0
+  const hasData   = combined.gross > 0 || combined.payroll > 0 || combined.fuel > 0 || combined.maintenance > 0 || combined.miles > 0 || insuranceAmt > 0
 
   return (
     <>
@@ -595,8 +646,8 @@ function MonthRow({ m, idx, isExpanded, onToggle, insuranceAmt, manual, onEditIn
               +manual
             </span>
           )}
-          <IconBtn icon="✎" title="Edit insurance"    onClick={() => onEditInsurance(idx)} active={insuranceAmt > 0} />
-          <IconBtn icon="⊕" title="Add manual data"   onClick={() => onEditManual(idx)}    active={hasManual} />
+          <IconBtn icon="✎" title="Edit insurance"  onClick={() => onEditInsurance(idx)} active={insuranceAmt > 0} />
+          <IconBtn icon="⊕" title="Add manual data" onClick={() => onEditManual(idx)}   active={hasManual} />
         </div>
 
         <Cell val={combined.gross}       color={C.gross}       />
@@ -605,20 +656,32 @@ function MonthRow({ m, idx, isExpanded, onToggle, insuranceAmt, manual, onEditIn
         <Cell val={combined.maintenance} color={C.maintenance} />
 
         {/* Insurance cell */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
           <span style={{ color: insuranceAmt > 0 ? C.insurance : '#D1D5DB', fontWeight: insuranceAmt > 0 ? 700 : 400 }}>
             {insuranceAmt > 0 ? fmt(insuranceAmt) : '—'}
           </span>
         </div>
 
+        {/* Miles */}
         <div style={{ textAlign: 'right', color: combined.miles > 0 ? C.miles : '#D1D5DB', fontWeight: combined.miles > 0 ? 600 : 400 }}>
           {combined.miles > 0 ? fmtMiles(combined.miles) : '—'}
+        </div>
+
+        {/* Units */}
+        <div style={{ textAlign: 'right', color: unitCount ? '#374151' : '#D1D5DB', fontWeight: unitCount ? 600 : 400, fontSize: 12 }}>
+          {unitCount ?? '—'}
+        </div>
+
+        {/* Net / Unit */}
+        <div style={{ textAlign: 'right', fontSize: 12, fontWeight: netPerUnit != null ? 700 : 400, color: netPerUnit != null ? (net >= 0 ? C.net : '#DC2626') : '#D1D5DB' }}>
+          {netPerUnit != null ? fmt(netPerUnit) : '—'}
         </div>
       </div>
 
       {/* Expanded weekly rows */}
       {isExpanded && (
         <div style={{ borderTop: '1px solid #D1FAE5', borderBottom: '1px solid #D1FAE5' }}>
+          {/* Sub-header */}
           <div style={{ display: 'grid', gridTemplateColumns: `180px ${COLS}`, padding: '5px 16px 5px 36px', gap: 8, background: '#F3F4F6', fontSize: 10, fontWeight: 700, color: '#9CA3AF' }}>
             <div>Week (Thu – Wed)</div>
             <div style={{ textAlign: 'right' }}>Gross</div>
@@ -627,6 +690,8 @@ function MonthRow({ m, idx, isExpanded, onToggle, insuranceAmt, manual, onEditIn
             <div style={{ textAlign: 'right' }}>Maintenance</div>
             <div style={{ textAlign: 'right' }}>Insurance</div>
             <div style={{ textAlign: 'right' }}>Miles</div>
+            <div style={{ textAlign: 'right' }}>Units</div>
+            <div style={{ textAlign: 'right' }}>Net/Unit</div>
           </div>
 
           {m.weeks.length === 0 && !hasManual && (
@@ -644,6 +709,8 @@ function MonthRow({ m, idx, isExpanded, onToggle, insuranceAmt, manual, onEditIn
               <div style={{ textAlign: 'right', color: wk.miles > 0 ? C.miles : '#D1D5DB', fontSize: 12 }}>
                 {wk.miles > 0 ? fmtMiles(wk.miles) : '—'}
               </div>
+              <div style={{ textAlign: 'right', color: '#D1D5DB' }}>—</div>
+              <div style={{ textAlign: 'right', color: '#D1D5DB' }}>—</div>
             </div>
           ))}
 
@@ -651,14 +718,18 @@ function MonthRow({ m, idx, isExpanded, onToggle, insuranceAmt, manual, onEditIn
           {hasManual && (
             <div style={{ display: 'grid', gridTemplateColumns: `180px ${COLS}`, padding: '6px 16px 6px 36px', gap: 8, borderTop: '1px solid #E5E7EB', background: '#FAF5FF', fontSize: 12 }}>
               <div style={{ color: '#7C3AED', fontWeight: 600, fontSize: 11 }}>⊕ Manual entry</div>
-              <Cell val={manual.gross}   color="#7C3AED" small />
-              <Cell val={manual.payroll} color="#7C3AED" small />
-              <Cell val={manual.fuel}    color="#7C3AED" small />
-              <div style={{ textAlign: 'right', color: '#D1D5DB' }}>—</div>
+              <Cell val={manual.gross}       color="#7C3AED" small />
+              <Cell val={manual.payroll}     color="#7C3AED" small />
+              <Cell val={manual.fuel}        color="#7C3AED" small />
+              <Cell val={manual.maintenance} color="#7C3AED" small />
               <div style={{ textAlign: 'right', color: '#D1D5DB' }}>—</div>
               <div style={{ textAlign: 'right', color: manual.miles > 0 ? '#7C3AED' : '#D1D5DB', fontSize: 12 }}>
                 {manual.miles > 0 ? fmtMiles(manual.miles) : '—'}
               </div>
+              <div style={{ textAlign: 'right', color: manual.unit_count > 0 ? '#7C3AED' : '#D1D5DB', fontWeight: 600 }}>
+                {manual.unit_count > 0 ? manual.unit_count : '—'}
+              </div>
+              <div style={{ textAlign: 'right', color: '#D1D5DB' }}>—</div>
             </div>
           )}
 
@@ -672,6 +743,12 @@ function MonthRow({ m, idx, isExpanded, onToggle, insuranceAmt, manual, onEditIn
             <Cell val={insuranceAmt}         color={C.insurance}   />
             <div style={{ textAlign: 'right', color: combined.miles > 0 ? C.miles : '#D1D5DB', fontWeight: 700 }}>
               {combined.miles > 0 ? fmtMiles(combined.miles) : '—'}
+            </div>
+            <div style={{ textAlign: 'right', color: unitCount ? '#374151' : '#D1D5DB', fontWeight: 700 }}>
+              {unitCount ?? '—'}
+            </div>
+            <div style={{ textAlign: 'right', fontWeight: 700, color: netPerUnit != null ? (net >= 0 ? C.net : '#DC2626') : '#D1D5DB' }}>
+              {netPerUnit != null ? fmt(netPerUnit) : '—'}
             </div>
           </div>
         </div>
@@ -692,6 +769,7 @@ export default function MonthlySummaryTab({ company }) {
   const { months, loading }          = useMonthlyAccountingSummary(year, company)
   const { entries: insEntries, getAmount, getEntry, setAmount } = useInsurance(year)
   const { entries: manEntries, getManual, getRawEntries, saveMonth } = useMonthlyManual(year)
+  const { yearSummaries, loading: allTimeLoading } = useAllTimeSummary(company)
 
   const monthsEnriched = useMemo(() =>
     months.map((m, i) => ({
@@ -708,7 +786,7 @@ export default function MonthlySummaryTab({ company }) {
         gross:       s.gross       + m.gross       + m.manual.gross,
         payroll:     s.payroll     + m.payroll     + m.manual.payroll,
         fuel:        s.fuel        + m.fuel        + m.manual.fuel,
-        maintenance: s.maintenance + m.maintenance,
+        maintenance: s.maintenance + m.maintenance + m.manual.maintenance,
         insurance:   s.insurance   + m.insurance,
         miles:       s.miles       + m.miles       + m.manual.miles,
       }),
@@ -716,6 +794,15 @@ export default function MonthlySummaryTab({ company }) {
     ),
     [monthsEnriched]
   )
+
+  // Average units across months that have a unit_count entered
+  const yearUnitCounts = useMemo(() => {
+    const counts = monthsEnriched.map(m => m.manual.unit_count).filter(v => v > 0)
+    return counts.length > 0 ? Math.round(counts.reduce((s, v) => s + v, 0) / counts.length) : null
+  }, [monthsEnriched])
+
+  const yearNet = totals.gross - totals.payroll - totals.fuel - totals.maintenance - totals.insurance
+  const yearNetPerUnit = yearUnitCounts ? yearNet / yearUnitCounts : null
 
   const pct = (num, den) => den > 0 ? ((num / den) * 100).toFixed(1) + '% of gross' : '—'
 
@@ -726,8 +813,6 @@ export default function MonthlySummaryTab({ company }) {
       setAmount('pro_freight', month, proAmt,        proNotes,        'liability'),
     ])
   }
-
-  const COLS = '1fr 1fr 1fr 1fr 1fr 148px 1fr'
 
   if (!unlocked) return <MonthlyLock onUnlock={() => setUnlocked(true)} />
 
@@ -758,7 +843,7 @@ export default function MonthlySummaryTab({ company }) {
         <div style={{ color: '#9CA3AF', padding: '32px 0' }}>Loading…</div>
       ) : (
         <>
-          {/* Stat cards */}
+          {/* ── Stat cards ── */}
           <div className="summary-stat-cards">
             <div className="summary-card green">
               <div className="summary-card-label">Gross Revenue</div>
@@ -793,20 +878,32 @@ export default function MonthlySummaryTab({ company }) {
               </div>
             </div>
             {totals.gross > 0 && (totals.payroll + totals.fuel + totals.maintenance + totals.insurance) > 0 && (
-              <div className="summary-card" style={{ borderLeft: '4px solid #10B981' }}>
+              <div className="summary-card" style={{ borderLeft: `4px solid ${C.net}` }}>
                 <div className="summary-card-label">Operating Net</div>
-                <div className="summary-card-value" style={{ color: '#10B981' }}>
-                  {fmtFull(totals.gross - totals.payroll - totals.fuel - totals.maintenance - totals.insurance)}
-                </div>
+                <div className="summary-card-value" style={{ color: C.net }}>{fmtFull(yearNet)}</div>
                 <div className="summary-card-sub">gross − pay − fuel − maint − ins</div>
+              </div>
+            )}
+            {yearUnitCounts && (
+              <div className="summary-card" style={{ borderLeft: '4px solid #374151' }}>
+                <div className="summary-card-label">Avg Units</div>
+                <div className="summary-card-value" style={{ color: '#374151' }}>{yearUnitCounts}</div>
+                <div className="summary-card-sub">avg trucks this year</div>
+              </div>
+            )}
+            {yearNetPerUnit != null && (
+              <div className="summary-card" style={{ borderLeft: `4px solid ${C.net}` }}>
+                <div className="summary-card-label">Net / Unit</div>
+                <div className="summary-card-value" style={{ color: yearNet >= 0 ? C.net : '#DC2626' }}>{fmt(yearNetPerUnit)}</div>
+                <div className="summary-card-sub">annual net ÷ avg units</div>
               </div>
             )}
           </div>
 
-          {/* Chart */}
+          {/* ── Chart ── */}
           <div className="summary-section-title">Monthly Breakdown — {year}</div>
           <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, padding: '16px 20px', marginBottom: 24 }}>
-            <MonthlyChart months={monthsEnriched.map(m => ({ ...m, gross: m.gross + m.manual.gross, fuel: m.fuel + m.manual.fuel, payroll: m.payroll + m.manual.payroll, miles: m.miles + m.manual.miles }))} />
+            <MonthlyChart months={monthsEnriched.map(m => ({ ...m, gross: m.gross + m.manual.gross, fuel: m.fuel + m.manual.fuel, payroll: m.payroll + m.manual.payroll, miles: m.miles + m.manual.miles, maintenance: m.maintenance + m.manual.maintenance }))} />
             <div style={{ paddingLeft: 72, marginTop: 8, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
               <span style={{ fontSize: 10, color: C.miles, fontWeight: 700 }}>▌</span>
               <span style={{ fontSize: 10, color: '#6B7280' }}>Miles (relative scale)</span>
@@ -814,14 +911,15 @@ export default function MonthlySummaryTab({ company }) {
             <MileageChart months={monthsEnriched.map(m => ({ ...m, miles: m.miles + m.manual.miles }))} />
           </div>
 
-          {/* Monthly detail */}
+          {/* ── Monthly detail table ── */}
           <div className="summary-section-title">
             Monthly Detail
             <span style={{ fontSize: 11, color: '#9CA3AF', marginLeft: 10, fontWeight: 400 }}>
-              ✎ = insurance &nbsp;·&nbsp; ⊕ = manual data
+              ✎ = insurance &nbsp;·&nbsp; ⊕ = manual data (gross, payroll, fuel, maintenance, units)
             </span>
           </div>
           <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, overflow: 'hidden', marginBottom: 24 }}>
+            {/* Header */}
             <div style={{ display: 'grid', gridTemplateColumns: `180px ${COLS}`, padding: '8px 16px', gap: 8, background: '#F3F4F6', fontSize: 11, fontWeight: 700, color: '#6B7280' }}>
               <div>Month</div>
               <div style={{ textAlign: 'right', color: C.gross }}>Gross</div>
@@ -830,6 +928,8 @@ export default function MonthlySummaryTab({ company }) {
               <div style={{ textAlign: 'right', color: C.maintenance }}>Maintenance</div>
               <div style={{ textAlign: 'right', color: C.insurance }}>Insurance</div>
               <div style={{ textAlign: 'right', color: C.miles }}>Miles</div>
+              <div style={{ textAlign: 'right' }}>Units</div>
+              <div style={{ textAlign: 'right', color: C.net }}>Net/Unit</div>
             </div>
 
             {monthsEnriched.map((m, i) => (
@@ -855,7 +955,69 @@ export default function MonthlySummaryTab({ company }) {
               <div style={{ textAlign: 'right', color: C.maintenance }}> {totals.maintenance > 0 ? fmt(totals.maintenance) : '—'}</div>
               <div style={{ textAlign: 'right', color: C.insurance }}>   {totals.insurance   > 0 ? fmt(totals.insurance)   : '—'}</div>
               <div style={{ textAlign: 'right', color: C.miles }}>       {totals.miles       > 0 ? fmtMiles(totals.miles)  : '—'}</div>
+              <div style={{ textAlign: 'right', color: '#374151' }}>     {yearUnitCounts     ?? '—'}</div>
+              <div style={{ textAlign: 'right', color: yearNetPerUnit != null ? (yearNet >= 0 ? C.net : '#DC2626') : '#9CA3AF' }}>
+                {yearNetPerUnit != null ? fmt(yearNetPerUnit) : '—'}
+              </div>
             </div>
+          </div>
+        </>
+      )}
+
+      {/* ── All-Time Year-over-Year ── */}
+      <div className="summary-section-title" style={{ marginTop: 8 }}>All-Time Performance — Year over Year</div>
+      {allTimeLoading ? (
+        <div style={{ color: '#9CA3AF', fontSize: 13, padding: '16px 0' }}>Loading historical data…</div>
+      ) : yearSummaries.length === 0 ? (
+        <div style={{ color: '#9CA3AF', fontSize: 13, padding: '16px 0' }}>No data found. Add manual entries via the ⊕ button above.</div>
+      ) : (
+        <>
+          <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, padding: '16px 20px', marginBottom: 16 }}>
+            <AllTimeChart data={yearSummaries} />
+          </div>
+
+          {/* All-time table */}
+          <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, overflow: 'hidden', marginBottom: 8 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr 1fr 1fr 1fr 1fr 1fr 70px 110px', padding: '8px 16px', gap: 8, background: '#F3F4F6', fontSize: 11, fontWeight: 700, color: '#6B7280' }}>
+              <div>Year</div>
+              <div style={{ textAlign: 'right', color: C.gross }}>Gross</div>
+              <div style={{ textAlign: 'right', color: C.payroll }}>Payroll</div>
+              <div style={{ textAlign: 'right', color: C.fuel }}>Fuel</div>
+              <div style={{ textAlign: 'right', color: C.maintenance }}>Maintenance</div>
+              <div style={{ textAlign: 'right', color: C.insurance }}>Insurance</div>
+              <div style={{ textAlign: 'right', color: C.net }}>Net</div>
+              <div style={{ textAlign: 'right' }}>Avg Units</div>
+              <div style={{ textAlign: 'right', color: C.net }}>Net/Unit</div>
+            </div>
+
+            {yearSummaries.map((y, i) => (
+              <div
+                key={y.year}
+                style={{
+                  display: 'grid', gridTemplateColumns: '80px 1fr 1fr 1fr 1fr 1fr 1fr 70px 110px',
+                  padding: '9px 16px', gap: 8,
+                  borderTop: i > 0 ? '1px solid #F3F4F6' : 'none',
+                  fontSize: 13,
+                }}
+              >
+                <div style={{ fontWeight: 800, color: '#111827' }}>{y.year}</div>
+                <div style={{ textAlign: 'right', fontWeight: 600, color: C.gross }}>{y.gross > 0 ? fmt(y.gross) : '—'}</div>
+                <div style={{ textAlign: 'right', color: C.payroll }}>{y.payroll > 0 ? fmt(y.payroll) : '—'}</div>
+                <div style={{ textAlign: 'right', color: C.fuel }}>{y.fuel > 0 ? fmt(y.fuel) : '—'}</div>
+                <div style={{ textAlign: 'right', color: C.maintenance }}>{y.maintenance > 0 ? fmt(y.maintenance) : '—'}</div>
+                <div style={{ textAlign: 'right', color: C.insurance }}>{y.insurance > 0 ? fmt(y.insurance) : '—'}</div>
+                <div style={{ textAlign: 'right', fontWeight: 700, color: y.net >= 0 ? C.net : '#DC2626' }}>{fmt(y.net)}</div>
+                <div style={{ textAlign: 'right', color: '#374151' }}>{y.units ?? '—'}</div>
+                <div style={{ textAlign: 'right', fontWeight: 700, color: y.netPerUnit != null ? (y.net >= 0 ? C.net : '#DC2626') : '#9CA3AF' }}>
+                  {y.netPerUnit != null ? fmt(y.netPerUnit) : '—'}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Disclaimer */}
+          <div style={{ fontSize: 11, color: '#9CA3AF', padding: '10px 14px', background: '#F9FAFB', border: '1px solid #E5E7EB', borderRadius: 8, marginBottom: 24, lineHeight: 1.6 }}>
+            <strong style={{ color: '#6B7280' }}>Note:</strong> The figures above are rough estimates based on available records. Actual net revenue is lower — additional operating expenses (office costs, licenses, permits, factoring fees, miscellaneous) are not captured here. This view is intended for high-level trend analysis only, not for precise financial reporting.
           </div>
         </>
       )}
