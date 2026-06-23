@@ -6,17 +6,23 @@ export function useAllTimeSummary(company, refreshKey = 0) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    async function paginate(query) {
-      const PAGE = 2000
-      let all = [], from = 0
-      while (true) {
-        const { data, error } = await query.range(from, from + PAGE - 1)
-        if (error || !data || data.length === 0) break
-        all = all.concat(data)
-        if (data.length < PAGE) break
-        from += PAGE
+    // Fetch one table year-by-year with fresh queries each time.
+    // This avoids Supabase query-object reuse issues and per-request row caps
+    // that cause recent years to be silently dropped when fetching all years in one shot.
+    async function fetchByYear(table, dateCol, selectCols) {
+      const thisYear = new Date().getFullYear()
+      const promises = []
+      for (let y = 2022; y <= thisYear; y++) {
+        promises.push(
+          supabase.from(table)
+            .select(selectCols)
+            .gte(dateCol, `${y}-01-01`)
+            .lte(dateCol, `${y}-12-31`)
+            .limit(10000)
+        )
       }
-      return all
+      const results = await Promise.all(promises)
+      return results.flatMap(r => r.data ?? [])
     }
 
     async function fetchAll() {
@@ -24,18 +30,15 @@ export function useAllTimeSummary(company, refreshKey = 0) {
       const [manualRes, insRes, loads, paystubs, fuel, maintenance] = await Promise.all([
         supabase.from('monthly_manual_entries').select('*').limit(5000),
         supabase.from('insurance_entries').select('*').limit(5000),
-        paginate(supabase.from('loads')
+        // Loads still use the single-query approach since pickup_date spans companies cleanly
+        supabase.from('loads')
           .select('price,pickup_date,date,company,status,truck_number')
-          .or('pickup_date.gte.2022-01-01,and(pickup_date.is.null,date.gte.2022-01-01)')),
-        paginate(supabase.from('paystubs')
-          .select('grand_total,start_date,company')
-          .gte('start_date', '2022-01-01')),
-        paginate(supabase.from('fuel_transactions')
-          .select('amount,transaction_date,company')
-          .gte('transaction_date', '2022-01-01')),
-        paginate(supabase.from('maintenance_records')
-          .select('amount,date,company')
-          .gte('date', '2022-01-01')),
+          .or('pickup_date.gte.2022-01-01,and(pickup_date.is.null,date.gte.2022-01-01)')
+          .limit(50000)
+          .then(r => r.data ?? []),
+        fetchByYear('paystubs',          'start_date',        'grand_total,start_date,company'),
+        fetchByYear('fuel_transactions',  'transaction_date',  'amount,transaction_date,company'),
+        fetchByYear('maintenance_records','date',              'amount,date,company'),
       ])
       setRaw({
         manual:      manualRes.data ?? [],
