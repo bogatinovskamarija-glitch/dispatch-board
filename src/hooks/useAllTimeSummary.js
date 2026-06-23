@@ -6,26 +6,44 @@ export function useAllTimeSummary(company, refreshKey = 0) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    async function paginate(query) {
+      const PAGE = 2000
+      let all = [], from = 0
+      while (true) {
+        const { data, error } = await query.range(from, from + PAGE - 1)
+        if (error || !data || data.length === 0) break
+        all = all.concat(data)
+        if (data.length < PAGE) break
+        from += PAGE
+      }
+      return all
+    }
+
     async function fetchAll() {
       setLoading(true)
-      const [manualRes, insRes, loadsRes, paystubsRes, fuelRes, maintRes] = await Promise.all([
+      const [manualRes, insRes, loads, paystubs, fuel, maintenance] = await Promise.all([
         supabase.from('monthly_manual_entries').select('*').limit(5000),
         supabase.from('insurance_entries').select('*').limit(5000),
-        supabase.from('loads')
+        paginate(supabase.from('loads')
           .select('price,pickup_date,date,company,status,truck_number')
-          .or('pickup_date.gte.2022-01-01,and(pickup_date.is.null,date.gte.2022-01-01)')
-          .limit(50000),
-        supabase.from('paystubs').select('grand_total,start_date,company').gte('start_date', '2022-01-01').limit(10000),
-        supabase.from('fuel_transactions').select('amount,transaction_date,company').gte('transaction_date', '2022-01-01').limit(10000),
-        supabase.from('maintenance_records').select('amount,date,company').gte('date', '2022-01-01').limit(10000),
+          .or('pickup_date.gte.2022-01-01,and(pickup_date.is.null,date.gte.2022-01-01)')),
+        paginate(supabase.from('paystubs')
+          .select('grand_total,start_date,company')
+          .gte('start_date', '2022-01-01')),
+        paginate(supabase.from('fuel_transactions')
+          .select('amount,transaction_date,company')
+          .gte('transaction_date', '2022-01-01')),
+        paginate(supabase.from('maintenance_records')
+          .select('amount,date,company')
+          .gte('date', '2022-01-01')),
       ])
       setRaw({
-        manual:      manualRes.data   ?? [],
-        insurance:   insRes.data      ?? [],
-        loads:       loadsRes.data    ?? [],
-        paystubs:    paystubsRes.data ?? [],
-        fuel:        fuelRes.data     ?? [],
-        maintenance: maintRes.data    ?? [],
+        manual:      manualRes.data ?? [],
+        insurance:   insRes.data    ?? [],
+        loads,
+        paystubs,
+        fuel,
+        maintenance,
       })
       setLoading(false)
     }
