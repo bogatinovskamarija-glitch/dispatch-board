@@ -47,7 +47,7 @@ export function useMonthlyAccountingSummary(year, company) {
       const [loadsRes, paystubsRes, fuelRes, maintRes] = await Promise.all([
         supabase
           .from('loads')
-          .select('id,price,total_miles,pickup_date,date,company,status')
+          .select('id,price,total_miles,pickup_date,date,company,status,truck_number')
           // Mirror the weekly hook: pickup_date is the source of truth;
           // fall back to date only when pickup_date is null.
           // Filtering by date alone misses pre-booked loads (entry date ≠ pickup date).
@@ -88,7 +88,7 @@ export function useMonthlyAccountingSummary(year, company) {
 
     const result = Array.from({ length: 12 }, () => ({
       gross: 0, payroll: 0, fuel: 0, maintenance: 0, miles: 0,
-      weeks: {},
+      weeks: {}, weekTrucks: {},
     }))
 
     const matchesCompany = r => !company || company === 'all' || r.company === company
@@ -108,6 +108,11 @@ export function useMonthlyAccountingSummary(year, company) {
       result[m].gross += price
       result[m].miles += miles
       addToWeek(result[m].weeks, dateStr, { gross: price, miles })
+      const truckNum = (l.truck_number || '').trim()
+      if (truckNum) {
+        if (!result[m].weekTrucks[weekStart]) result[m].weekTrucks[weekStart] = new Set()
+        result[m].weekTrucks[weekStart].add(truckNum)
+      }
     }
 
     for (const p of paystubs) {
@@ -137,10 +142,18 @@ export function useMonthlyAccountingSummary(year, company) {
       addToWeek(result[m].weeks, rec.date, { maintenance: amt })
     }
 
-    return result.map(m => ({
-      ...m,
-      weeks: Object.values(m.weeks).sort((a, b) => a.start.localeCompare(b.start)),
-    }))
+    return result.map(m => {
+      const weeklyCounts = Object.values(m.weekTrucks).map(s => s.size).filter(n => n > 0)
+      const avgTrucks = weeklyCounts.length > 0
+        ? Math.round(weeklyCounts.reduce((s, v) => s + v, 0) / weeklyCounts.length)
+        : null
+      return {
+        ...m,
+        avgTrucks,
+        weekTrucks: undefined,
+        weeks: Object.values(m.weeks).sort((a, b) => a.start.localeCompare(b.start)),
+      }
+    })
   }, [loads, paystubs, fuel, maintenance, company])
 
   return { months, loading }

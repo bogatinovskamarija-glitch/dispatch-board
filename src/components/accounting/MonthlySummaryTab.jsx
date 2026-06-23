@@ -765,18 +765,29 @@ export default function MonthlySummaryTab({ company }) {
   const [unlocked,     setUnlocked]     = useState(() => sessionStorage.getItem(MONTHLY_SESSION_KEY) === '1')
   const [editInsMonth, setEditInsMonth] = useState(null)
   const [editManMonth, setEditManMonth] = useState(null)
+  const [allTimeKey,   setAllTimeKey]   = useState(0)
 
   const { months, loading }          = useMonthlyAccountingSummary(year, company)
   const { entries: insEntries, getAmount, getEntry, setAmount } = useInsurance(year)
   const { entries: manEntries, getManual, getRawEntries, saveMonth } = useMonthlyManual(year)
-  const { yearSummaries, loading: allTimeLoading } = useAllTimeSummary(company)
+  const { yearSummaries, loading: allTimeLoading } = useAllTimeSummary(company, allTimeKey)
+
+  async function handleSaveManual(month, caratData, proData) {
+    await saveMonth(month, caratData, proData)
+    setAllTimeKey(k => k + 1)
+  }
 
   const monthsEnriched = useMemo(() =>
-    months.map((m, i) => ({
-      ...m,
-      insurance: getAmount(company, i + 1),
-      manual:    getManual(company, i + 1),
-    })),
+    months.map((m, i) => {
+      const manual = getManual(company, i + 1)
+      // Use manual unit_count if entered; fall back to computed weekly avg trucks from loads
+      if (!manual.unit_count && m.avgTrucks) manual.unit_count = m.avgTrucks
+      return {
+        ...m,
+        insurance: getAmount(company, i + 1),
+        manual,
+      }
+    }),
     [months, insEntries, manEntries, company]
   )
 
@@ -1037,7 +1048,7 @@ export default function MonthlySummaryTab({ company }) {
           monthIdx={editManMonth}
           year={year}
           rawEntries={getRawEntries(editManMonth + 1)}
-          onSave={saveMonth}
+          onSave={handleSaveManual}
           onClose={() => setEditManMonth(null)}
         />
       )}

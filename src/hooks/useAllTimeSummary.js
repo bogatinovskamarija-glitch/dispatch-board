@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 
-export function useAllTimeSummary(company) {
+export function useAllTimeSummary(company, refreshKey = 0) {
   const [raw, setRaw] = useState({ manual: [], insurance: [], loads: [], paystubs: [], fuel: [], maintenance: [] })
   const [loading, setLoading] = useState(true)
 
@@ -11,9 +11,8 @@ export function useAllTimeSummary(company) {
       const [manualRes, insRes, loadsRes, paystubsRes, fuelRes, maintRes] = await Promise.all([
         supabase.from('monthly_manual_entries').select('*').limit(5000),
         supabase.from('insurance_entries').select('*').limit(5000),
-        // Real system data — fetch from 2022 onwards (pre-2022 comes entirely from manual entries)
         supabase.from('loads')
-          .select('price,pickup_date,date,company,status')
+          .select('price,pickup_date,date,company,status,truck_number')
           .or('pickup_date.gte.2022-01-01,and(pickup_date.is.null,date.gte.2022-01-01)')
           .limit(50000),
         supabase.from('paystubs').select('grand_total,start_date,company').gte('start_date', '2022-01-01').limit(10000),
@@ -31,7 +30,7 @@ export function useAllTimeSummary(company) {
       setLoading(false)
     }
     fetchAll()
-  }, []) // fetch once — data rarely changes mid-session
+  }, [refreshKey])
 
   const yearSummaries = useMemo(() => {
     const NON_REVENUE = new Set(['home', 'broken', 'no_driver'])
@@ -39,7 +38,11 @@ export function useAllTimeSummary(company) {
 
     const years = {}
     const ensure = y => {
-      if (!years[y]) years[y] = { year: y, gross: 0, payroll: 0, fuel: 0, maintenance: 0, insurance: 0, unitsByMonth: {} }
+      if (!years[y]) years[y] = {
+        year: y, gross: 0, payroll: 0, fuel: 0, maintenance: 0, insurance: 0,
+        unitsByMonth: {},        // from manual entries
+        trucksByMonth: {},       // computed from real loads: { month -> Set<truck_number> }
+      }
     }
 
     // Manual entries — primary source for historical years, supplemental for tracked years
@@ -50,7 +53,6 @@ export function useAllTimeSummary(company) {
       years[e.year].payroll     += Number(e.payroll)     || 0
       years[e.year].fuel        += Number(e.fuel)        || 0
       years[e.year].maintenance += Number(e.maintenance) || 0
-      // Collect unit counts per month so we can average for the year
       const uc = Number(e.unit_count) || 0
       if (uc > 0) {
         // For company='all', same month from both companies adds up (total fleet)
@@ -65,14 +67,20 @@ export function useAllTimeSummary(company) {
       years[ins.year].insurance += Number(ins.amount) || 0
     }
 
-    // Real loads (2022+)
+    // Real loads (2022+) — also track unique trucks per month for auto unit count
     for (const l of raw.loads) {
       if (!matchCo(l) || NON_REVENUE.has(l.status)) continue
       const d = l.pickup_date || l.date
       if (!d) continue
       const y = parseInt(d.substring(0, 4))
+      const mo = parseInt(d.substring(5, 7))
       ensure(y)
       years[y].gross += Number(l.price) || 0
+      const trk = (l.truck_number || '').trim()
+      if (trk) {
+        if (!years[y].trucksByMonth[mo]) years[y].trucksByMonth[mo] = new Set()
+        years[y].trucksByMonth[mo].add(trk)
+      }
     }
 
     // Real paystubs (2022+)
@@ -102,10 +110,24 @@ export function useAllTimeSummary(company) {
     return Object.values(years)
       .map(y => {
         const net = y.gross - y.payroll - y.fuel - y.maintenance - y.insurance
-        const monthVals = Object.values(y.unitsByMonth)
-        const avgUnits = monthVals.length > 0
-          ? Math.round(monthVals.reduce((s, v) => s + v, 0) / monthVals.length)
+
+        // Build per-month unit count: prefer manual entry, fall back to computed truck count
+        const allMonths = new Set([
+          ...Object.keys(y.unitsByMonth).map(Number),
+          ...Object.keys(y.trucksByMonth).map(Number),
+        ])
+        const monthUnits = []
+        for (const mo of allMonths) {
+          const manualVal = y.unitsByMonth[mo] || 0
+          const computedVal = y.trucksByMonth[mo] ? y.trucksByMonth[mo].size : 0
+          const val = manualVal > 0 ? manualVal : computedVal
+          if (val > 0) monthUnits.push(val)
+        }
+
+        const avgUnits = monthUnits.length > 0
+          ? Math.round(monthUnits.reduce((s, v) => s + v, 0) / monthUnits.length)
           : null
+
         return {
           year:        y.year,
           gross:       y.gross,
