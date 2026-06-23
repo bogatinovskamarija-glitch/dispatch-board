@@ -12,13 +12,13 @@ const MONTHS      = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct'
 const MONTHS_FULL = ['January','February','March','April','May','June','July','August','September','October','November','December']
 
 const C = {
-  gross:       '#059669',
-  payroll:     '#2563EB',
-  fuel:        '#D97706',
-  maintenance: '#6B7280',
-  insurance:   '#DC2626',
-  miles:       '#8B5CF6',
-  net:         '#10B981',
+  gross:       '#34D399',  // emerald-400
+  payroll:     '#818CF8',  // indigo-400
+  fuel:        '#FBBF24',  // amber-400
+  maintenance: '#94A3B8',  // slate-400
+  insurance:   '#FB7185',  // rose-400
+  miles:       '#C084FC',  // purple-400
+  net:         '#4ADE80',  // green-400
 }
 
 // Shared grid column definition — update here to affect all rows simultaneously
