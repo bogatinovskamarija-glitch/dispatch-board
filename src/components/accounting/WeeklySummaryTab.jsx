@@ -120,24 +120,33 @@ export default function WeeklySummaryTab({ company }) {
   const maintenanceTotal           = useWeekMaintenanceTotal(start, end, company)
   const maintenanceByUnit          = useWeekMaintenanceByUnit(start, end, company)
 
-  // Fuel policy amount per driver for the week (from fuel_transactions)
-  const [fuelByDriver, setFuelByDriver] = useState({})
+  // Fuel policy amount for the week — keyed by truck_number (primary) and driver_name (fallback)
+  const [fuelByTruck,      setFuelByTruck]      = useState({})
+  const [fuelByDriverName, setFuelByDriverName] = useState({})
   useEffect(() => {
     if (!start || !end) return
     let q = supabase
       .from('fuel_transactions')
-      .select('driver_name, amount')
+      .select('driver_name, truck_number, amount')
       .gte('transaction_date', start)
       .lte('transaction_date', end)
     if (company && company !== 'all') q = q.eq('company', company)
     q.then(({ data }) => {
-      const map = {}
+      const byTruck = {}
+      const byName  = {}
       for (const t of (data ?? [])) {
-        const name = (t.driver_name || '').trim()
-        if (!name) continue
-        map[name.toLowerCase()] = (map[name.toLowerCase()] || 0) + (Number(t.amount) || 0)
+        const amt   = Number(t.amount) || 0
+        const truck = (t.truck_number || '').trim()
+        const name  = (t.driver_name  || '').trim()
+        if (truck) {
+          byTruck[truck] = (byTruck[truck] || 0) + amt
+        } else if (name) {
+          // Only fall back to driver name when there's no truck number
+          byName[name.toLowerCase()] = (byName[name.toLowerCase()] || 0) + amt
+        }
       }
-      setFuelByDriver(map)
+      setFuelByTruck(byTruck)
+      setFuelByDriverName(byName)
     })
   }, [start, end, company])
 
@@ -188,6 +197,11 @@ export default function WeeklySummaryTab({ company }) {
         const maintenance =
           [...r.trucks].reduce((s, u) => s + (maintenanceByUnit[u] || 0), 0) +
           [...r.trailers].reduce((s, u) => s + (maintenanceByUnit[u] || 0), 0)
+        // Match fuel by truck number first (avoids EFS driver-name typos),
+        // then fall back to driver name for transactions without a truck number.
+        const fuel =
+          [...r.trucks].reduce((s, u) => s + (fuelByTruck[u] || 0), 0) +
+          (fuelByDriverName[r.name.toLowerCase()] || 0)
         return {
           ...r,
           trucks: undefined,
@@ -196,12 +210,12 @@ export default function WeeklySummaryTab({ company }) {
           payroll:     r.hasProfile && !r.missingPay ? r.payroll : (r.hasProfile ? r.payroll : null),
           net:         r.hasProfile && !r.missingPay ? r.gross - r.payroll : null,
           expenses:    driverExpenses[r.name] || 0,
-          fuel:        fuelByDriver[r.name.toLowerCase()] || 0,
+          fuel,
           maintenance,
         }
       })
       .sort((a, b) => b.gross - a.gross)
-  }, [loads, profiles, driverExpenses, fuelByDriver, maintenanceByUnit])
+  }, [loads, profiles, driverExpenses, fuelByTruck, fuelByDriverName, maintenanceByUnit])
 
   // ── Top-line metrics ──────────────────────────────────────────────────────
   const totalRevenue   = loads.reduce((s, l) => s + (Number(l.price) || 0), 0)
