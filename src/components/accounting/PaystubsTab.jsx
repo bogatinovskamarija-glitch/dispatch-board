@@ -727,6 +727,7 @@ export default function PaystubsTab({ drivers, company }) {
           <table className="acct-table acct-table-paystub">
             <thead>
               <tr>
+                <th style={{ width: 28 }}></th>
                 <th>Load #</th>
                 <th>Pickup</th>
                 <th>Delivery</th>
@@ -743,6 +744,18 @@ export default function PaystubsTab({ drivers, company }) {
                 const flatLoad = isPerMile && (pay.payType ?? 'per_mile') === 'flat'
                 return (
                   <tr key={l.id}>
+                    <td style={{ textAlign: 'center' }}>
+                      <button
+                        title="Remove from paystub"
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9CA3AF', fontSize: 14, lineHeight: 1, padding: '2px 4px', borderRadius: 4 }}
+                        onMouseOver={e => e.currentTarget.style.color = '#DC2626'}
+                        onMouseOut={e => e.currentTarget.style.color = '#9CA3AF'}
+                        onClick={() => {
+                          setLoads(prev => prev.filter(x => x.id !== l.id))
+                          setLoadPay(prev => { const next = { ...prev }; delete next[l.id]; return next })
+                        }}
+                      >✕</button>
+                    </td>
                     <td>{l.load_number || '—'}</td>
                     <td>{l.pickup_date  || l.date || '—'}</td>
                     <td>{l.delivery_date || '—'}</td>
@@ -809,7 +822,7 @@ export default function PaystubsTab({ drivers, company }) {
             </tbody>
             <tfoot>
               <tr>
-                <td colSpan={isPerMile ? 8 : 6} className="acct-subtotal-label">Sub-Total</td>
+                <td colSpan={isPerMile ? 9 : 7} className="acct-subtotal-label">Sub-Total</td>
                 <td className="acct-subtotal-val">{fmt(loadTotal)}</td>
               </tr>
             </tfoot>
