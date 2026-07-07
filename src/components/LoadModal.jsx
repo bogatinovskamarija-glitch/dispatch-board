@@ -58,7 +58,17 @@ export default function LoadModal({ load, date, drivers, trucks, trailers, fleet
   }, [load, date])
 
   function set(field, value) {
-    setForm(f => ({ ...f, [field]: value }))
+    setForm(f => {
+      const next = { ...f, [field]: value }
+      // When switching to a non-load status, ensure stops has at least 2 entries
+      // so the From/To date fields always have a backing slot.
+      if (field === 'status' && ['home', 'broken', 'no_driver'].includes(value)) {
+        const stops = [...next.stops]
+        while (stops.length < 2) stops.push({ type: 'delivery', location: '', date: '', appt: '' })
+        next.stops = stops
+      }
+      return next
+    })
   }
 
   function updateStop(i, field, value) {
@@ -285,63 +295,87 @@ export default function LoadModal({ load, date, drivers, trucks, trailers, fleet
               </div>
             </div>
 
-            {/* ROUTE — dynamic stops */}
-            <div className="form-section">
-              <div className="form-section-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span>Route</span>
-                <button type="button" className="btn btn-ghost" style={{ padding: '2px 10px', fontSize: 11, height: 24 }} onClick={addStop}>
-                  + Add Stop
-                </button>
-              </div>
-
-              <div className="stops-header">
-                <span>Type</span>
-                <span>Location</span>
-                <span>Date</span>
-                <span>Appt</span>
-                <span />
-              </div>
-
-              {form.stops.map((stop, i) => (
-                <div key={i} className="stop-row">
-                  <select
-                    value={stop.type}
-                    onChange={e => updateStop(i, 'type', e.target.value)}
-                    className={`stop-type-${stop.type}`}
-                  >
-                    <option value="pickup">Pickup</option>
-                    <option value="delivery">Delivery</option>
-                  </select>
-                  <input
-                    type="text"
-                    placeholder="City, State"
-                    value={stop.location}
-                    onChange={e => updateStop(i, 'location', e.target.value)}
-                  />
-                  <input
-                    type="date"
-                    value={stop.date}
-                    onChange={e => updateStop(i, 'date', e.target.value)}
-                  />
-                  <input
-                    type="text"
-                    placeholder="e.g. 3:30 AM"
-                    value={stop.appt}
-                    onChange={e => updateStop(i, 'appt', e.target.value)}
-                  />
-                  {form.stops.length > 1 ? (
-                    <button type="button" className="stop-remove" onClick={() => removeStop(i)} title="Remove stop">✕</button>
-                  ) : (
-                    <span />
-                  )}
+            {/* ROUTE — simplified From/To for non-load statuses, full stops for active loads */}
+            {['home', 'broken', 'no_driver'].includes(form.status) ? (
+              <div className="form-section">
+                <div className="form-section-title">Dates</div>
+                <div className="form-grid">
+                  <div className="form-group">
+                    <label>From</label>
+                    <input
+                      type="date"
+                      value={form.stops[0]?.date || ''}
+                      onChange={e => updateStop(0, 'date', e.target.value)}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>To</label>
+                    <input
+                      type="date"
+                      value={form.stops[1]?.date || ''}
+                      onChange={e => updateStop(1, 'date', e.target.value)}
+                    />
+                  </div>
                 </div>
-              ))}
-
-              <div className="form-group" style={{ marginTop: 10, maxWidth: 160 }}>
-                <label>Zip</label>
-                <input type="text" placeholder="08873" value={form.zip} onChange={e => set('zip', e.target.value)} />
               </div>
-            </div>
+            ) : (
+              <div className="form-section">
+                <div className="form-section-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span>Route</span>
+                  <button type="button" className="btn btn-ghost" style={{ padding: '2px 10px', fontSize: 11, height: 24 }} onClick={addStop}>
+                    + Add Stop
+                  </button>
+                </div>
+
+                <div className="stops-header">
+                  <span>Type</span>
+                  <span>Location</span>
+                  <span>Date</span>
+                  <span>Appt</span>
+                  <span />
+                </div>
+
+                {form.stops.map((stop, i) => (
+                  <div key={i} className="stop-row">
+                    <select
+                      value={stop.type}
+                      onChange={e => updateStop(i, 'type', e.target.value)}
+                      className={`stop-type-${stop.type}`}
+                    >
+                      <option value="pickup">Pickup</option>
+                      <option value="delivery">Delivery</option>
+                    </select>
+                    <input
+                      type="text"
+                      placeholder="City, State"
+                      value={stop.location}
+                      onChange={e => updateStop(i, 'location', e.target.value)}
+                    />
+                    <input
+                      type="date"
+                      value={stop.date}
+                      onChange={e => updateStop(i, 'date', e.target.value)}
+                    />
+                    <input
+                      type="text"
+                      placeholder="e.g. 3:30 AM"
+                      value={stop.appt}
+                      onChange={e => updateStop(i, 'appt', e.target.value)}
+                    />
+                    {form.stops.length > 1 ? (
+                      <button type="button" className="stop-remove" onClick={() => removeStop(i)} title="Remove stop">✕</button>
+                    ) : (
+                      <span />
+                    )}
+                  </div>
+                ))}
+
+                <div className="form-group" style={{ marginTop: 10, maxWidth: 160 }}>
+                  <label>Zip</label>
+                  <input type="text" placeholder="08873" value={form.zip} onChange={e => set('zip', e.target.value)} />
+                </div>
+              </div>
+            )}
 
             {/* LOAD DETAILS */}
             <div className="form-section">

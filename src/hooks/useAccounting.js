@@ -21,8 +21,9 @@ export function usePendingInvoices(company = 'all') {
       .order('delivery_date', { ascending: false })
     if (company !== 'all') q = q.eq('company', company)
     const { data } = await q
-    // Also exclude manually archived loads (safe even if column doesn't exist yet)
-    setLoads((data ?? []).filter(l => l.broker && !l.is_archived))
+    // TONU loads show even without a broker (broker may be added later before invoicing).
+    // All other statuses require a broker to appear here.
+    setLoads((data ?? []).filter(l => (l.broker || l.status === 'tonu') && !l.is_archived))
     setLoading(false)
   }, [company])
 
