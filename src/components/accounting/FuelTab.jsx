@@ -4,6 +4,7 @@ import { useFuelTransactions, importFuelTransactions, clearFuelWeek } from '../.
 import { useDriverProfiles } from '../../hooks/useDriverProfiles'
 import { supabase } from '../../lib/supabase'
 import { getThursdayWeek } from '../../hooks/useWeeklySummary'
+import { detectTruckCompanies } from '../../hooks/useIFTA'
 
 const fmt$  = n => '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2 })
 const fmtG  = n => Number(n).toFixed(3) + ' gal'
@@ -304,11 +305,12 @@ export default function FuelTab({ company }) {
     setImporting(true)
     setImportMsg(null)
     try {
+      const fallback = company !== 'all' ? company : 'carat'
       let rows
       if (preview.format === 'efs') {
-        rows = parseEFSRows(preview.rows, week.from, company === 'all' ? 'carat' : company)
+        rows = parseEFSRows(preview.rows, week.from, fallback)
       } else if (preview.format === 'txnreport') {
-        rows = parseTxnReportRows(preview.rows, company)
+        rows = parseTxnReportRows(preview.rows, fallback)
       } else {
         if (!colMap) { alert('Please map all columns first.'); setImporting(false); return }
         const get = (row, col) => col != null && col !== '' ? row[Number(col)] : ''
@@ -324,13 +326,30 @@ export default function FuelTab({ company }) {
             amount:        cleanNum(get(row, colMap.amountCol)),
             rebate_amount: cleanNum(get(row, colMap.rebateCol)) || 0,
             fuel_category: get(row, colMap.categoryCol) || null,
-            company:       company === 'all' ? 'carat' : company,
+            company:       fallback,
             week_start:    week.from,
           }
         }).filter(r => r && r.gallons != null && r.amount != null)
         localStorage.setItem('fuel_colmap', JSON.stringify(colMap))
       }
       if (!rows.length) { setImportMsg('No valid rows found. Check the column mapping.'); setImporting(false); return }
+
+      // Auto-detect company per truck from load history (EFS and txnreport only)
+      if (preview.format === 'efs' || preview.format === 'txnreport') {
+        const truckNums = [...new Set(rows.map(r => r.truck_number).filter(Boolean))]
+        if (truckNums.length) {
+          const dates  = rows.map(r => r.transaction_date).filter(Boolean).sort()
+          const from   = dates[0]
+          const to     = dates[dates.length - 1]
+          const coMap  = await detectTruckCompanies(truckNums, from, to, fallback)
+          for (const r of rows) {
+            if (r.truck_number && coMap[r.truck_number]) {
+              r.company = coMap[r.truck_number]
+            }
+          }
+        }
+      }
+
       await importFuelTransactions(rows)
       setImportMsg(`✓ ${rows.length} transactions imported.`)
       setPreview(null)

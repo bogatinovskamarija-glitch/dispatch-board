@@ -216,11 +216,45 @@ export function parseMotiveCSV(text) {
   return result
 }
 
+// ── Detect which company each truck belongs to based on load history ──────────
+// Uses the dominant company (most loads) for each truck in the given date range.
+// Falls back to `fallback` when a truck has no loads in that period.
+export async function detectTruckCompanies(truckNumbers, from, to, fallback = 'carat') {
+  if (!truckNumbers.length) return {}
+  const { data } = await supabase
+    .from('loads')
+    .select('truck_number, company')
+    .in('truck_number', truckNumbers.map(String))
+    .gte('pickup_date', from)
+    .lte('pickup_date', to)
+    .not('company', 'is', null)
+
+  const counts = {}
+  for (const row of (data ?? [])) {
+    const t = String(row.truck_number || '').trim()
+    const c = row.company
+    if (!t || !c) continue
+    if (!counts[t]) counts[t] = {}
+    counts[t][c] = (counts[t][c] || 0) + 1
+  }
+
+  const result = {}
+  for (const truck of truckNumbers) {
+    const t = String(truck).trim()
+    const co = counts[t]
+    result[t] = co
+      ? Object.entries(co).sort((a, b) => b[1] - a[1])[0][0]
+      : fallback
+  }
+  return result
+}
+
 // ── Bulk save mileage for all trucks from CSV import ─────────────────────────
-export async function saveIFTAMileageBulk(company, year, quarter, truckMilesMap) {
-  const co = company !== 'all' ? company : 'carat'
+// truckCompanyMap: { truckNumber: 'carat'|'pro_freight' } — detected from loads
+export async function saveIFTAMileageBulk(year, quarter, truckMilesMap, truckCompanyMap, fallback = 'carat') {
   const rows = []
   for (const [truck, stateMap] of Object.entries(truckMilesMap)) {
+    const co = (truckCompanyMap && truckCompanyMap[truck]) || fallback
     for (const [state, miles] of Object.entries(stateMap)) {
       rows.push({
         company: co, year, quarter,

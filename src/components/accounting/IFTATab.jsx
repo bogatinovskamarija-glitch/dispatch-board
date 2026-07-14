@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import {
   useIFTATrucks, useIFTAFuel, useIFTAMileage, useHUTData,
   saveIFTAMileage, saveIFTAMileageBulk, parseMotiveCSV,
+  detectTruckCompanies, quarterRange,
 } from '../../hooks/useIFTA'
 
 // ── Q1 2026 IFTA tax rates ($/gallon) — update rates each quarter ─────────────
@@ -432,28 +433,33 @@ export default function IFTATab({ company }) {
     if (!file) return
     e.target.value = ''
     const reader = new FileReader()
-    reader.onload = ev => {
+    reader.onload = async ev => {
       try {
-        const truckMap = parseMotiveCSV(ev.target.result)
+        const truckMap   = parseMotiveCSV(ev.target.result)
         const truckCount = Object.keys(truckMap).length
         const rowCount   = Object.values(truckMap).reduce((s, m) => s + Object.keys(m).length, 0)
         if (!truckCount) {
           setImportMsg('No valid IFTA data found in this file.')
           return
         }
-        setImportPreview({ truckMap, truckCount, rowCount })
-      } catch {
+        // Detect company from load history — trucks driving for Pro Freight go to pro_freight
+        const { from, to } = quarterRange(year, quarter)
+        const fallback    = company !== 'all' ? company : 'carat'
+        const companyMap  = await detectTruckCompanies(Object.keys(truckMap), from, to, fallback)
+        setImportPreview({ truckMap, companyMap, truckCount, rowCount })
+      } catch (err) {
         setImportMsg('Could not parse file — make sure it is the Motive distance summary CSV.')
       }
     }
     reader.readAsText(file)
-  }, [])
+  }, [year, quarter, company])
 
   const handleImportConfirm = useCallback(async () => {
     if (!importPreview) return
     setImporting(true)
     try {
-      const n = await saveIFTAMileageBulk(company, year, quarter, importPreview.truckMap)
+      const fallback = company !== 'all' ? company : 'carat'
+      const n = await saveIFTAMileageBulk(year, quarter, importPreview.truckMap, importPreview.companyMap, fallback)
       await refetchMiles()
       setImportPreview(null)
       setImportMsg(`Imported ${n} entries across ${importPreview.truckCount} trucks.`)
@@ -892,10 +898,14 @@ export default function IFTATab({ company }) {
                 Found <strong>{importPreview.truckCount} trucks</strong> and <strong>{importPreview.rowCount} state entries</strong>.
                 Existing entries for the same truck + state + quarter will be overwritten.
               </div>
+              <div style={{ fontSize: 12, color: '#6B7280', marginBottom: 10, background: '#F0FDF4', border: '1px solid #86EFAC', borderRadius: 6, padding: '8px 12px' }}>
+                Company auto-detected from load history. Trucks with no loads in this quarter fall back to {company !== 'all' ? (company === 'pro_freight' ? 'Pro Freight' : 'Carat') : 'Carat'}.
+              </div>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
                   <tr style={{ background: '#F9FAFB' }}>
                     <th style={{ padding: '8px 10px', textAlign: 'left', borderBottom: '1px solid #E5E7EB', fontSize: 11, color: '#6B7280', textTransform: 'uppercase' }}>Truck</th>
+                    <th style={{ padding: '8px 10px', textAlign: 'left', borderBottom: '1px solid #E5E7EB', fontSize: 11, color: '#6B7280', textTransform: 'uppercase' }}>Company</th>
                     <th style={{ padding: '8px 10px', textAlign: 'right', borderBottom: '1px solid #E5E7EB', fontSize: 11, color: '#6B7280', textTransform: 'uppercase' }}>States</th>
                     <th style={{ padding: '8px 10px', textAlign: 'right', borderBottom: '1px solid #E5E7EB', fontSize: 11, color: '#6B7280', textTransform: 'uppercase' }}>Total Miles</th>
                   </tr>
@@ -905,9 +915,17 @@ export default function IFTATab({ company }) {
                     .sort((a, b) => Number(a[0]) - Number(b[0]))
                     .map(([t, stMap]) => {
                       const total = Object.values(stMap).reduce((s, m) => s + m, 0)
+                      const co    = importPreview.companyMap?.[t] || 'carat'
+                      const coLabel = co === 'pro_freight' ? 'Pro Freight' : 'Carat'
+                      const coColor = co === 'pro_freight' ? '#7C3AED' : '#0284C7'
                       return (
                         <tr key={t} style={{ borderBottom: '1px solid #F3F4F6' }}>
                           <td style={{ padding: '7px 10px', fontWeight: 600 }}>Truck {t}</td>
+                          <td style={{ padding: '7px 10px' }}>
+                            <span style={{ fontSize: 11, fontWeight: 600, color: coColor, background: co === 'pro_freight' ? '#EDE9FE' : '#E0F2FE', borderRadius: 4, padding: '2px 7px' }}>
+                              {coLabel}
+                            </span>
+                          </td>
                           <td style={{ padding: '7px 10px', textAlign: 'right', color: '#6B7280' }}>{Object.keys(stMap).length}</td>
                           <td style={{ padding: '7px 10px', textAlign: 'right' }}>{fNum(total)}</td>
                         </tr>
