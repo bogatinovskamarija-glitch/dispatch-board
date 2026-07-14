@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import {
-  useIFTATrucks, useIFTAFuel, useIFTAMileage, useHUTData, saveIFTAMileage,
+  useIFTATrucks, useIFTAFuel, useIFTAMileage, useHUTData,
+  saveIFTAMileage, saveIFTAMileageBulk, parseMotiveCSV,
 } from '../../hooks/useIFTA'
 
 // ── Q1 2026 IFTA tax rates ($/gallon) — update rates each quarter ─────────────
@@ -81,6 +82,12 @@ export default function IFTATab({ company }) {
   const [saveMsg, setSaveMsg] = useState('')
   const [rates,   setRates]   = useState({ ...DEFAULT_RATES })
   const [editingRateState, setEditingRateState] = useState(null)
+
+  // CSV import
+  const fileInputRef = useRef(null)
+  const [importPreview, setImportPreview] = useState(null) // { truckMap, truckCount, rowCount }
+  const [importing,     setImporting]     = useState(false)
+  const [importMsg,     setImportMsg]     = useState('')
 
   // milesEdit: local edits before saving { ST: rawInputString }
   const [milesEdit, setMilesEdit] = useState({})
@@ -185,6 +192,43 @@ export default function IFTATab({ company }) {
     setTimeout(() => { document.title = 'Dispatcher Board' }, 1000)
   }, [truck, quarter, year])
 
+  const handleFileSelect = useCallback((e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    e.target.value = ''
+    const reader = new FileReader()
+    reader.onload = ev => {
+      try {
+        const truckMap = parseMotiveCSV(ev.target.result)
+        const truckCount = Object.keys(truckMap).length
+        const rowCount   = Object.values(truckMap).reduce((s, m) => s + Object.keys(m).length, 0)
+        if (!truckCount) {
+          setImportMsg('No valid IFTA data found in this file.')
+          return
+        }
+        setImportPreview({ truckMap, truckCount, rowCount })
+      } catch {
+        setImportMsg('Could not parse file — make sure it is the Motive distance summary CSV.')
+      }
+    }
+    reader.readAsText(file)
+  }, [])
+
+  const handleImportConfirm = useCallback(async () => {
+    if (!importPreview) return
+    setImporting(true)
+    try {
+      const n = await saveIFTAMileageBulk(company, year, quarter, importPreview.truckMap)
+      await refetchMiles()
+      setImportPreview(null)
+      setImportMsg(`Imported ${n} entries across ${importPreview.truckCount} trucks.`)
+      setTimeout(() => setImportMsg(''), 4000)
+    } catch (e) {
+      setImportMsg('Import error: ' + e.message)
+    }
+    setImporting(false)
+  }, [importPreview, company, year, quarter, refetchMiles])
+
   // ── HUT data for this quarter ─────────────────────────────────────────────────
   const hutTableData = useMemo(() => {
     const allTrucks = Object.keys(hutByTruck).sort((a, b) => Number(a) - Number(b))
@@ -267,11 +311,29 @@ export default function IFTATab({ company }) {
         </div>
 
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
-          {saveMsg && (
-            <span style={{ fontSize: 12, color: saveMsg.startsWith('Error') ? '#DC2626' : '#16A34A', fontWeight: 500 }}>
-              {saveMsg}
+          {(saveMsg || importMsg) && (
+            <span style={{ fontSize: 12, color: (saveMsg || importMsg).startsWith('Error') || (saveMsg || importMsg).startsWith('No valid') ? '#DC2626' : '#16A34A', fontWeight: 500 }}>
+              {saveMsg || importMsg}
             </span>
           )}
+          {/* Hidden file input for CSV import */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={handleFileSelect}
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            style={{
+              background: '#fff', color: '#374151', border: '1px solid #D1D5DB',
+              borderRadius: 6, padding: '7px 14px', fontSize: 13, cursor: 'pointer',
+            }}
+            title="Import Motive distance_summary_by_vehicle CSV"
+          >
+            ↑ Import Motive CSV
+          </button>
           {truck !== 'ALL' && (
             <button
               onClick={handleSave}
@@ -535,6 +597,58 @@ export default function IFTATab({ company }) {
           Miles shown are YTD totals from all quarters entered. HUT is filed separately through each state's portal — this table is for reference only.
         </div>
       </div>
+
+      {/* ── CSV Import Preview Modal ──────────────────────────────────────── */}
+      {importPreview && (
+        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setImportPreview(null)}>
+          <div className="modal" style={{ maxWidth: 540 }}>
+            <div className="modal-header">
+              <div className="modal-title">Import Motive Mileage — Q{quarter} {year}</div>
+              <button className="modal-close" onClick={() => setImportPreview(null)}>✕</button>
+            </div>
+            <div className="modal-body" style={{ maxHeight: 420, overflowY: 'auto' }}>
+              <div style={{ marginBottom: 12, fontSize: 13, color: '#374151' }}>
+                Found <strong>{importPreview.truckCount} trucks</strong> and <strong>{importPreview.rowCount} state entries</strong>.
+                Existing entries for the same truck + state + quarter will be overwritten.
+              </div>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                <thead>
+                  <tr style={{ background: '#F9FAFB' }}>
+                    <th style={{ padding: '8px 10px', textAlign: 'left', borderBottom: '1px solid #E5E7EB', fontSize: 11, color: '#6B7280', textTransform: 'uppercase' }}>Truck</th>
+                    <th style={{ padding: '8px 10px', textAlign: 'right', borderBottom: '1px solid #E5E7EB', fontSize: 11, color: '#6B7280', textTransform: 'uppercase' }}>States</th>
+                    <th style={{ padding: '8px 10px', textAlign: 'right', borderBottom: '1px solid #E5E7EB', fontSize: 11, color: '#6B7280', textTransform: 'uppercase' }}>Total Miles</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.entries(importPreview.truckMap)
+                    .sort((a, b) => Number(a[0]) - Number(b[0]))
+                    .map(([t, stMap]) => {
+                      const total = Object.values(stMap).reduce((s, m) => s + m, 0)
+                      return (
+                        <tr key={t} style={{ borderBottom: '1px solid #F3F4F6' }}>
+                          <td style={{ padding: '7px 10px', fontWeight: 600 }}>Truck {t}</td>
+                          <td style={{ padding: '7px 10px', textAlign: 'right', color: '#6B7280' }}>{Object.keys(stMap).length}</td>
+                          <td style={{ padding: '7px 10px', textAlign: 'right' }}>{fNum(total)}</td>
+                        </tr>
+                      )
+                    })
+                  }
+                </tbody>
+              </table>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-ghost" onClick={() => setImportPreview(null)}>Cancel</button>
+              <button
+                className="btn btn-primary"
+                onClick={handleImportConfirm}
+                disabled={importing}
+              >
+                {importing ? 'Importing…' : `Import ${importPreview.rowCount} entries`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

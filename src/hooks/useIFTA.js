@@ -163,6 +163,82 @@ export function useHUTData(year, company) {
   return { hutByTruck, loading, refetch: fetch }
 }
 
+// ── State full name → 2-letter abbreviation (IFTA jurisdictions only) ─────────
+export const STATE_NAME_TO_ABBR = {
+  'Alabama': 'AL', 'Arizona': 'AZ', 'Arkansas': 'AR', 'California': 'CA',
+  'Colorado': 'CO', 'Connecticut': 'CT', 'Delaware': 'DE', 'Florida': 'FL',
+  'Georgia': 'GA', 'Idaho': 'ID', 'Illinois': 'IL', 'Indiana': 'IN',
+  'Iowa': 'IA', 'Kansas': 'KS', 'Kentucky': 'KY', 'Louisiana': 'LA',
+  'Maine': 'ME', 'Maryland': 'MD', 'Massachusetts': 'MA', 'Michigan': 'MI',
+  'Minnesota': 'MN', 'Mississippi': 'MS', 'Missouri': 'MO', 'Montana': 'MT',
+  'Nebraska': 'NE', 'Nevada': 'NV', 'New Hampshire': 'NH', 'New Jersey': 'NJ',
+  'New Mexico': 'NM', 'New York': 'NY', 'North Carolina': 'NC', 'North Dakota': 'ND',
+  'Ohio': 'OH', 'Oklahoma': 'OK', 'Oregon': 'OR', 'Pennsylvania': 'PA',
+  'Rhode Island': 'RI', 'South Carolina': 'SC', 'South Dakota': 'SD',
+  'Tennessee': 'TN', 'Texas': 'TX', 'Utah': 'UT', 'Vermont': 'VT',
+  'Virginia': 'VA', 'Washington': 'WA', 'West Virginia': 'WV',
+  'Wisconsin': 'WI', 'Wyoming': 'WY',
+  // DC is not an IFTA jurisdiction — intentionally omitted
+}
+
+// Parse a single CSV line handling quoted fields ("1,234.56")
+function parseCSVLine(line) {
+  const cols = []
+  let cur = ''
+  let inQ = false
+  for (const ch of line) {
+    if (ch === '"') { inQ = !inQ }
+    else if (ch === ',' && !inQ) { cols.push(cur); cur = '' }
+    else { cur += ch }
+  }
+  cols.push(cur)
+  return cols
+}
+
+// Parse Motive distance_summary_by_vehicle CSV
+// Returns { truckNumber: { ST: miles } }
+export function parseMotiveCSV(text) {
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean)
+  // First line is header: Vehicle,Jurisdiction,Distance (mi),Fuel (gal)
+  const result = {}
+  for (const line of lines.slice(1)) {
+    const cols = parseCSVLine(line)
+    if (cols.length < 3) continue
+    const truck = cols[0].trim()
+    const juris = cols[1].trim()
+    const miles = parseFloat((cols[2] || '').replace(/,/g, ''))
+    if (!truck || !juris || isNaN(miles) || miles <= 0) continue
+    const st = STATE_NAME_TO_ABBR[juris]
+    if (!st) continue  // skip DC and unknown jurisdictions
+    if (!result[truck]) result[truck] = {}
+    result[truck][st] = (result[truck][st] || 0) + miles
+  }
+  return result
+}
+
+// ── Bulk save mileage for all trucks from CSV import ─────────────────────────
+export async function saveIFTAMileageBulk(company, year, quarter, truckMilesMap) {
+  const co = company !== 'all' ? company : 'carat'
+  const rows = []
+  for (const [truck, stateMap] of Object.entries(truckMilesMap)) {
+    for (const [state, miles] of Object.entries(stateMap)) {
+      rows.push({
+        company: co, year, quarter,
+        truck_number: truck,
+        state,
+        miles: Math.round(miles * 100) / 100,
+        updated_at: new Date().toISOString(),
+      })
+    }
+  }
+  if (!rows.length) return 0
+  const { error } = await supabase
+    .from('ifta_mileage_entries')
+    .upsert(rows, { onConflict: 'company,year,quarter,truck_number,state' })
+  if (error) throw new Error(error.message)
+  return rows.length
+}
+
 // ── Save mileage entries for one truck ────────────────────────────────────────
 export async function saveIFTAMileage(company, year, quarter, truckNumber, milesMap) {
   const co = company !== 'all' ? company : 'carat'
