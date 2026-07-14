@@ -93,6 +93,58 @@ function parseEFSRows(rows, weekStart, company) {
   }).filter(Boolean)
 }
 
+// ── Transaction Report CSV (alternate fuel provider) ─────────────────────────
+// Header row: Card #, Tran Date, Invoice, Unit, Driver Name, Odometer,
+//             Location Name, City, State/ Prov, Fees, Item, Unit Price, Qty, Amt, DB, Currency
+const TXN_COLS = {
+  date:     1,   // Tran Date  (M/D/YYYY)
+  truck:    3,   // Unit
+  driver:   4,   // Driver Name
+  location: 6,   // Location Name
+  city:     7,   // City
+  state:    8,   // State/ Prov
+  category: 10,  // Item  (ULSD / ULSR / DEFD)
+  gallons:  12,  // Qty
+  amount:   13,  // Amt
+}
+
+function isTxnReportFormat(headers) {
+  const h = headers.map(x => String(x).toLowerCase().trim())
+  return h.includes('tran date') && h.includes('unit') && h.includes('item') && h.includes('qty') && h.includes('amt')
+}
+
+function parseTxnReportRows(rows, company) {
+  return rows.map(row => {
+    if (!row || !row.length) return null
+    const date = parseDate(row[TXN_COLS.date])
+    if (!date) return null
+    const truck = String(row[TXN_COLS.truck] || '').trim()
+    if (!truck) return null
+    const gallons = cleanNum(row[TXN_COLS.gallons])
+    const amount  = cleanNum(row[TXN_COLS.amount])
+    if (gallons == null || amount == null) return null
+    const locParts = [
+      String(row[TXN_COLS.location] || '').trim(),
+      String(row[TXN_COLS.city]     || '').trim(),
+      String(row[TXN_COLS.state]    || '').trim(),
+    ].filter(Boolean)
+    const weekStart = getThursdayWeek(date).start
+    return {
+      transaction_date: date,
+      truck_number:     truck,
+      driver_name:      String(row[TXN_COLS.driver] || '').trim() || null,
+      location:         locParts.join(', ') || null,
+      gallons,
+      amount,
+      rebate_amount:    0,
+      fuel_category:    String(row[TXN_COLS.category] || '').trim() || null,
+      company:          company === 'all' ? 'carat' : company,
+      week_start:       weekStart,
+      raw_row:          {},
+    }
+  }).filter(Boolean)
+}
+
 // ── Generic CSV parser (fallback for non-XLSX or unknown formats) ──────────
 function parseCSV(text) {
   const lines = text.trim().split(/\r?\n/)
@@ -230,16 +282,15 @@ export default function FuelTab({ company }) {
     } else {
       reader.onload = ev => {
         const text = ev.target.result
-        // EFS CSV has 2 header rows: line[0] = group labels, line[1] = sub-headers
-        // Detect by checking the raw second line before any parsing
         const rawLines = text.trim().split(/\r?\n/)
         const line1 = (rawLines[1] || '').toLowerCase()
         const { headers, rows } = parseCSV(text)
-        // Check for EFS sub-header row — works for both quoted and unquoted CSVs
-        // "driver name" + "driver id" are unique to EFS format
         if (rawLines.length >= 3 && line1.includes('driver name') && line1.includes('driver id')) {
-          // Reconstruct as [groupLabels, subHeaders, ...data] for parseEFSRows
+          // EFS 2-row header format
           setPreview({ rows: [headers, rows[0], ...rows.slice(1)], format: 'efs' })
+        } else if (isTxnReportFormat(headers)) {
+          // Alternate fuel provider: single-header Transaction Report CSV
+          setPreview({ rows, format: 'txnreport', csvHeaders: headers })
         } else {
           setPreview({ rows, format: 'csv', csvHeaders: headers })
         }
@@ -256,6 +307,8 @@ export default function FuelTab({ company }) {
       let rows
       if (preview.format === 'efs') {
         rows = parseEFSRows(preview.rows, week.from, company === 'all' ? 'carat' : company)
+      } else if (preview.format === 'txnreport') {
+        rows = parseTxnReportRows(preview.rows, company)
       } else {
         if (!colMap) { alert('Please map all columns first.'); setImporting(false); return }
         const get = (row, col) => col != null && col !== '' ? row[Number(col)] : ''
@@ -308,6 +361,14 @@ export default function FuelTab({ company }) {
     if (!preview || preview.format !== 'efs') return 0
     return parseEFSRows(preview.rows, week.from, company === 'all' ? 'carat' : company).length
   }, [preview, week.from, company])
+  const txnSample = useMemo(() => {
+    if (!preview || preview.format !== 'txnreport') return []
+    return parseTxnReportRows(preview.rows, company).slice(0, 5)
+  }, [preview, company])
+  const txnRowCount = useMemo(() => {
+    if (!preview || preview.format !== 'txnreport') return 0
+    return parseTxnReportRows(preview.rows, company).length
+  }, [preview, company])
 
   // Fuzzy driver name match — handles minor typos like "Wiliams" vs "Williams"
   function findProfile(driverName) {
@@ -476,6 +537,51 @@ export default function FuelTab({ company }) {
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="btn btn-primary" onClick={handleImport} disabled={importing}>
               {importing ? 'Importing…' : `Import ${efsRowCount} Transactions`}
+            </button>
+            <button className="btn btn-ghost" onClick={() => setPreview(null)}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Transaction Report CSV preview (auto-detected) ──────────── */}
+      {preview?.format === 'txnreport' && (
+        <div className="fuel-mapper">
+          <div className="fuel-mapper-title">
+            ✓ Transaction Report format detected — {txnRowCount} transactions ready to import
+            <span style={{ float: 'right', fontSize: 11, color: '#6B7280', fontWeight: 400 }}>No column mapping needed · dates auto-assigned per week</span>
+          </div>
+          <div style={{ overflowX: 'auto', marginBottom: 12 }}>
+            <table style={{ fontSize: 11, borderCollapse: 'collapse', width: '100%' }}>
+              <thead>
+                <tr style={{ background: '#F3F4F6' }}>
+                  {['Date','Truck','Driver','Location','Category','Gallons','Amount'].map(h => (
+                    <th key={h} style={{ padding: '4px 8px', textAlign: 'left', fontWeight: 600, color: '#6B7280', whiteSpace: 'nowrap' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {txnSample.map((r, i) => (
+                  <tr key={i} style={{ borderTop: '1px solid #E5E7EB' }}>
+                    <td style={{ padding: '4px 8px', whiteSpace: 'nowrap' }}>{r.transaction_date}</td>
+                    <td style={{ padding: '4px 8px' }}>{r.truck_number}</td>
+                    <td style={{ padding: '4px 8px', color: '#374151' }}>{r.driver_name || '—'}</td>
+                    <td style={{ padding: '4px 8px', color: '#6B7280', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.location || '—'}</td>
+                    <td style={{ padding: '4px 8px' }}>
+                      <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 8, background: String(r.fuel_category||'').includes('DEF') ? '#F0F9FF' : '#FFF7ED', color: String(r.fuel_category||'').includes('DEF') ? '#0284C7' : '#EA580C', fontWeight: 600 }}>
+                        {r.fuel_category || '—'}
+                      </span>
+                    </td>
+                    <td style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 600 }}>{r.gallons.toFixed(3)}</td>
+                    <td style={{ padding: '4px 8px', textAlign: 'right' }}>{fmt$(r.amount)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {txnRowCount > 5 && <div style={{ fontSize: 11, color: '#9CA3AF', marginBottom: 10 }}>Showing 5 of {txnRowCount} rows</div>}
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn btn-primary" onClick={handleImport} disabled={importing}>
+              {importing ? 'Importing…' : `Import ${txnRowCount} Transactions`}
             </button>
             <button className="btn btn-ghost" onClick={() => setPreview(null)}>Cancel</button>
           </div>
