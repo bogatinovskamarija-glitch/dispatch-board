@@ -100,22 +100,22 @@ export function useIFTAMileage(year, quarter, company, truckNumber) {
 
   const fetch = useCallback(async () => {
     setLoading(true)
-    const co = company !== 'all' ? company : 'carat'
 
     if (truckNumber === 'ALL') {
-      // Aggregate across all trucks
-      const { data } = await supabase
+      let q = supabase
         .from('ifta_mileage_entries')
         .select('state, miles')
-        .eq('company', co)
         .eq('year', year)
         .eq('quarter', quarter)
+      if (company !== 'all') q = q.eq('company', company)
+      const { data } = await q
       const map = {}
       for (const r of (data ?? [])) {
         map[r.state] = (map[r.state] || 0) + Number(r.miles)
       }
       setMiles(map)
     } else {
+      const co = company !== 'all' ? company : 'carat'
       const { data } = await supabase
         .from('ifta_mileage_entries')
         .select('state, miles')
@@ -142,13 +142,13 @@ export function useHUTData(year, company) {
 
   const fetch = useCallback(async () => {
     setLoading(true)
-    const co = company !== 'all' ? company : 'carat'
-    const { data } = await supabase
+    let hutQ = supabase
       .from('ifta_mileage_entries')
       .select('truck_number, quarter, state, miles')
-      .eq('company', co)
       .eq('year', year)
       .in('state', HUT_STATES)
+    if (company !== 'all') hutQ = hutQ.eq('company', company)
+    const { data } = await hutQ
     const byTruck = {}
     for (const r of (data ?? [])) {
       const t = r.truck_number
