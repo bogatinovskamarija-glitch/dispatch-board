@@ -134,8 +134,10 @@ export function useIFTAMileage(year, quarter, company, truckNumber) {
   return { miles, loading, refetch: fetch }
 }
 
-// ── HUT reference: miles for KY/NM/CT/NY per truck per quarter ───────────────
-export function useHUTData(year, company) {
+// ── HUT reference: miles for KY/NM/CT/NY per truck ───────────────────────────
+// KY/NM/CT are quarterly — only the selected quarter's miles
+// NY is annual — sum of all quarters in the year
+export function useHUTData(year, quarter, company) {
   const [hutByTruck, setHutByTruck] = useState({}) // { truckNum: { KY, NM, CT, NY } }
   const [loading,    setLoading]    = useState(true)
   const HUT_STATES = ['KY', 'NM', 'CT', 'NY']
@@ -153,11 +155,17 @@ export function useHUTData(year, company) {
     for (const r of (data ?? [])) {
       const t = r.truck_number
       if (!byTruck[t]) byTruck[t] = { KY: 0, NM: 0, CT: 0, NY: 0 }
-      byTruck[t][r.state] = (byTruck[t][r.state] || 0) + Number(r.miles)
+      // KY/NM/CT: quarterly — only count miles from the selected quarter
+      // NY: annual — sum all quarters
+      if (r.state === 'NY') {
+        byTruck[t].NY += Number(r.miles)
+      } else if (Number(r.quarter) === Number(quarter)) {
+        byTruck[t][r.state] = (byTruck[t][r.state] || 0) + Number(r.miles)
+      }
     }
     setHutByTruck(byTruck)
     setLoading(false)
-  }, [year, company])
+  }, [year, quarter, company])
 
   useEffect(() => { fetch() }, [fetch])
   return { hutByTruck, loading, refetch: fetch }

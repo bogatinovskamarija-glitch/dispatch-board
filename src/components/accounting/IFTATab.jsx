@@ -109,7 +109,7 @@ export default function IFTATab({ company }) {
   const { fuelByState, totalGal } = useIFTAFuel(year, quarter, company, truck)
   const { miles: savedMiles, loading: milesLoading, refetch: refetchMiles } =
     useIFTAMileage(year, quarter, company, truck)
-  const { hutByTruck } = useHUTData(year, company)
+  const { hutByTruck } = useHUTData(year, quarter, company)
 
   // Reload rates from localStorage when year/quarter changes
   useEffect(() => {
@@ -854,7 +854,7 @@ export default function IFTATab({ company }) {
             Highway Use Tax (HUT) Reference — {year}
           </div>
           <div style={{ fontSize: 12, color: '#6B7280' }}>
-            KY / NM / CT — quarterly &nbsp;|&nbsp; NY — annual
+            KY / NM / CT — Q{quarter} only &nbsp;|&nbsp; NY — {year} annual (all quarters)
           </div>
         </div>
         <div style={{ overflowX: 'auto' }}>
@@ -870,7 +870,9 @@ export default function IFTATab({ company }) {
                   {Object.entries(HUT_INFO).map(([st, info]) => (
                     <th key={st} style={{ padding: '9px 10px', textAlign: 'right', fontSize: 11, fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '2px solid #E5E7EB' }}>
                       {st} Miles<br />
-                      <span style={{ fontWeight: 400, fontSize: 10, textTransform: 'none' }}>({info.period})</span>
+                      <span style={{ fontWeight: 400, fontSize: 10, textTransform: 'none' }}>
+                        {info.period === 'Annual' ? `(${year} Annual)` : `(Q${quarter} Only)`}
+                      </span>
                     </th>
                   ))}
                 </tr>
