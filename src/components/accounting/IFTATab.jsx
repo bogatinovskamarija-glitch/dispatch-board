@@ -81,7 +81,12 @@ export default function IFTATab({ company }) {
   const [showAll, setShowAll] = useState(false)
   const [saving,  setSaving]  = useState(false)
   const [saveMsg, setSaveMsg] = useState('')
-  const [rates,   setRates]   = useState({ ...DEFAULT_RATES })
+  const [rates,   setRates]   = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(`ifta_rates_${now.getFullYear()}_${curQ}`) || 'null')
+      return saved ? { ...DEFAULT_RATES, ...saved } : { ...DEFAULT_RATES }
+    } catch { return { ...DEFAULT_RATES } }
+  })
   const [editingRateState, setEditingRateState] = useState(null)
 
   // OO billing fees (per-truck only)
@@ -105,6 +110,20 @@ export default function IFTATab({ company }) {
   const { miles: savedMiles, loading: milesLoading, refetch: refetchMiles } =
     useIFTAMileage(year, quarter, company, truck)
   const { hutByTruck } = useHUTData(year, company)
+
+  // Reload rates from localStorage when year/quarter changes
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(`ifta_rates_${year}_${quarter}`) || 'null')
+      setRates(saved ? { ...DEFAULT_RATES, ...saved } : { ...DEFAULT_RATES })
+    } catch { setRates({ ...DEFAULT_RATES }) }
+  }, [year, quarter])
+
+  // Persist rates to localStorage whenever they change
+  useEffect(() => {
+    try { localStorage.setItem(`ifta_rates_${year}_${quarter}`, JSON.stringify(rates)) }
+    catch { /* storage full — ignore */ }
+  }, [rates, year, quarter])
 
   // Reset local edits whenever saved data or truck changes
   useEffect(() => {
