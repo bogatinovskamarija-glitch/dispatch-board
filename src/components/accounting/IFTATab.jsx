@@ -83,6 +83,10 @@ export default function IFTATab({ company }) {
   const [rates,   setRates]   = useState({ ...DEFAULT_RATES })
   const [editingRateState, setEditingRateState] = useState(null)
 
+  // OO billing fees (per-truck only)
+  const [prepFee, setPrepFee] = useState(150)
+  const [hutFee,  setHutFee]  = useState(70)
+
   // CSV import
   const fileInputRef = useRef(null)
   const [importPreview, setImportPreview] = useState(null) // { truckMap, truckCount, rowCount }
@@ -186,11 +190,242 @@ export default function IFTATab({ company }) {
   }, [truck, company, year, quarter, savedMiles, refetchMiles])
 
   const handlePrint = useCallback(() => {
-    const label = truck === 'ALL' ? 'Fleet Total' : `Truck ${truck}`
-    document.title = `IFTA Q${quarter} ${year} — ${label}`
-    window.print()
-    setTimeout(() => { document.title = 'Dispatcher Board' }, 1000)
-  }, [truck, quarter, year])
+    const coName = company === 'pro_freight' ? 'PRO FREIGHT TRANSPORTATION' : 'CARAT EXPEDITED INC'
+    const truckLabel = truck === 'ALL' ? 'Fleet Total — All Trucks' : `Truck ${truck}`
+    const periodStarts = [`${year}-01-01`, `${year}-04-01`, `${year}-07-01`, `${year}-10-01`]
+    const periodEnds   = [`${year}-03-31`, `${year}-06-30`, `${year}-09-30`, `${year}-12-31`]
+    const fmtDt = s => new Date(s + 'T12:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+    const periodStr = `${fmtDt(periodStarts[quarter - 1])} – ${fmtDt(periodEnds[quarter - 1])}`
+
+    const activeRows  = stateRows.filter(r => r.stMiles > 0 || r.taxPaidGal > 0)
+    const activeSurch = surchargeRows
+
+    const fmtTax = n => {
+      if (Math.abs(n) < 0.005) return '—'
+      return n < 0 ? `(${Math.abs(n).toFixed(2)})` : n.toFixed(2)
+    }
+    const fmtAmt = n => {
+      if (Math.abs(n) < 0.005) return '$0.00'
+      return n < 0 ? `($${Math.abs(n).toFixed(2)})` : `$${n.toFixed(2)}`
+    }
+
+    const isOO   = truck !== 'ALL'
+    const line1  = totals.total
+    const line2  = isOO ? (Number(prepFee) || 0) : 0
+    const line3  = isOO ? (Number(hutFee)  || 0) : 0
+    const totalDue = line1 + line2 + line3
+
+    const stateTableRows = activeRows.map((r, i) => `
+      <tr style="background:${i % 2 === 0 ? '#ffffff' : '#f8f9fa'}">
+        <td class="l bold">${r.st}${SURCHARGES[r.st] ? ' <span class="badge-s">+S</span>' : ''}</td>
+        <td class="r">${fNum(r.stMiles)}</td>
+        <td class="r">${r.taxPaidGal > 0 ? r.taxPaidGal.toFixed(3) : '—'}</td>
+        <td class="r">${r.taxableGal > 0 ? r.taxableGal.toFixed(3) : '—'}</td>
+        <td class="r ${r.netGal < -0.005 ? 'cr' : r.netGal > 0.005 ? 'dr' : ''}">${r.netGal !== 0 ? r.netGal.toFixed(3) : '—'}</td>
+        <td class="r">${(rates[r.st] || 0).toFixed(4)}</td>
+        <td class="r bold ${r.tax < -0.005 ? 'cr' : r.tax > 0.005 ? 'dr' : ''}">${fmtTax(r.tax)}</td>
+      </tr>`).join('')
+
+    const surchargeTableRows = activeSurch.map((r, i) => `
+      <tr style="background:#fffbf0">
+        <td class="l" style="color:#92400E;font-style:italic">${r.st} Surcharge</td>
+        <td class="r" style="color:#9CA3AF">—</td>
+        <td class="r" style="color:#9CA3AF">—</td>
+        <td class="r" style="color:#9CA3AF">${r.taxableGal.toFixed(3)}</td>
+        <td class="r ${r.netGal < -0.005 ? 'cr' : r.netGal > 0.005 ? 'dr' : ''}">${r.netGal.toFixed(3)}</td>
+        <td class="r">${SURCHARGES[r.st].toFixed(4)}</td>
+        <td class="r bold ${r.surchargeTax < -0.005 ? 'cr' : r.surchargeTax > 0.005 ? 'dr' : ''}">${fmtTax(r.surchargeTax)}</td>
+      </tr>`).join('')
+
+    const billingSection = isOO ? `
+      <div class="billing-box">
+        <div class="billing-title">OO Billing Summary</div>
+        <table class="billing-table">
+          <tr>
+            <td class="billing-num">1.</td>
+            <td class="billing-label">IFTA Tax / Credit Due</td>
+            <td class="billing-amt ${line1 < 0 ? 'cr' : line1 > 0 ? 'dr' : ''}">${fmtAmt(line1)}</td>
+          </tr>
+          <tr>
+            <td class="billing-num">2.</td>
+            <td class="billing-label">Preparation Fee</td>
+            <td class="billing-amt">${fmtAmt(line2)}</td>
+          </tr>
+          <tr>
+            <td class="billing-num">3.</td>
+            <td class="billing-label">New York + CT HUT</td>
+            <td class="billing-amt">${fmtAmt(line3)}</td>
+          </tr>
+          <tr class="billing-total-row">
+            <td class="billing-num"></td>
+            <td class="billing-label bold">TOTAL AMOUNT DUE</td>
+            <td class="billing-amt bold ${totalDue < 0 ? 'cr' : 'dr'}">${fmtAmt(totalDue)}</td>
+          </tr>
+        </table>
+      </div>` : ''
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>IFTA Q${quarter} ${year} — ${truckLabel}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; font-size: 11px; color: #1a1a1a; background: #fff; padding: 32px 40px; }
+    @media print { body { padding: 16px 20px; } @page { margin: 1cm; } }
+
+    /* Header */
+    .report-header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #1e3a5f; padding-bottom: 12px; margin-bottom: 18px; }
+    .co-name { font-size: 18px; font-weight: 800; color: #1e3a5f; letter-spacing: 0.02em; }
+    .co-sub { font-size: 11px; color: #6B7280; margin-top: 2px; }
+    .report-title-block { text-align: right; }
+    .report-title { font-size: 16px; font-weight: 700; color: #1e3a5f; }
+    .report-sub { font-size: 12px; color: #374151; margin-top: 3px; }
+
+    /* Info row */
+    .info-row { display: flex; gap: 0; border: 1px solid #d1d5db; border-radius: 6px; overflow: hidden; margin-bottom: 20px; }
+    .info-cell { flex: 1; padding: 10px 14px; border-right: 1px solid #e5e7eb; }
+    .info-cell:last-child { border-right: none; }
+    .info-cell-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em; color: #6B7280; font-weight: 600; margin-bottom: 3px; }
+    .info-cell-value { font-size: 14px; font-weight: 700; color: #111827; }
+
+    /* State table */
+    .section-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #6B7280; margin-bottom: 6px; }
+    table.ifta-tbl { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+    table.ifta-tbl thead tr { background: #1e3a5f; color: #fff; }
+    table.ifta-tbl thead th { padding: 7px 8px; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+    table.ifta-tbl tbody td { padding: 5px 8px; border-bottom: 1px solid #f0f0f0; font-size: 11px; }
+    table.ifta-tbl tfoot td { padding: 7px 8px; font-size: 11px; font-weight: 700; background: #f1f5f9; border-top: 2px solid #1e3a5f; }
+    .l { text-align: left; }
+    .r { text-align: right; }
+    .bold { font-weight: 700; }
+    .dr { color: #b91c1c; }
+    .cr { color: #15803d; }
+    .badge-s { font-size: 8px; background: #fef3c7; color: #92400e; border-radius: 2px; padding: 0 3px; vertical-align: middle; }
+
+    /* Totals note */
+    .totals-note { font-size: 10px; color: #6B7280; margin-bottom: 20px; display: flex; gap: 20px; }
+
+    /* Billing box */
+    .billing-box { border: 2px solid #1e3a5f; border-radius: 6px; overflow: hidden; max-width: 380px; margin-left: auto; margin-bottom: 24px; }
+    .billing-title { background: #1e3a5f; color: #fff; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; padding: 8px 14px; }
+    .billing-table { width: 100%; border-collapse: collapse; }
+    .billing-table tr { border-bottom: 1px solid #e5e7eb; }
+    .billing-table tr:last-child { border-bottom: none; }
+    .billing-num { padding: 8px 6px 8px 14px; width: 24px; color: #6B7280; font-size: 11px; }
+    .billing-label { padding: 8px 6px; font-size: 11px; color: #374151; }
+    .billing-amt { padding: 8px 14px 8px 6px; text-align: right; font-size: 12px; min-width: 90px; }
+    .billing-total-row { background: #f8fafc; border-top: 2px solid #1e3a5f !important; }
+    .billing-total-row .billing-label { font-size: 12px; color: #111827; }
+    .billing-total-row .billing-amt { font-size: 14px; }
+
+    /* Footer */
+    .report-footer { border-top: 1px solid #e5e7eb; padding-top: 12px; font-size: 10px; color: #9CA3AF; display: flex; justify-content: space-between; }
+    .sig-line { display: flex; gap: 40px; margin-top: 24px; }
+    .sig-field { flex: 1; border-bottom: 1px solid #1a1a1a; padding-bottom: 2px; margin-bottom: 4px; min-width: 120px; height: 28px; }
+    .sig-label { font-size: 9px; color: #6B7280; }
+  </style>
+</head>
+<body>
+
+  <div class="report-header">
+    <div>
+      <div class="co-name">${coName}</div>
+      <div class="co-sub">Illinois IFTA Registrant</div>
+    </div>
+    <div class="report-title-block">
+      <div class="report-title">IFTA Quarterly Report</div>
+      <div class="report-sub">Q${quarter} ${year} &nbsp;·&nbsp; ${QTR_LABELS[quarter - 1].replace('–', '–')}</div>
+    </div>
+  </div>
+
+  <div class="info-row">
+    <div class="info-cell">
+      <div class="info-cell-label">Vehicle</div>
+      <div class="info-cell-value">${truckLabel}</div>
+    </div>
+    <div class="info-cell">
+      <div class="info-cell-label">Period</div>
+      <div class="info-cell-value" style="font-size:11px;padding-top:2px">${periodStr}</div>
+    </div>
+    <div class="info-cell">
+      <div class="info-cell-label">Total Miles</div>
+      <div class="info-cell-value">${fNum(totalMiles)}</div>
+    </div>
+    <div class="info-cell">
+      <div class="info-cell-label">Total Diesel Gal</div>
+      <div class="info-cell-value">${totalGal.toFixed(3)}</div>
+    </div>
+    <div class="info-cell">
+      <div class="info-cell-label">Fleet MPG</div>
+      <div class="info-cell-value">${mpg > 0 ? mpg.toFixed(2) : '—'}</div>
+    </div>
+  </div>
+
+  <div class="section-title">IFTA State Mileage &amp; Tax Calculation</div>
+  <table class="ifta-tbl">
+    <thead>
+      <tr>
+        <th class="l" style="width:70px">State</th>
+        <th class="r">Total Miles</th>
+        <th class="r">Tax-Paid Gal</th>
+        <th class="r">Taxable Gal</th>
+        <th class="r">Net Gal</th>
+        <th class="r">Rate ($/gal)</th>
+        <th class="r">Tax / Credit</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${stateTableRows}
+      ${surchargeTableRows}
+    </tbody>
+    <tfoot>
+      <tr>
+        <td class="l bold">TOTALS</td>
+        <td class="r">${fNum(totalMiles)}</td>
+        <td class="r">${totals.taxPaidGal.toFixed(3)}</td>
+        <td class="r">${totals.taxableGal.toFixed(3)}</td>
+        <td class="r bold ${totals.netGal < 0 ? 'cr' : 'dr'}">${totals.netGal.toFixed(3)}</td>
+        <td></td>
+        <td class="r bold ${totals.total < 0 ? 'cr' : totals.total > 0 ? 'dr' : ''}">${fmtAmt(totals.total)}</td>
+      </tr>
+    </tfoot>
+  </table>
+
+  <div class="totals-note">
+    <span>Base IFTA: <strong>${fmtAmt(totals.tax)}</strong></span>
+    <span>Surcharges (IN / KY / VA): <strong>${fmtAmt(totals.surchargeTax)}</strong></span>
+    <span>Net IFTA Balance: <strong class="${totals.total < 0 ? 'cr' : 'dr'}">${fmtAmt(totals.total)}</strong></span>
+  </div>
+
+  ${billingSection}
+
+  <div class="sig-line" style="${isOO ? '' : 'margin-top:32px'}">
+    <div>
+      <div class="sig-field"></div>
+      <div class="sig-label">Authorized Signature</div>
+    </div>
+    <div>
+      <div class="sig-field"></div>
+      <div class="sig-label">Date</div>
+    </div>
+    <div style="flex:2"></div>
+  </div>
+
+  <div class="report-footer" style="margin-top:20px">
+    <span>Generated ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
+    <span>IFTA Q${quarter} ${year} · ${coName} · ${truckLabel}</span>
+  </div>
+
+</body>
+</html>`
+
+    const w = window.open('', '_blank', 'width=900,height=700')
+    if (!w) { alert('Please allow pop-ups to print the report.'); return }
+    w.document.write(html)
+    w.document.close()
+    setTimeout(() => { w.focus(); w.print() }, 400)
+  }, [truck, quarter, year, company, stateRows, surchargeRows, totals, totalMiles, totalGal, mpg, rates, prepFee, hutFee])
 
   const handleFileSelect = useCallback((e) => {
     const file = e.target.files?.[0]
@@ -381,6 +616,52 @@ export default function IFTATab({ company }) {
           color={totals.total > 0 ? '#DC2626' : totals.total < 0 ? '#16A34A' : '#111827'}
         />
       </div>
+
+      {/* ── OO Billing Fees (per-truck only) ──────────────────────────── */}
+      {truck !== 'ALL' && (
+        <div className="ifta-no-print" style={{
+          background: '#fff', border: '1px solid #E5E7EB', borderRadius: 8,
+          padding: '14px 20px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap',
+        }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            OO Billing Fees
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <label style={{ fontSize: 12, color: '#6B7280' }}>Preparation Fee</label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+              <span style={{ fontSize: 13, color: '#374151' }}>$</span>
+              <input
+                type="number" min="0" step="1"
+                value={prepFee}
+                onChange={e => setPrepFee(e.target.value)}
+                style={{ width: 72, border: '1px solid #D1D5DB', borderRadius: 5, padding: '4px 6px', fontSize: 13, textAlign: 'right' }}
+              />
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <label style={{ fontSize: 12, color: '#6B7280' }}>NY + CT HUT</label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+              <span style={{ fontSize: 13, color: '#374151' }}>$</span>
+              <input
+                type="number" min="0" step="1"
+                value={hutFee}
+                onChange={e => setHutFee(e.target.value)}
+                style={{ width: 72, border: '1px solid #D1D5DB', borderRadius: 5, padding: '4px 6px', fontSize: 13, textAlign: 'right' }}
+              />
+            </div>
+          </div>
+          <div style={{ marginLeft: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+            <div style={{ fontSize: 11, color: '#6B7280' }}>Total OO Amount Due</div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: (totals.total + (Number(prepFee)||0) + (Number(hutFee)||0)) < 0 ? '#15803d' : '#b91c1c' }}>
+              {(() => {
+                const t = totals.total + (Number(prepFee)||0) + (Number(hutFee)||0)
+                return t < 0 ? `($${Math.abs(t).toFixed(2)})` : `$${t.toFixed(2)}`
+              })()}
+            </div>
+            <div style={{ fontSize: 10, color: '#9CA3AF' }}>IFTA + prep fee + HUT</div>
+          </div>
+        </div>
+      )}
 
       {truck === 'ALL' && (
         <div style={{
