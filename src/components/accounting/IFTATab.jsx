@@ -1,0 +1,540 @@
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
+import {
+  useIFTATrucks, useIFTAFuel, useIFTAMileage, useHUTData, saveIFTAMileage,
+} from '../../hooks/useIFTA'
+
+// ── Q1 2026 IFTA tax rates ($/gallon) — update rates each quarter ─────────────
+const DEFAULT_RATES = {
+  AL: 0.2900, AZ: 0.2600, AR: 0.2850, CA: 0.8530, CO: 0.2650,
+  CT: 0.4920, DE: 0.2200, FL: 0.3950, GA: 0.3620, ID: 0.3200,
+  IL: 0.7570, IN: 0.5900, IA: 0.3250, KS: 0.2600, KY: 0.2340,
+  LA: 0.2000, ME: 0.3120, MD: 0.4690, MA: 0.2400, MI: 0.4900,
+  MN: 0.2850, MS: 0.1800, MO: 0.2700, MT: 0.2775, NE: 0.2480,
+  NV: 0.2700, NH: 0.2220, NJ: 0.4930, NM: 0.2100, NY: 0.3960,
+  NC: 0.4040, ND: 0.2300, OH: 0.4700, OK: 0.1900, OR: 0.0000,
+  PA: 0.7410, RI: 0.3400, SC: 0.2800, SD: 0.2800, TN: 0.2700,
+  TX: 0.2000, UT: 0.2450, VT: 0.3100, VA: 0.3180, WA: 0.4450,
+  WV: 0.3570, WI: 0.3290, WY: 0.2400,
+}
+
+// Surcharge states — filed as additional rows in IFTA (separate from base rate)
+const SURCHARGES = {
+  IN: 0.1100,
+  KY: 0.1120,
+  VA: 0.1420,
+}
+
+const STATES = Object.keys(DEFAULT_RATES).sort()
+
+const HUT_INFO = {
+  KY: { label: 'Kentucky',     period: 'Quarterly' },
+  NM: { label: 'New Mexico',   period: 'Quarterly' },
+  CT: { label: 'Connecticut',  period: 'Quarterly' },
+  NY: { label: 'New York',     period: 'Annual' },
+}
+
+const QTR_LABELS = ['Q1 (Jan–Mar)', 'Q2 (Apr–Jun)', 'Q3 (Jul–Sep)', 'Q4 (Oct–Dec)']
+
+const f2   = n => Number(n).toFixed(2)
+const fNum = n => Math.round(n).toLocaleString()
+
+function Cell({ children, right, bold, muted, style }) {
+  return (
+    <td style={{
+      padding: '4px 10px',
+      textAlign: right ? 'right' : 'left',
+      fontWeight: bold ? 600 : 400,
+      color: muted ? '#9CA3AF' : undefined,
+      borderBottom: '1px solid #F3F4F6',
+      fontSize: 13,
+      ...style,
+    }}>
+      {children}
+    </td>
+  )
+}
+
+function SummaryCard({ label, value, sub, color }) {
+  return (
+    <div style={{
+      background: '#fff', border: '1px solid #E5E7EB', borderRadius: 8,
+      padding: '14px 20px', minWidth: 130,
+    }}>
+      <div style={{ fontSize: 11, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>
+        {label}
+      </div>
+      <div style={{ fontSize: 22, fontWeight: 700, color: color || '#111827' }}>{value}</div>
+      {sub && <div style={{ fontSize: 11, color: '#9CA3AF', marginTop: 2 }}>{sub}</div>}
+    </div>
+  )
+}
+
+export default function IFTATab({ company }) {
+  const now = new Date()
+  const curQ = Math.ceil((now.getMonth() + 1) / 3)
+
+  const [year,    setYear]    = useState(now.getFullYear())
+  const [quarter, setQuarter] = useState(curQ)
+  const [truck,   setTruck]   = useState('ALL')
+  const [showAll, setShowAll] = useState(false)
+  const [saving,  setSaving]  = useState(false)
+  const [saveMsg, setSaveMsg] = useState('')
+  const [rates,   setRates]   = useState({ ...DEFAULT_RATES })
+  const [editingRateState, setEditingRateState] = useState(null)
+
+  // milesEdit: local edits before saving { ST: rawInputString }
+  const [milesEdit, setMilesEdit] = useState({})
+  const milesEditRef = useRef(milesEdit)
+  milesEditRef.current = milesEdit
+
+  // ── Data ─────────────────────────────────────────────────────────────────────
+  const { trucks }        = useIFTATrucks(year, quarter, company)
+  const { fuelByState, totalGal } = useIFTAFuel(year, quarter, company, truck)
+  const { miles: savedMiles, loading: milesLoading, refetch: refetchMiles } =
+    useIFTAMileage(year, quarter, company, truck)
+  const { hutByTruck } = useHUTData(year, company)
+
+  // Reset local edits whenever saved data or truck changes
+  useEffect(() => {
+    setMilesEdit(
+      Object.fromEntries(Object.entries(savedMiles).map(([k, v]) => [k, String(v)]))
+    )
+  }, [savedMiles, truck, year, quarter])
+
+  // Effective miles: merge savedMiles with local edits
+  const effectiveMiles = useMemo(() => {
+    const base = { ...savedMiles }
+    for (const [st, val] of Object.entries(milesEdit)) {
+      const n = Number(val)
+      if (!isNaN(n)) base[st] = n
+    }
+    return base
+  }, [savedMiles, milesEdit])
+
+  // ── IFTA calculations ─────────────────────────────────────────────────────────
+  const totalMiles = useMemo(
+    () => STATES.reduce((s, st) => s + (effectiveMiles[st] || 0), 0),
+    [effectiveMiles]
+  )
+  const mpg = totalMiles > 0 && totalGal > 0 ? totalMiles / totalGal : 0
+
+  const stateRows = useMemo(() => {
+    return STATES.map(st => {
+      const stMiles   = effectiveMiles[st] || 0
+      const taxPaidGal = fuelByState[st] || 0
+      const taxableGal = mpg > 0 ? stMiles / mpg : 0
+      const netGal     = taxableGal - taxPaidGal
+      const rate       = rates[st] || 0
+      const tax        = netGal * rate
+      const hasSurcharge = st in SURCHARGES
+      const surchargeGal = taxableGal // same taxable gallons base for surcharge
+      const surchargeTax = hasSurcharge ? netGal * SURCHARGES[st] : 0
+      return { st, stMiles, taxPaidGal, taxableGal, netGal, rate, tax, hasSurcharge, surchargeTax }
+    })
+  }, [effectiveMiles, fuelByState, mpg, rates])
+
+  const visibleRows = useMemo(() => {
+    if (showAll) return stateRows
+    return stateRows.filter(r => r.stMiles > 0 || r.taxPaidGal > 0)
+  }, [stateRows, showAll])
+
+  const totals = useMemo(() => {
+    const base = stateRows.reduce((s, r) => ({
+      taxPaidGal: s.taxPaidGal + r.taxPaidGal,
+      taxableGal: s.taxableGal + r.taxableGal,
+      netGal:     s.netGal + r.netGal,
+      tax:        s.tax + r.tax,
+      surchargeTax: s.surchargeTax + r.surchargeTax,
+    }), { taxPaidGal: 0, taxableGal: 0, netGal: 0, tax: 0, surchargeTax: 0 })
+    return { ...base, total: base.tax + base.surchargeTax }
+  }, [stateRows])
+
+  // Surcharge summary rows for states with surcharge
+  const surchargeRows = useMemo(
+    () => stateRows.filter(r => r.hasSurcharge && (r.stMiles > 0 || r.taxPaidGal > 0)),
+    [stateRows]
+  )
+
+  // ── Actions ───────────────────────────────────────────────────────────────────
+  const handleSave = useCallback(async () => {
+    if (truck === 'ALL') return
+    setSaving(true)
+    setSaveMsg('')
+    try {
+      // Build map: include states where miles > 0, or where DB had a value (to allow zero-out)
+      const toSave = {}
+      for (const st of STATES) {
+        const edited = Number(milesEditRef.current[st]) || 0
+        const wasSaved = (savedMiles[st] || 0) > 0
+        if (edited > 0 || wasSaved) toSave[st] = edited
+      }
+      await saveIFTAMileage(company !== 'all' ? company : 'carat', year, quarter, truck, toSave)
+      await refetchMiles()
+      setSaveMsg('Saved')
+      setTimeout(() => setSaveMsg(''), 2500)
+    } catch (e) {
+      setSaveMsg('Error: ' + e.message)
+    }
+    setSaving(false)
+  }, [truck, company, year, quarter, savedMiles, refetchMiles])
+
+  const handlePrint = useCallback(() => {
+    const label = truck === 'ALL' ? 'Fleet Total' : `Truck ${truck}`
+    document.title = `IFTA Q${quarter} ${year} — ${label}`
+    window.print()
+    setTimeout(() => { document.title = 'Dispatcher Board' }, 1000)
+  }, [truck, quarter, year])
+
+  // ── HUT data for this quarter ─────────────────────────────────────────────────
+  const hutTableData = useMemo(() => {
+    const allTrucks = Object.keys(hutByTruck).sort((a, b) => Number(a) - Number(b))
+    if (!allTrucks.length) return []
+    return allTrucks.map(t => ({
+      truck: t,
+      KY: hutByTruck[t]?.KY || 0,
+      NM: hutByTruck[t]?.NM || 0,
+      CT: hutByTruck[t]?.CT || 0,
+      NY: hutByTruck[t]?.NY || 0,
+    }))
+  }, [hutByTruck])
+
+  // ── Render ────────────────────────────────────────────────────────────────────
+  return (
+    <div className="ifta-wrap" style={{ padding: '20px 24px', maxWidth: 1100, margin: '0 auto' }}>
+
+      {/* ── Print styles ──────────────────────────────────────────────────── */}
+      <style>{`
+        @media print {
+          .ifta-no-print { display: none !important; }
+          .ifta-wrap { padding: 0 !important; max-width: 100% !important; }
+          body { background: white !important; }
+          * { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+          .ifta-section + .ifta-section { page-break-before: auto; }
+        }
+        .ifta-miles-input {
+          width: 80px; border: 1px solid #D1D5DB; border-radius: 4px;
+          padding: 2px 6px; font-size: 13px; text-align: right;
+          background: #FAFAFA;
+        }
+        .ifta-miles-input:focus {
+          outline: none; border-color: #6366F1; background: white;
+        }
+        .ifta-miles-input:read-only {
+          background: #F3F4F6; color: #6B7280; border-color: #E5E7EB; cursor: default;
+        }
+        .ifta-rate-input {
+          width: 60px; border: 1px solid #D1D5DB; border-radius: 4px;
+          padding: 2px 4px; font-size: 12px; text-align: right; background: white;
+        }
+        .ifta-rate-input:focus { outline: none; border-color: #6366F1; }
+        .ifta-row:hover td { background: #F9FAFB; }
+      `}</style>
+
+      {/* ── Controls ──────────────────────────────────────────────────────── */}
+      <div className="ifta-no-print" style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <label style={{ fontSize: 13, color: '#374151', fontWeight: 500 }}>Year</label>
+          <select
+            value={year}
+            onChange={e => setYear(Number(e.target.value))}
+            style={{ border: '1px solid #D1D5DB', borderRadius: 6, padding: '5px 8px', fontSize: 13 }}
+          >
+            {[2024, 2025, 2026, 2027].map(y => (
+              <option key={y} value={y}>{y}</option>
+            ))}
+          </select>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <label style={{ fontSize: 13, color: '#374151', fontWeight: 500 }}>Quarter</label>
+          <select
+            value={quarter}
+            onChange={e => setQuarter(Number(e.target.value))}
+            style={{ border: '1px solid #D1D5DB', borderRadius: 6, padding: '5px 8px', fontSize: 13 }}
+          >
+            {[1,2,3,4].map(q => <option key={q} value={q}>Q{q} — {QTR_LABELS[q-1]}</option>)}
+          </select>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <label style={{ fontSize: 13, color: '#374151', fontWeight: 500 }}>Truck</label>
+          <select
+            value={truck}
+            onChange={e => { setTruck(e.target.value); setMilesEdit({}) }}
+            style={{ border: '1px solid #D1D5DB', borderRadius: 6, padding: '5px 8px', fontSize: 13, minWidth: 130 }}
+          >
+            <option value="ALL">All Trucks (Fleet)</option>
+            {trucks.map(t => <option key={t} value={t}>Truck {t}</option>)}
+          </select>
+        </div>
+
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
+          {saveMsg && (
+            <span style={{ fontSize: 12, color: saveMsg.startsWith('Error') ? '#DC2626' : '#16A34A', fontWeight: 500 }}>
+              {saveMsg}
+            </span>
+          )}
+          {truck !== 'ALL' && (
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              style={{
+                background: '#4F46E5', color: '#fff', border: 'none', borderRadius: 6,
+                padding: '7px 16px', fontSize: 13, fontWeight: 600, cursor: saving ? 'default' : 'pointer',
+                opacity: saving ? 0.7 : 1,
+              }}
+            >
+              {saving ? 'Saving…' : 'Save Mileage'}
+            </button>
+          )}
+          <button
+            onClick={handlePrint}
+            style={{
+              background: '#fff', color: '#374151', border: '1px solid #D1D5DB',
+              borderRadius: 6, padding: '7px 14px', fontSize: 13, cursor: 'pointer',
+            }}
+          >
+            Print / Export
+          </button>
+        </div>
+      </div>
+
+      {/* ── Print header (hidden on screen) ──────────────────────────────── */}
+      <div style={{ display: 'none' }} className="ifta-print-only">
+        <h2 style={{ margin: '0 0 4px', fontSize: 18 }}>
+          IFTA Report — Q{quarter} {year}
+        </h2>
+        <div style={{ fontSize: 14, color: '#374151', marginBottom: 16 }}>
+          {truck === 'ALL' ? 'Fleet Total (All Trucks)' : `Truck ${truck}`}
+        </div>
+      </div>
+
+      {/* ── Summary cards ─────────────────────────────────────────────────── */}
+      <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
+        <SummaryCard label="Total Miles" value={fNum(totalMiles)} sub="from mileage entries" />
+        <SummaryCard label="Total Diesel Gal" value={f2(totalGal)} sub="from EFS fuel records" />
+        <SummaryCard label="Fleet MPG" value={mpg > 0 ? f2(mpg) : '—'} sub="miles ÷ gallons" />
+        <SummaryCard
+          label="Net IFTA Balance"
+          value={totals.total === 0 ? '$0.00' : (totals.total > 0 ? `$${f2(totals.total)}` : `-$${f2(Math.abs(totals.total))}`)}
+          sub={totals.total > 0 ? 'owed to states' : totals.total < 0 ? 'credit from states' : ''}
+          color={totals.total > 0 ? '#DC2626' : totals.total < 0 ? '#16A34A' : '#111827'}
+        />
+      </div>
+
+      {truck === 'ALL' && (
+        <div style={{
+          background: '#EEF2FF', border: '1px solid #C7D2FE', borderRadius: 8,
+          padding: '10px 16px', marginBottom: 16, fontSize: 13, color: '#3730A3',
+        }} className="ifta-no-print">
+          Showing aggregated fleet totals. Select a specific truck to enter or edit mileage.
+        </div>
+      )}
+
+      {/* ── State filter toggle ────────────────────────────────────────────── */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }} className="ifta-no-print">
+        <div style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>IFTA Mileage & Calculations</div>
+        <button
+          onClick={() => setShowAll(p => !p)}
+          style={{
+            background: 'none', border: '1px solid #D1D5DB', borderRadius: 6,
+            padding: '4px 10px', fontSize: 12, cursor: 'pointer', color: '#374151',
+          }}
+        >
+          {showAll ? 'Hide empty states' : `Show all ${STATES.length} states`}
+        </button>
+        {!showAll && visibleRows.length === 0 && (
+          <span style={{ fontSize: 12, color: '#9CA3AF' }}>
+            No mileage or fuel data yet for this period.
+          </span>
+        )}
+      </div>
+
+      {/* ── IFTA Table ────────────────────────────────────────────────────── */}
+      <div className="ifta-section" style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 8, overflow: 'hidden', marginBottom: 24 }}>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 700 }}>
+            <thead>
+              <tr style={{ background: '#F9FAFB' }}>
+                <th style={{ padding: '10px 10px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '2px solid #E5E7EB', width: 50 }}>State</th>
+                <th style={{ padding: '10px 10px', textAlign: 'right', fontSize: 11, fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '2px solid #E5E7EB' }}>Miles</th>
+                <th style={{ padding: '10px 10px', textAlign: 'right', fontSize: 11, fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '2px solid #E5E7EB' }}>Tax-Paid Gal</th>
+                <th style={{ padding: '10px 10px', textAlign: 'right', fontSize: 11, fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '2px solid #E5E7EB' }}>Taxable Gal</th>
+                <th style={{ padding: '10px 10px', textAlign: 'right', fontSize: 11, fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '2px solid #E5E7EB' }}>Net Gal</th>
+                <th style={{ padding: '10px 10px', textAlign: 'right', fontSize: 11, fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '2px solid #E5E7EB', minWidth: 90 }}>Rate ($/gal)</th>
+                <th style={{ padding: '10px 10px', textAlign: 'right', fontSize: 11, fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '2px solid #E5E7EB' }}>Tax / Credit</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(showAll ? stateRows : visibleRows).map(r => (
+                <tr key={r.st} className="ifta-row">
+                  <Cell>
+                    <span style={{ fontWeight: 600, color: '#374151' }}>{r.st}</span>
+                    {r.hasSurcharge && (
+                      <span style={{ fontSize: 10, background: '#FEF3C7', color: '#92400E', borderRadius: 3, padding: '1px 4px', marginLeft: 4 }}>+S</span>
+                    )}
+                  </Cell>
+                  <Cell right>
+                    {truck === 'ALL' ? (
+                      <span>{fNum(effectiveMiles[r.st] || 0)}</span>
+                    ) : (
+                      <input
+                        className="ifta-miles-input"
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={milesEdit[r.st] !== undefined ? milesEdit[r.st] : (effectiveMiles[r.st] || '')}
+                        onChange={e => setMilesEdit(p => ({ ...p, [r.st]: e.target.value }))}
+                        onFocus={e => e.target.select()}
+                        placeholder="0"
+                      />
+                    )}
+                  </Cell>
+                  <Cell right muted={r.taxPaidGal === 0}>{f2(r.taxPaidGal)}</Cell>
+                  <Cell right muted={r.taxableGal === 0}>{f2(r.taxableGal)}</Cell>
+                  <Cell right style={{ color: r.netGal < 0 ? '#16A34A' : r.netGal > 0 ? '#DC2626' : undefined }}>
+                    {f2(r.netGal)}
+                  </Cell>
+                  <Cell right>
+                    {editingRateState === r.st ? (
+                      <input
+                        className="ifta-rate-input"
+                        autoFocus
+                        type="number"
+                        step="0.001"
+                        min="0"
+                        value={rates[r.st] || 0}
+                        onChange={e => setRates(p => ({ ...p, [r.st]: Number(e.target.value) }))}
+                        onBlur={() => setEditingRateState(null)}
+                        onKeyDown={e => e.key === 'Enter' && setEditingRateState(null)}
+                      />
+                    ) : (
+                      <span
+                        onClick={() => setEditingRateState(r.st)}
+                        title="Click to edit rate"
+                        style={{ cursor: 'pointer', textDecoration: 'underline dotted', textUnderlineOffset: 2, color: '#374151' }}
+                      >
+                        {f2(rates[r.st] || 0)}
+                      </span>
+                    )}
+                  </Cell>
+                  <Cell right bold={Math.abs(r.tax) > 0} style={{ color: r.tax < 0 ? '#16A34A' : r.tax > 0 ? '#DC2626' : '#9CA3AF' }}>
+                    {r.tax === 0 ? '—' : (r.tax < 0 ? `(${f2(Math.abs(r.tax))})` : f2(r.tax))}
+                  </Cell>
+                </tr>
+              ))}
+
+              {/* ── Surcharge rows ───────────────────────────────────────── */}
+              {surchargeRows.map(r => (
+                <tr key={`${r.st}-surcharge`} className="ifta-row">
+                  <Cell>
+                    <span style={{ color: '#92400E', fontWeight: 600 }}>{r.st} Surcharge</span>
+                  </Cell>
+                  <Cell right muted>—</Cell>
+                  <Cell right muted>—</Cell>
+                  <Cell right muted>{f2(r.taxableGal)}</Cell>
+                  <Cell right style={{ color: r.netGal < 0 ? '#16A34A' : r.netGal > 0 ? '#DC2626' : undefined }}>
+                    {f2(r.netGal)}
+                  </Cell>
+                  <Cell right muted>{f2(SURCHARGES[r.st])}</Cell>
+                  <Cell right bold style={{ color: r.surchargeTax < 0 ? '#16A34A' : r.surchargeTax > 0 ? '#DC2626' : '#9CA3AF' }}>
+                    {r.surchargeTax === 0 ? '—' : (r.surchargeTax < 0 ? `(${f2(Math.abs(r.surchargeTax))})` : f2(r.surchargeTax))}
+                  </Cell>
+                </tr>
+              ))}
+
+              {/* ── Totals row ───────────────────────────────────────────── */}
+              <tr style={{ background: '#F9FAFB', borderTop: '2px solid #E5E7EB' }}>
+                <td colSpan={2} style={{ padding: '10px 10px', fontWeight: 700, fontSize: 13, color: '#111827' }}>
+                  TOTALS
+                </td>
+                <td style={{ padding: '10px 10px', textAlign: 'right', fontWeight: 700, fontSize: 13 }}>
+                  {f2(totals.taxPaidGal)}
+                </td>
+                <td style={{ padding: '10px 10px', textAlign: 'right', fontWeight: 700, fontSize: 13 }}>
+                  {f2(totals.taxableGal)}
+                </td>
+                <td style={{ padding: '10px 10px', textAlign: 'right', fontWeight: 700, fontSize: 13, color: totals.netGal < 0 ? '#16A34A' : totals.netGal > 0 ? '#DC2626' : undefined }}>
+                  {f2(totals.netGal)}
+                </td>
+                <td style={{ padding: '10px 10px' }}></td>
+                <td style={{ padding: '10px 10px', textAlign: 'right', fontWeight: 700, fontSize: 14, color: totals.total > 0 ? '#DC2626' : totals.total < 0 ? '#16A34A' : '#374151' }}>
+                  {totals.total === 0 ? '$0.00' : totals.total < 0
+                    ? `($${f2(Math.abs(totals.total))})`
+                    : `$${f2(totals.total)}`
+                  }
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        {/* Base + surcharge breakdown */}
+        {(totals.tax !== 0 || totals.surchargeTax !== 0) && (
+          <div style={{ padding: '10px 16px', borderTop: '1px solid #F3F4F6', fontSize: 12, color: '#6B7280', display: 'flex', gap: 20 }}>
+            <span>Base IFTA: <strong style={{ color: '#374151' }}>${f2(totals.tax)}</strong></span>
+            <span>Surcharges (IN/KY/VA): <strong style={{ color: '#374151' }}>${f2(totals.surchargeTax)}</strong></span>
+            <span style={{ fontWeight: 600, color: totals.total > 0 ? '#DC2626' : '#16A34A' }}>
+              Total Net: {totals.total >= 0 ? '' : '—'} ${f2(Math.abs(totals.total))}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* ── HUT Reference Section ─────────────────────────────────────────── */}
+      <div className="ifta-section" style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 8, overflow: 'hidden' }}>
+        <div style={{ padding: '14px 16px', borderBottom: '1px solid #F3F4F6', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ fontWeight: 700, fontSize: 14, color: '#111827' }}>
+            Highway Use Tax (HUT) Reference — {year}
+          </div>
+          <div style={{ fontSize: 12, color: '#6B7280' }}>
+            KY / NM / CT — quarterly &nbsp;|&nbsp; NY — annual
+          </div>
+        </div>
+        <div style={{ overflowX: 'auto' }}>
+          {hutTableData.length === 0 ? (
+            <div style={{ padding: '24px 16px', color: '#9CA3AF', fontSize: 13 }}>
+              Enter mileage per truck above — KY, NM, CT, and NY miles will appear here automatically.
+            </div>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ background: '#F9FAFB' }}>
+                  <th style={{ padding: '9px 10px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '2px solid #E5E7EB' }}>Truck</th>
+                  {Object.entries(HUT_INFO).map(([st, info]) => (
+                    <th key={st} style={{ padding: '9px 10px', textAlign: 'right', fontSize: 11, fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '2px solid #E5E7EB' }}>
+                      {st} Miles<br />
+                      <span style={{ fontWeight: 400, fontSize: 10, textTransform: 'none' }}>({info.period})</span>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {hutTableData.map(row => (
+                  <tr key={row.truck} className="ifta-row">
+                    <Cell><span style={{ fontWeight: 600 }}>Truck {row.truck}</span></Cell>
+                    {['KY', 'NM', 'CT', 'NY'].map(st => (
+                      <Cell key={st} right muted={row[st] === 0}>
+                        {row[st] > 0 ? fNum(row[st]) : '—'}
+                      </Cell>
+                    ))}
+                  </tr>
+                ))}
+                {/* Totals row */}
+                <tr style={{ background: '#F9FAFB', borderTop: '2px solid #E5E7EB' }}>
+                  <td style={{ padding: '10px 10px', fontWeight: 700, fontSize: 13 }}>TOTAL</td>
+                  {['KY', 'NM', 'CT', 'NY'].map(st => (
+                    <td key={st} style={{ padding: '10px 10px', textAlign: 'right', fontWeight: 700, fontSize: 13 }}>
+                      {fNum(hutTableData.reduce((s, r) => s + r[st], 0))}
+                    </td>
+                  ))}
+                </tr>
+              </tbody>
+            </table>
+          )}
+        </div>
+        <div style={{ padding: '10px 16px', fontSize: 11, color: '#9CA3AF', borderTop: '1px solid #F3F4F6' }}>
+          Miles shown are YTD totals from all quarters entered. HUT is filed separately through each state's portal — this table is for reference only.
+        </div>
+      </div>
+    </div>
+  )
+}
