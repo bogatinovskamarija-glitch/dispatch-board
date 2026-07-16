@@ -5,25 +5,27 @@ import {
   detectTruckCompanies, quarterRange,
 } from '../../hooks/useIFTA'
 
-// ── Q1 2026 IFTA tax rates ($/gallon) — update rates each quarter ─────────────
+// ── Q2 2026 IFTA tax rates ($/gallon) — source: IL MFUT-15 Q2 2026 official filing
+// KY base rate is 0.000 in Q2 — KY only collects via surcharge through IL IFTA
+// IN surcharge is incorporated into the base rate (0.630) for Q2 — no separate surcharge
 const DEFAULT_RATES = {
-  AL: 0.2900, AZ: 0.2600, AR: 0.2850, CA: 0.8530, CO: 0.2650,
-  CT: 0.4920, DE: 0.2200, FL: 0.3950, GA: 0.3620, ID: 0.3200,
-  IL: 0.7570, IN: 0.5900, IA: 0.3250, KS: 0.2600, KY: 0.2340,
-  LA: 0.2000, ME: 0.3120, MD: 0.4690, MA: 0.2400, MI: 0.4900,
-  MN: 0.2850, MS: 0.1800, MO: 0.2700, MT: 0.2775, NE: 0.2480,
-  NV: 0.2700, NH: 0.2220, NJ: 0.4930, NM: 0.2100, NY: 0.3960,
-  NC: 0.4040, ND: 0.2300, OH: 0.4700, OK: 0.1900, OR: 0.0000,
+  AL: 0.3100, AZ: 0.2600, AR: 0.2850, CA: 0.8530, CO: 0.2650,
+  CT: 0.4890, DE: 0.2200, FL: 0.4100, GA: 0.3730, ID: 0.3200,
+  IL: 0.7380, IN: 0.6300, IA: 0.3250, KS: 0.2600, KY: 0.0000,
+  LA: 0.2000, ME: 0.3120, MD: 0.4680, MA: 0.2400, MI: 0.5240,
+  MN: 0.3260, MS: 0.2100, MO: 0.2950, MT: 0.2775, NE: 0.3180,
+  NV: 0.2700, NH: 0.2220, NJ: 0.5610, NM: 0.2100, NY: 0.3810,
+  NC: 0.4100, ND: 0.2300, OH: 0.4700, OK: 0.1900, OR: 0.0000,
   PA: 0.7410, RI: 0.3400, SC: 0.2800, SD: 0.2800, TN: 0.2700,
-  TX: 0.2000, UT: 0.2450, VT: 0.3100, VA: 0.3180, WA: 0.4450,
+  TX: 0.2000, UT: 0.2450, VT: 0.3100, VA: 0.3270, WA: 0.4450,
   WV: 0.3570, WI: 0.3290, WY: 0.2400,
 }
 
-// Surcharge states — filed as additional rows in IFTA (separate from base rate)
+// Surcharge states — applied to TAXABLE gallons (state miles ÷ MPG), NOT net gallons
+// IN surcharge removed for Q2 2026 (incorporated into base rate 0.630 per IL MFUT-15)
 const SURCHARGES = {
-  IN: 0.1100,
-  KY: 0.1120,
-  VA: 0.1420,
+  KY: 0.1050,
+  VA: 0.1430,
 }
 
 const STATES = Object.keys(DEFAULT_RATES).sort()
@@ -158,8 +160,8 @@ export default function IFTATab({ company }) {
       const rate       = rates[st] || 0
       const tax        = netGal * rate
       const hasSurcharge = st in SURCHARGES
-      const surchargeGal = taxableGal // same taxable gallons base for surcharge
-      const surchargeTax = hasSurcharge ? netGal * SURCHARGES[st] : 0
+      // Surcharge applies to ALL taxable gallons — no tax-paid credit (per IFTA rules)
+      const surchargeTax = hasSurcharge ? taxableGal * SURCHARGES[st] : 0
       return { st, stMiles, taxPaidGal, taxableGal, netGal, rate, tax, hasSurcharge, surchargeTax }
     })
   }, [effectiveMiles, fuelByState, mpg, rates])
@@ -252,9 +254,9 @@ export default function IFTATab({ company }) {
         <td class="r" style="color:#9CA3AF">—</td>
         <td class="r" style="color:#9CA3AF">—</td>
         <td class="r" style="color:#9CA3AF">${r.taxableGal.toFixed(3)}</td>
-        <td class="r ${r.netGal < -0.005 ? 'cr' : r.netGal > 0.005 ? 'dr' : ''}">${r.netGal.toFixed(3)}</td>
+        <td class="r dr">${r.taxableGal.toFixed(3)}</td>
         <td class="r">${SURCHARGES[r.st].toFixed(4)}</td>
-        <td class="r bold ${r.surchargeTax < -0.005 ? 'cr' : r.surchargeTax > 0.005 ? 'dr' : ''}">${fmtTax(r.surchargeTax)}</td>
+        <td class="r bold dr">${fmtTax(r.surchargeTax)}</td>
       </tr>`).join('')
 
     const billingSection = isOO ? `
@@ -799,12 +801,11 @@ export default function IFTATab({ company }) {
                   <Cell right muted>—</Cell>
                   <Cell right muted>—</Cell>
                   <Cell right muted>{f2(r.taxableGal)}</Cell>
-                  <Cell right style={{ color: r.netGal < 0 ? '#16A34A' : r.netGal > 0 ? '#DC2626' : undefined }}>
-                    {f2(r.netGal)}
-                  </Cell>
+                  {/* Surcharge has no tax-paid credit — net = taxable */}
+                  <Cell right style={{ color: '#DC2626' }}>{f2(r.taxableGal)}</Cell>
                   <Cell right muted>{f2(SURCHARGES[r.st])}</Cell>
-                  <Cell right bold style={{ color: r.surchargeTax < 0 ? '#16A34A' : r.surchargeTax > 0 ? '#DC2626' : '#9CA3AF' }}>
-                    {r.surchargeTax === 0 ? '—' : (r.surchargeTax < 0 ? `(${f2(Math.abs(r.surchargeTax))})` : f2(r.surchargeTax))}
+                  <Cell right bold style={{ color: r.surchargeTax > 0 ? '#DC2626' : '#9CA3AF' }}>
+                    {r.surchargeTax === 0 ? '—' : f2(r.surchargeTax)}
                   </Cell>
                 </tr>
               ))}
