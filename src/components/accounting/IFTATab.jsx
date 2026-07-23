@@ -700,7 +700,7 @@ export default function IFTATab({ company }) {
       )}
 
       {/* ── State filter toggle ────────────────────────────────────────────── */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }} className="ifta-no-print">
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12, flexWrap: 'wrap' }} className="ifta-no-print">
         <div style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>IFTA Mileage & Calculations</div>
         <button
           onClick={() => setShowAll(p => !p)}
@@ -710,6 +710,20 @@ export default function IFTATab({ company }) {
           }}
         >
           {showAll ? 'Hide empty states' : `Show all ${STATES.length} states`}
+        </button>
+        <button
+          onClick={() => {
+            if (window.confirm(`Reset all rates to Q${quarter} ${year} defaults? This clears any manual edits.`)) {
+              localStorage.removeItem(`ifta_rates_${year}_${quarter}`)
+              setRates({ ...DEFAULT_RATES })
+            }
+          }}
+          style={{
+            background: 'none', border: '1px solid #FCA5A5', borderRadius: 6,
+            padding: '4px 10px', fontSize: 12, cursor: 'pointer', color: '#DC2626',
+          }}
+        >
+          Reset to Q{quarter} defaults
         </button>
         {!showAll && visibleRows.length === 0 && (
           <span style={{ fontSize: 12, color: '#9CA3AF' }}>

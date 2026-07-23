@@ -75,7 +75,7 @@ export function useWeekLoads(weekStart, weekEnd, company) {
       // created on or before week end AND (no delivery date OR delivery date is within/after week start)
       let q = supabase.from('loads')
         .select('*')
-        .lte('date', weekEnd)
+        .or(`date.lte.${weekEnd},pickup_date.lte.${weekEnd}`)
         .or(`delivery_date.is.null,delivery_date.gte.${weekStart}`)
         .order('company')
         .order('truck_number')
