@@ -149,7 +149,8 @@ export default function IFTATab({ company }) {
     () => STATES.reduce((s, st) => s + (effectiveMiles[st] || 0), 0),
     [effectiveMiles]
   )
-  const mpg = totalMiles > 0 && totalGal > 0 ? totalMiles / totalGal : 0
+  // Round MPG to 2 decimal places — matches MFUT-15 rounding so taxable ≠ tax-paid in totals
+  const mpg = totalMiles > 0 && totalGal > 0 ? Math.round(totalMiles / totalGal * 100) / 100 : 0
 
   const stateRows = useMemo(() => {
     return STATES.map(st => {
