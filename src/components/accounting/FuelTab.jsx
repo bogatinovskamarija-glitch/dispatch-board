@@ -410,7 +410,7 @@ export default function FuelTab({ company }) {
   const summary = useMemo(() => {
     const map = {}
     for (const t of transactions) {
-      const key = t.truck_number || t.driver_name || 'Unknown'
+      const key = t.driver_name || t.truck_number || 'Unknown'
       if (!map[key]) map[key] = {
         truck: t.truck_number || '—', driver: t.driver_name || driverByTruck[t.truck_number] || '—',
         gallons: 0, diesel: 0, reefer: 0, def: 0, retail: 0, amount: 0, rebate: 0, count: 0, txns: [],
@@ -433,7 +433,7 @@ export default function FuelTab({ company }) {
     }
     return Object.values(map).sort((a,b) => b.amount - a.amount).map(r => {
       // Try truck number first, fall back to driver name (handles driver swapping trucks)
-      const miles = milesMap[r.truck] || milesByDriver[r.driver?.toLowerCase().trim()] || 0
+      const miles = milesByDriver[r.driver?.toLowerCase().trim()] || milesMap[r.truck] || 0
       // OO charge = retail price (pre-rebate) — OO doesn't benefit from the policy discount
       const ooCharge = r.txns
         .filter(t => !String(t.fuel_category || '').toUpperCase().includes('DEF'))
@@ -703,7 +703,7 @@ export default function FuelTab({ company }) {
           </div>
 
           {/* Per-truck summary */}
-          <div className="summary-section-title" style={{ marginTop: 20 }}>Fuel by Truck</div>
+          <div className="summary-section-title" style={{ marginTop: 20 }}>Fuel by Driver</div>
           <table className="acct-table fuel-summary-table">
             <thead>
               <tr>
@@ -729,7 +729,7 @@ export default function FuelTab({ company }) {
                 const cpm     = r.miles > 0 ? (r.amount / r.miles * 100) : null
                 const hasRetail = r.retail > r.amount
                 return (
-                  <tr key={r.truck}>
+                  <tr key={r.driver !== '—' ? r.driver : r.truck}>
                     <td style={{ fontWeight: 600 }}>{r.truck}</td>
                     <td>
                       <span>{r.driver !== '—' ? r.driver : <span style={{ color: '#9CA3AF', fontStyle: 'italic' }}>Not linked</span>}</span>
