@@ -60,12 +60,7 @@ export function useMonthlyAccountingSummary(year, company) {
           .gte('start_date', from)
           .lte('start_date', to)
           .limit(5000),
-        supabase
-          .from('fuel_transactions')
-          .select('id,amount,rebate_amount,transaction_date,company')
-          .gte('transaction_date', from)
-          .lte('transaction_date', to)
-          .limit(100000),
+        supabase.rpc('get_fuel_weekly_by_company', { p_year: Number(year) }),
         supabase
           .from('maintenance_records')
           .select('id,amount,date,company')
@@ -73,12 +68,10 @@ export function useMonthlyAccountingSummary(year, company) {
           .lte('date', to)
           .limit(5000),
       ])
-      if (fuelRes.error) console.error('[Monthly] Fuel query error:', fuelRes.error)
       setLoads(loadsRes.data ?? [])
       setPaystubs(paystubsRes.data ?? [])
       setFuel(fuelRes.data ?? [])
       setMaintenance(maintRes.data ?? [])
-      console.log('[Monthly] Fuel rows fetched:', (fuelRes.data ?? []).length)
       setLoading(false)
     }
 
@@ -126,13 +119,15 @@ export function useMonthlyAccountingSummary(year, company) {
       addToWeek(result[m].weeks, p.start_date, { payroll: amt })
     }
 
+    // fuel is now weekly aggregates from the RPC: {week_start, company, fuel}
     for (const f of fuel) {
-      if (!matchesCompany(f) || !f.transaction_date) continue
-      const m = monthOf(f.transaction_date)
+      if (!matchesCompany(f) || !f.week_start) continue
+      const m = monthOf(f.week_start)
       if (m == null) continue
-      const amt = Math.max(0, (Number(f.amount) || 0) - (Number(f.rebate_amount) || 0))
+      const amt = Number(f.fuel) || 0
       result[m].fuel += amt
-      addToWeek(result[m].weeks, f.transaction_date, { fuel: amt })
+      if (!result[m].weeks[f.week_start]) result[m].weeks[f.week_start] = emptyWeek(f.week_start)
+      result[m].weeks[f.week_start].fuel += amt
     }
 
     for (const rec of maintenance) {
