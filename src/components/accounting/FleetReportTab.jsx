@@ -20,19 +20,20 @@ const QUARTERS = [
 ]
 
 // ── Print function ────────────────────────────────────────────────────────────
-function printFleetReport({ year, quarter, company, truckReport, driverReport, from, to }) {
+function printFleetReport({ year, quarter, company, truckReport, driverReport, from, to, periodDays }) {
   const companyLabel = company === 'all' ? 'All Companies' : company === 'carat' ? 'Carat Expedited' : 'Pro Freight'
   const periodLabel  = QUARTERS.find(q => q.value === quarter)?.label ?? 'Full Year'
   const generated    = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
 
-  const truckRows = truckReport.map((r, i) => {
-    const idleDays = r.emptyDays + r.noDriverDays + r.homeDays
+  const truckRows = truckReport.map((r) => {
     const netColor = r.net >= 0 ? '#059669' : '#DC2626'
+    const dayAvg   = (r.gross > 0 && periodDays > 0) ? fmtFull(Math.round(r.gross / periodDays)) : '—'
     return `
     <tr>
       <td style="font-weight:700">${r.truck}</td>
       <td style="color:#374151;font-size:11px">${r.drivers}</td>
       <td style="text-align:right;color:#059669;font-weight:600">${r.gross > 0 ? fmtFull(r.gross) : '—'}</td>
+      <td style="text-align:right;color:#10B981;font-size:11px">${dayAvg}</td>
       <td style="text-align:right;color:${netColor};font-weight:700">${r.net !== 0 ? fmtFull(r.net) : '—'}</td>
       <td style="text-align:right;color:#D97706">${r.fuel > 0 ? fmtFull(r.fuel) : '—'}</td>
       <td style="text-align:right;color:#6B7280">${r.maintenance > 0 ? fmtFull(r.maintenance) : '—'}</td>
@@ -114,6 +115,7 @@ function printFleetReport({ year, quarter, company, truckReport, driverReport, f
         <th>Truck</th>
         <th>Driver(s)</th>
         <th style="text-align:right;color:#059669">Gross</th>
+        <th style="text-align:right;color:#10B981">$/day</th>
         <th style="text-align:right;color:#059669">Net*</th>
         <th style="text-align:right;color:#D97706">Fuel (net)</th>
         <th style="text-align:right;color:#6B7280">Maintenance</th>
@@ -128,6 +130,7 @@ function printFleetReport({ year, quarter, company, truckReport, driverReport, f
       <tr class="total-row">
         <td colspan="2">Fleet Total</td>
         <td style="text-align:right;color:#059669">${fmtFull(totGross)}</td>
+        <td style="text-align:right;color:#10B981;font-size:11px">${totGross > 0 && periodDays > 0 ? fmtFull(Math.round(totGross / periodDays)) : '—'}</td>
         <td style="text-align:right;color:${totNet >= 0 ? '#059669':'#DC2626'}">${fmtFull(totNet)}</td>
         <td style="text-align:right;color:#D97706">${fmtFull(totFuel)}</td>
         <td style="text-align:right;color:#6B7280">${fmtFull(totMaint)}</td>
@@ -176,7 +179,7 @@ export default function FleetReportTab({ company }) {
   const [year,    setYear]    = useState(currentYear)
   const [quarter, setQuarter] = useState('year')
 
-  const { truckReport, driverReport, loading, from, to } = useFleetReport(year, quarter, company)
+  const { truckReport, driverReport, loading, from, to, periodDays } = useFleetReport(year, quarter, company)
 
   const totGross = truckReport.reduce((s,r) => s + r.gross, 0)
   const totNet   = truckReport.reduce((s,r) => s + r.net, 0)
@@ -212,7 +215,7 @@ export default function FleetReportTab({ company }) {
           className="btn btn-ghost btn-xs"
           style={{ marginLeft: 'auto', fontSize: 12 }}
           disabled={loading || truckReport.length === 0}
-          onClick={() => printFleetReport({ year, quarter, company, truckReport, driverReport, from, to })}
+          onClick={() => printFleetReport({ year, quarter, company, truckReport, driverReport, from, to, periodDays })}
         >
           📄 Print / PDF
         </button>
@@ -272,6 +275,7 @@ export default function FleetReportTab({ company }) {
                     <th style={{ width: 60 }}>Truck</th>
                     <th>Driver(s)</th>
                     <th style={{ textAlign: 'right', color: C.gross }}>Gross</th>
+                    <th style={{ textAlign: 'right', color: '#10B981' }}>$/day</th>
                     <th style={{ textAlign: 'right', color: C.net }}>Net*</th>
                     <th style={{ textAlign: 'right', color: C.fuel }}>Fuel</th>
                     <th style={{ textAlign: 'right', color: C.maint }}>Maint.</th>
@@ -290,6 +294,9 @@ export default function FleetReportTab({ company }) {
                         <td style={{ color: '#6B7280', fontSize: 11 }}>{r.drivers}</td>
                         <td style={{ textAlign: 'right', color: C.gross, fontWeight: 600 }}>
                           {r.gross > 0 ? fmt$(r.gross) : <span style={{ color: '#D1D5DB' }}>—</span>}
+                        </td>
+                        <td style={{ textAlign: 'right', color: r.gross > 0 ? '#10B981' : '#D1D5DB', fontSize: 11 }}>
+                          {r.gross > 0 && periodDays > 0 ? fmt$(Math.round(r.gross / periodDays)) : '—'}
                         </td>
                         <td style={{ textAlign: 'right', fontWeight: 700, color: netColor }}>
                           {r.net !== 0 ? fmt$(r.net) : <span style={{ color: '#D1D5DB' }}>—</span>}
@@ -320,6 +327,7 @@ export default function FleetReportTab({ company }) {
                   <tr style={{ background: '#F3F4F6', fontWeight: 800 }}>
                     <td colSpan={2}>Fleet Total</td>
                     <td style={{ textAlign: 'right', color: C.gross }}>{fmt$(totGross)}</td>
+                    <td style={{ textAlign: 'right', color: '#10B981', fontSize: 11 }}>{totGross > 0 && periodDays > 0 ? fmt$(Math.round(totGross / periodDays)) : '—'}</td>
                     <td style={{ textAlign: 'right', color: totNet >= 0 ? C.net : '#DC2626' }}>{fmt$(totNet)}</td>
                     <td style={{ textAlign: 'right', color: C.fuel }}>{totFuel > 0 ? fmt$(totFuel) : '—'}</td>
                     <td style={{ textAlign: 'right', color: C.maint }}>{totMaint > 0 ? fmt$(totMaint) : '—'}</td>
@@ -362,7 +370,7 @@ export default function FleetReportTab({ company }) {
                           <td style={{ color: '#9CA3AF', fontWeight: 600, fontSize: 11 }}>#{i+1}</td>
                           <td style={{ fontWeight: 700 }}>
                             {d.name}
-                            {i === 0 && <span style={{ marginLeft: 6, fontSize: 9, background: '#FEF3C7', color: '#D97706', padding: '1px 5px', borderRadius: 6, fontWeight: 700 }}>TOP</span>}
+                            {i === 0 && <span style={{ marginLeft: 6, fontSize: 14 }}>🏆</span>}
                           </td>
                           <td style={{ textAlign: 'right', color: C.gross, fontWeight: 600 }}>{d.gross > 0 ? fmt$(d.gross) : '—'}</td>
                           <td style={{ textAlign: 'right', color: d.fuel > 0 ? C.fuel : '#D1D5DB' }}>{d.fuel > 0 ? fmt$(d.fuel) : '—'}</td>
@@ -398,7 +406,7 @@ export default function FleetReportTab({ company }) {
                           <td style={{ color: '#9CA3AF', fontWeight: 600, fontSize: 11 }}>#{i+1}</td>
                           <td style={{ fontWeight: 700 }}>
                             {d.name}
-                            {i === 0 && <span style={{ marginLeft: 6, fontSize: 9, background: '#EDE9FE', color: '#7C3AED', padding: '1px 5px', borderRadius: 6, fontWeight: 700 }}>TOP</span>}
+                            {i === 0 && <span style={{ marginLeft: 6, fontSize: 14 }}>🏆</span>}
                           </td>
                           <td style={{ textAlign: 'right', color: C.payroll, fontWeight: 600 }}>{d.payroll > 0 ? fmt$(d.payroll) : '—'}</td>
                           <td style={{ textAlign: 'right', color: d.gross > 0 ? C.gross : '#D1D5DB' }}>{d.gross > 0 ? fmt$(d.gross) : '—'}</td>

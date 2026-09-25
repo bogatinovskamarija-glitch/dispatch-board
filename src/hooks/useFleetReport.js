@@ -27,6 +27,7 @@ export function quarterRange(year, quarter) {
 const IDLE_STATUSES  = new Set(['empty', 'no_driver', 'home'])
 const REVENUE_STATUS = new Set(['covered','at_pickup','at_delivery','tonu','empty','prebooked'])
 
+
 export function useFleetReport(year, quarter, company) {
   const [loads,       setLoads]       = useState([])
   const [paystubs,    setPaystubs]    = useState([])
@@ -126,6 +127,7 @@ export function useFleetReport(year, quarter, company) {
       return trucks[t]
     }
 
+    // Build truck rows ONLY from loads — this naturally excludes trailers
     for (const l of loads) {
       const t = (l.truck_number || '').trim()
       if (!t) continue
@@ -135,29 +137,32 @@ export function useFleetReport(year, quarter, company) {
       const startDate = l.pickup_date || l.date
       if (!startDate) continue
 
-      if (IDLE_STATUSES.has(l.status)) {
-        const days = daysBetween(startDate, l.delivery_date)
-        if (l.status === 'empty')     rec.emptyDays    += days
-        if (l.status === 'no_driver') rec.noDriverDays += days
-        if (l.status === 'home')      rec.homeDays     += days
-      } else if (REVENUE_STATUS.has(l.status)) {
+      // Count idle days and revenue independently — 'empty' status qualifies for BOTH
+      if (l.status === 'empty')     rec.emptyDays    += daysBetween(startDate, l.delivery_date)
+      if (l.status === 'no_driver') rec.noDriverDays += daysBetween(startDate, l.delivery_date)
+      if (l.status === 'home')      rec.homeDays     += daysBetween(startDate, l.delivery_date)
+
+      if (REVENUE_STATUS.has(l.status)) {
         rec.gross += Number(l.price) || 0
         rec.miles += Number(l.total_miles) || 0
       }
     }
 
+    // Only apply fuel/maintenance to trucks already in the map (skips trailers, unknown units)
     for (const f of fuel) {
       const t = (f.truck_number || '').trim()
-      if (!t) continue
+      if (!trucks[t]) continue  // not a known tractor — skip
       const cat = String(f.fuel_category || '').toUpperCase()
-      if (cat === 'DEFD') continue  // exclude DEF — not a real fuel cost in this context
-      ensureTruck(t).fuel += Math.max(0, (Number(f.amount) || 0) - (Number(f.rebate_amount) || 0))
+      if (cat === 'DEFD') continue
+      trucks[t].fuel += Math.max(0, (Number(f.amount) || 0) - (Number(f.rebate_amount) || 0))
     }
 
     for (const m of maintenance) {
       const t = (m.unit_number || '').trim()
-      if (!t) continue
-      ensureTruck(t).maintenance += Number(m.amount) || 0
+      if (!trucks[t]) continue  // not a known tractor — skip trailers and unknowns
+      const isTrailer = (m.unit_type || '').toLowerCase().includes('trailer')
+      if (isTrailer) continue
+      trucks[t].maintenance += Number(m.amount) || 0
     }
 
     return Object.values(trucks)
@@ -228,5 +233,7 @@ export function useFleetReport(year, quarter, company) {
     return { oo, company: company }
   }, [loads, paystubs, fuel, profileMap])
 
-  return { truckReport, driverReport, loading, from, to }
+  const numPeriodDays = useMemo(() => daysBetween(from, to), [from, to])
+
+  return { truckReport, driverReport, loading, from, to, periodDays: numPeriodDays }
 }
