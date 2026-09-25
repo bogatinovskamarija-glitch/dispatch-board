@@ -62,7 +62,7 @@ export function useMonthlyAccountingSummary(year, company) {
           .limit(5000),
         supabase
           .from('fuel_transactions')
-          .select('id,amount,transaction_date,company')
+          .select('id,amount,rebate_amount,transaction_date,company')
           .gte('transaction_date', from)
           .lte('transaction_date', to)
           .limit(5000),
@@ -128,7 +128,7 @@ export function useMonthlyAccountingSummary(year, company) {
       if (!matchesCompany(f) || !f.transaction_date) continue
       const m = monthOf(f.transaction_date)
       if (m == null) continue
-      const amt = Number(f.amount) || 0
+      const amt = Math.max(0, (Number(f.amount) || 0) - (Number(f.rebate_amount) || 0))
       result[m].fuel += amt
       addToWeek(result[m].weeks, f.transaction_date, { fuel: amt })
     }
