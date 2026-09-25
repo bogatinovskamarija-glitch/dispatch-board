@@ -6,6 +6,7 @@ import MonthlySummaryTab from './accounting/MonthlySummaryTab'
 import LedgerTab from './accounting/LedgerTab'
 import FuelTab   from './accounting/FuelTab'
 import IFTATab   from './accounting/IFTATab'
+import FleetReportTab from './accounting/FleetReportTab'
 import { useCompanySettings } from '../hooks/useSettings'
 
 function CompanySettingsModal({ onClose }) {
@@ -110,6 +111,9 @@ export default function AccountingView({ onClose, drivers }) {
             <button className={tab === 'ifta' ? 'active' : ''} onClick={() => setTab('ifta')}>
               IFTA / HUT
             </button>
+            <button className={tab === 'fleet' ? 'active' : ''} onClick={() => setTab('fleet')}>
+              Fleet Report
+            </button>
           </div>
         </div>
 
@@ -139,6 +143,7 @@ export default function AccountingView({ onClose, drivers }) {
         {tab === 'summary'   && <WeeklySummaryTab company={company} />}
         {tab === 'monthly'   && <MonthlySummaryTab company={company} />}
         {tab === 'ifta'      && <IFTATab company={company} />}
+        {tab === 'fleet'     && <FleetReportTab company={company} />}
       </div>
 
       {settings && <CompanySettingsModal onClose={() => setSettings(false)} />}
