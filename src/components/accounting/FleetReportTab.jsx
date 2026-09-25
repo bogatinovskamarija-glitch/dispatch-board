@@ -8,7 +8,7 @@ const fmtFull = n => '$' + Number(n || 0).toLocaleString('en-US', { minimumFract
 const C = {
   gross: '#059669', net: '#4ADE80', fuel: '#D97706',
   maint: '#6B7280', payroll: '#4F46E5', miles: '#8B5CF6',
-  empty: '#D97706', noDriver: '#6B7280', home: '#DB2777',
+  onRoad: '#0EA5E9', noDriver: '#6B7280', home: '#DB2777',
 }
 
 const QUARTERS = [
@@ -38,20 +38,20 @@ function printFleetReport({ year, quarter, company, truckReport, driverReport, f
       <td style="text-align:right;color:#D97706">${r.fuel > 0 ? fmtFull(r.fuel) : '—'}</td>
       <td style="text-align:right;color:#6B7280">${r.maintenance > 0 ? fmtFull(r.maintenance) : '—'}</td>
       <td style="text-align:right;color:#8B5CF6">${r.miles > 0 ? fmtMi(r.miles) : '—'}</td>
-      <td style="text-align:right;color:#D97706">${r.emptyDays > 0 ? r.emptyDays + ' d' : '—'}</td>
+      <td style="text-align:right;color:#0EA5E9">${r.onRoadDays > 0 ? r.onRoadDays + ' d' : '—'}</td>
       <td style="text-align:right;color:#6B7280">${r.noDriverDays > 0 ? r.noDriverDays + ' d' : '—'}</td>
       <td style="text-align:right;color:#DB2777">${r.homeDays > 0 ? r.homeDays + ' d' : '—'}</td>
     </tr>`
   }).join('')
 
-  const totGross = truckReport.reduce((s,r) => s + r.gross, 0)
-  const totNet   = truckReport.reduce((s,r) => s + r.net, 0)
-  const totFuel  = truckReport.reduce((s,r) => s + r.fuel, 0)
-  const totMaint = truckReport.reduce((s,r) => s + r.maintenance, 0)
-  const totMiles = truckReport.reduce((s,r) => s + r.miles, 0)
-  const totEmpty = truckReport.reduce((s,r) => s + r.emptyDays, 0)
-  const totNoDrv = truckReport.reduce((s,r) => s + r.noDriverDays, 0)
-  const totHome  = truckReport.reduce((s,r) => s + r.homeDays, 0)
+  const totGross  = truckReport.reduce((s,r) => s + r.gross, 0)
+  const totNet    = truckReport.reduce((s,r) => s + r.net, 0)
+  const totFuel   = truckReport.reduce((s,r) => s + r.fuel, 0)
+  const totMaint  = truckReport.reduce((s,r) => s + r.maintenance, 0)
+  const totMiles  = truckReport.reduce((s,r) => s + r.miles, 0)
+  const totOnRoad = truckReport.reduce((s,r) => s + r.onRoadDays, 0)
+  const totNoDrv  = truckReport.reduce((s,r) => s + r.noDriverDays, 0)
+  const totHome   = truckReport.reduce((s,r) => s + r.homeDays, 0)
 
   const driverSection = (title, drivers, isOO) => {
     if (!drivers.length) return ''
@@ -120,7 +120,7 @@ function printFleetReport({ year, quarter, company, truckReport, driverReport, f
         <th style="text-align:right;color:#D97706">Fuel (net)</th>
         <th style="text-align:right;color:#6B7280">Maintenance</th>
         <th style="text-align:right;color:#8B5CF6">Miles</th>
-        <th style="text-align:right;color:#D97706">Empty</th>
+        <th style="text-align:right;color:#0EA5E9">On Road</th>
         <th style="text-align:right;color:#6B7280">No Driver</th>
         <th style="text-align:right;color:#DB2777">At Home</th>
       </tr>
@@ -135,13 +135,13 @@ function printFleetReport({ year, quarter, company, truckReport, driverReport, f
         <td style="text-align:right;color:#D97706">${fmtFull(totFuel)}</td>
         <td style="text-align:right;color:#6B7280">${fmtFull(totMaint)}</td>
         <td style="text-align:right;color:#8B5CF6">${fmtMi(totMiles)}</td>
-        <td style="text-align:right;color:#D97706">${totEmpty > 0 ? totEmpty + ' d' : '—'}</td>
+        <td style="text-align:right;color:#0EA5E9">${totOnRoad > 0 ? totOnRoad + ' d' : '—'}</td>
         <td style="text-align:right;color:#6B7280">${totNoDrv > 0 ? totNoDrv + ' d' : '—'}</td>
         <td style="text-align:right;color:#DB2777">${totHome > 0 ? totHome + ' d' : '—'}</td>
       </tr>
     </tbody>
   </table>
-  <p style="font-size:10px;color:#9CA3AF;margin-top:6px">* Net = Gross − Fuel − Maintenance (payroll excluded at truck level — see driver sections below)</p>
+  <p style="font-size:10px;color:#9CA3AF;margin-top:6px">* Net = Gross − Fuel − Maintenance (payroll excluded at truck level — see driver sections below). On Road = days with covered or empty-loaded status (both count as having a load).</p>
 
   ${driverSection('Owner-Operator Leaderboard', driverReport.oo, true)}
   ${driverSection('Company Driver Leaderboard', driverReport.company, false)}
@@ -181,14 +181,14 @@ export default function FleetReportTab({ company }) {
 
   const { truckReport, driverReport, loading, from, to, periodDays } = useFleetReport(year, quarter, company)
 
-  const totGross = truckReport.reduce((s,r) => s + r.gross, 0)
-  const totNet   = truckReport.reduce((s,r) => s + r.net, 0)
-  const totFuel  = truckReport.reduce((s,r) => s + r.fuel, 0)
-  const totMaint = truckReport.reduce((s,r) => s + r.maintenance, 0)
-  const totMiles = truckReport.reduce((s,r) => s + r.miles, 0)
-  const totEmpty = truckReport.reduce((s,r) => s + r.emptyDays, 0)
-  const totNoDrv = truckReport.reduce((s,r) => s + r.noDriverDays, 0)
-  const totHome  = truckReport.reduce((s,r) => s + r.homeDays, 0)
+  const totGross  = truckReport.reduce((s,r) => s + r.gross, 0)
+  const totNet    = truckReport.reduce((s,r) => s + r.net, 0)
+  const totFuel   = truckReport.reduce((s,r) => s + r.fuel, 0)
+  const totMaint  = truckReport.reduce((s,r) => s + r.maintenance, 0)
+  const totMiles  = truckReport.reduce((s,r) => s + r.miles, 0)
+  const totOnRoad = truckReport.reduce((s,r) => s + r.onRoadDays, 0)
+  const totNoDrv  = truckReport.reduce((s,r) => s + r.noDriverDays, 0)
+  const totHome   = truckReport.reduce((s,r) => s + r.homeDays, 0)
 
   return (
     <div className="summary-wrap">
@@ -253,11 +253,18 @@ export default function FleetReportTab({ company }) {
                 <div className="summary-card-value" style={{ color: C.miles }}>{fmtMi(totMiles)}</div>
                 <div className="summary-card-sub">loaded miles</div>
               </div>
-              {(totEmpty + totNoDrv + totHome) > 0 && (
-                <div className="summary-card" style={{ borderLeft: '4px solid #D97706' }}>
+              {totOnRoad > 0 && (
+                <div className="summary-card" style={{ borderLeft: `4px solid ${C.onRoad}` }}>
+                  <div className="summary-card-label">On Road Days</div>
+                  <div className="summary-card-value" style={{ color: C.onRoad }}>{totOnRoad}</div>
+                  <div className="summary-card-sub">covered + loaded (all trucks)</div>
+                </div>
+              )}
+              {(totNoDrv + totHome) > 0 && (
+                <div className="summary-card" style={{ borderLeft: '4px solid #6B7280' }}>
                   <div className="summary-card-label">Total Idle Days</div>
-                  <div className="summary-card-value" style={{ color: '#D97706' }}>{totEmpty + totNoDrv + totHome}</div>
-                  <div className="summary-card-sub">empty + no driver + home</div>
+                  <div className="summary-card-value" style={{ color: '#6B7280' }}>{totNoDrv + totHome}</div>
+                  <div className="summary-card-sub">no driver + home</div>
                 </div>
               )}
             </div>
@@ -280,7 +287,7 @@ export default function FleetReportTab({ company }) {
                     <th style={{ textAlign: 'right', color: C.fuel }}>Fuel</th>
                     <th style={{ textAlign: 'right', color: C.maint }}>Maint.</th>
                     <th style={{ textAlign: 'right', color: C.miles }}>Miles</th>
-                    <th style={{ textAlign: 'right', color: C.empty }}>Empty</th>
+                    <th style={{ textAlign: 'right', color: C.onRoad }}>On Road</th>
                     <th style={{ textAlign: 'right', color: C.noDriver }}>No Driver</th>
                     <th style={{ textAlign: 'right', color: C.home }}>Home</th>
                   </tr>
@@ -310,8 +317,8 @@ export default function FleetReportTab({ company }) {
                         <td style={{ textAlign: 'right', color: r.miles > 0 ? C.miles : '#D1D5DB' }}>
                           {r.miles > 0 ? fmtMi(r.miles) : '—'}
                         </td>
-                        <td style={{ textAlign: 'right', color: r.emptyDays > 0 ? C.empty : '#D1D5DB', fontWeight: r.emptyDays > 0 ? 600 : 400 }}>
-                          {r.emptyDays > 0 ? `${r.emptyDays}d` : '—'}
+                        <td style={{ textAlign: 'right', color: r.onRoadDays > 0 ? C.onRoad : '#D1D5DB', fontWeight: r.onRoadDays > 0 ? 600 : 400 }}>
+                          {r.onRoadDays > 0 ? `${r.onRoadDays}d` : '—'}
                         </td>
                         <td style={{ textAlign: 'right', color: r.noDriverDays > 0 ? C.noDriver : '#D1D5DB', fontWeight: r.noDriverDays > 0 ? 600 : 400 }}>
                           {r.noDriverDays > 0 ? `${r.noDriverDays}d` : '—'}
@@ -332,7 +339,7 @@ export default function FleetReportTab({ company }) {
                     <td style={{ textAlign: 'right', color: C.fuel }}>{totFuel > 0 ? fmt$(totFuel) : '—'}</td>
                     <td style={{ textAlign: 'right', color: C.maint }}>{totMaint > 0 ? fmt$(totMaint) : '—'}</td>
                     <td style={{ textAlign: 'right', color: C.miles }}>{fmtMi(totMiles)}</td>
-                    <td style={{ textAlign: 'right', color: C.empty }}>{totEmpty > 0 ? `${totEmpty}d` : '—'}</td>
+                    <td style={{ textAlign: 'right', color: C.onRoad }}>{totOnRoad > 0 ? `${totOnRoad}d` : '—'}</td>
                     <td style={{ textAlign: 'right', color: C.noDriver }}>{totNoDrv > 0 ? `${totNoDrv}d` : '—'}</td>
                     <td style={{ textAlign: 'right', color: C.home }}>{totHome > 0 ? `${totHome}d` : '—'}</td>
                   </tr>

@@ -65,7 +65,8 @@ export function useMonthlyAccountingSummary(year, company) {
           .select('id,amount,rebate_amount,transaction_date,company')
           .gte('transaction_date', from)
           .lte('transaction_date', to)
-          .limit(5000),
+          .order('transaction_date', { ascending: true })
+          .limit(50000),
         supabase
           .from('maintenance_records')
           .select('id,amount,date,company')

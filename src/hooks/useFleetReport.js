@@ -24,7 +24,8 @@ export function quarterRange(year, quarter) {
   }
 }
 
-const IDLE_STATUSES  = new Set(['empty', 'no_driver', 'home'])
+const IDLE_STATUSES  = new Set(['no_driver', 'home'])
+const ON_ROAD_STATUS = new Set(['covered', 'empty'])   // empty = truck has a load, same as covered
 const REVENUE_STATUS = new Set(['covered','at_pickup','at_delivery','tonu','empty','prebooked'])
 
 
@@ -119,7 +120,7 @@ export function useFleetReport(year, quarter, company) {
           miles: 0,
           fuel: 0,
           maintenance: 0,
-          emptyDays: 0,
+          onRoadDays: 0,
           noDriverDays: 0,
           homeDays: 0,
         }
@@ -137,10 +138,10 @@ export function useFleetReport(year, quarter, company) {
       const startDate = l.pickup_date || l.date
       if (!startDate) continue
 
-      // Count idle days and revenue independently — 'empty' status qualifies for BOTH
-      if (l.status === 'empty')     rec.emptyDays    += daysBetween(startDate, l.delivery_date)
-      if (l.status === 'no_driver') rec.noDriverDays += daysBetween(startDate, l.delivery_date)
-      if (l.status === 'home')      rec.homeDays     += daysBetween(startDate, l.delivery_date)
+      const days = daysBetween(startDate, l.delivery_date)
+      if (ON_ROAD_STATUS.has(l.status)) rec.onRoadDays  += days
+      if (l.status === 'no_driver')     rec.noDriverDays += days
+      if (l.status === 'home')          rec.homeDays     += days
 
       if (REVENUE_STATUS.has(l.status)) {
         rec.gross += Number(l.price) || 0
@@ -168,8 +169,9 @@ export function useFleetReport(year, quarter, company) {
     return Object.values(trucks)
       .map(r => ({
         ...r,
-        drivers: [...r.drivers].join(', ') || '—',
-        net: r.gross - r.fuel - r.maintenance,
+        drivers:  [...r.drivers].join(', ') || '—',
+        net:      r.gross - r.fuel - r.maintenance,
+        idleDays: r.noDriverDays + r.homeDays,
       }))
       .sort((a, b) => b.gross - a.gross)
   }, [loads, fuel, maintenance])
