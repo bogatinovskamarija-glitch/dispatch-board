@@ -65,8 +65,7 @@ export function useMonthlyAccountingSummary(year, company) {
           .select('id,amount,rebate_amount,transaction_date,company')
           .gte('transaction_date', from)
           .lte('transaction_date', to)
-          .order('transaction_date', { ascending: true })
-          .limit(50000),
+          .limit(100000),
         supabase
           .from('maintenance_records')
           .select('id,amount,date,company')
@@ -74,10 +73,12 @@ export function useMonthlyAccountingSummary(year, company) {
           .lte('date', to)
           .limit(5000),
       ])
+      if (fuelRes.error) console.error('[Monthly] Fuel query error:', fuelRes.error)
       setLoads(loadsRes.data ?? [])
       setPaystubs(paystubsRes.data ?? [])
       setFuel(fuelRes.data ?? [])
       setMaintenance(maintRes.data ?? [])
+      console.log('[Monthly] Fuel rows fetched:', (fuelRes.data ?? []).length)
       setLoading(false)
     }
 
