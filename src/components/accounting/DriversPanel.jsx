@@ -93,7 +93,7 @@ export default function DriversPanel({ profiles, inactiveProfiles, drivers, save
                     {p.profile_type === 'company'
                       ? p.pay_type === 'per_mile'
                         ? `$${p.pay_rate}/mile`
-                        : `Flat rate`
+                        : p.pay_rate ? `Flat $${Number(p.pay_rate).toLocaleString('en-US')}/week` : 'Flat rate'
                       : `${p.commission_pct ?? 15}% commission`
                     }
                   </td>
@@ -219,6 +219,12 @@ export default function DriversPanel({ profiles, inactiveProfiles, drivers, save
                       <div className="form-group">
                         <label>Rate ($/mile)</label>
                         <input type="number" step="0.01" value={form.pay_rate} onChange={e => set('pay_rate', e.target.value)} placeholder="0.70" />
+                      </div>
+                    )}
+                    {form.pay_type === 'flat_rate' && (
+                      <div className="form-group">
+                        <label>Weekly Rate ($)</label>
+                        <input type="number" step="0.01" value={form.pay_rate} onChange={e => set('pay_rate', e.target.value)} placeholder="1500.00" />
                       </div>
                     )}
                   </>

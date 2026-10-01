@@ -165,8 +165,9 @@ export default function PaystubsTab({ drivers, company }) {
     profiles.find(p => p.driver_name === driverName) || null
   , [profiles, driverName])
 
-  const isOO      = profile?.profile_type === 'owner_operator'
-  const isPerMile = profile?.pay_type === 'per_mile' && !isOO
+  const isOO       = profile?.profile_type === 'owner_operator'
+  const isPerMile  = profile?.pay_type === 'per_mile' && !isOO
+  const isFlatRate = profile?.pay_type === 'flat_rate' && !isOO
 
   // ── Load loads for driver + date range ──────────────────────────────────
   async function loadLoads() {
@@ -320,7 +321,9 @@ export default function PaystubsTab({ drivers, company }) {
     return da < db ? -1 : da > db ? 1 : 0
   })
 
-  const loadTotal = loads.reduce((s, l) => s + (Number(loadPay[l.id]?.amount) || 0), 0)
+  const loadTotal = isFlatRate
+    ? (Number(profile?.pay_rate) || 0)
+    : loads.reduce((s, l) => s + (Number(loadPay[l.id]?.amount) || 0), 0)
   const addTotal  = additions.reduce((s, a) => s + (Number(a.amount) || 0), 0)
 
   // Commission auto-calc for OO — applies to commissionable deduction row
@@ -689,8 +692,9 @@ export default function PaystubsTab({ drivers, company }) {
             <span className={`profile-badge ${isOO ? 'badge-oo' : 'badge-co'}`}>
               {isOO ? 'Owner Operator' : 'Company Driver'}
             </span>
-            {isPerMile && <span className="paystub-rate-hint">${profile.pay_rate}/mi</span>}
-            {isOO      && <span className="paystub-rate-hint">{commissionPct}% commission</span>}
+            {isPerMile  && <span className="paystub-rate-hint">${profile.pay_rate}/mi</span>}
+            {isFlatRate && <span className="paystub-rate-hint">${Number(profile.pay_rate).toLocaleString('en-US')}/week flat rate</span>}
+            {isOO       && <span className="paystub-rate-hint">{commissionPct}% commission</span>}
           </div>
         )}
         <div className="form-group">
@@ -734,8 +738,8 @@ export default function PaystubsTab({ drivers, company }) {
                 <th>Route</th>
                 {isPerMile && <th>Type</th>}
                 {isPerMile && <><th>Loaded Mi</th><th>Empty Mi</th><th>Rate</th></>}
-                {!isPerMile && <><th>Loaded Mi</th><th>Empty Mi</th></>}
-                <th>{isOO ? 'Gross ($)' : 'Pay ($)'}</th>
+                {!isPerMile && !isFlatRate && <><th>Loaded Mi</th><th>Empty Mi</th></>}
+                {!isFlatRate && <th>{isOO ? 'Gross ($)' : 'Pay ($)'}</th>}
               </tr>
             </thead>
             <tbody>
@@ -797,32 +801,36 @@ export default function PaystubsTab({ drivers, company }) {
                             onChange={e => updateLoadRate(l.id, e.target.value)} />
                         </td>
                       </>
-                    ) : (
+                    ) : !isFlatRate ? (
                       <>
                         <td>{l.total_miles || '—'}</td>
                         <td>
                           <input type="number" className="pay-amount-input" placeholder="0" value={pay.emptyMiles ?? ''} onChange={e => updateLoadEmptyMiles(l.id, e.target.value)} />
                         </td>
                       </>
+                    ) : null}
+                    {!isFlatRate && (
+                      <td>
+                        <input
+                          type="number"
+                          className="pay-amount-input"
+                          placeholder="0.00"
+                          value={pay.amount ?? ''}
+                          readOnly={isPerMile && !flatLoad}
+                          style={isPerMile && !flatLoad ? { background: '#F3F4F6', color: '#374151' } : {}}
+                          onChange={e => updateLoadAmount(l.id, e.target.value)}
+                        />
+                      </td>
                     )}
-                    <td>
-                      <input
-                        type="number"
-                        className="pay-amount-input"
-                        placeholder="0.00"
-                        value={pay.amount ?? ''}
-                        readOnly={isPerMile && !flatLoad}
-                        style={isPerMile && !flatLoad ? { background: '#F3F4F6', color: '#374151' } : {}}
-                        onChange={e => updateLoadAmount(l.id, e.target.value)}
-                      />
-                    </td>
                   </tr>
                 )
               })}
             </tbody>
             <tfoot>
               <tr>
-                <td colSpan={isPerMile ? 9 : 7} className="acct-subtotal-label">Sub-Total</td>
+                <td colSpan={isFlatRate ? 4 : isPerMile ? 9 : 7} className="acct-subtotal-label">
+                  {isFlatRate ? 'Weekly Flat Rate' : 'Sub-Total'}
+                </td>
                 <td className="acct-subtotal-val">{fmt(loadTotal)}</td>
               </tr>
             </tfoot>

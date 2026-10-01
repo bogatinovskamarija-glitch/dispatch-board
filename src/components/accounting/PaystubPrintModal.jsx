@@ -32,8 +32,9 @@ export default function PaystubPrintModal({
   const co = { ...coSettings, logo: LOGOS[company] || LOGOS.carat }
   const today  = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
 
-  const isOO      = profile?.profile_type === 'owner_operator'
-  const isPerMile = profile?.pay_type === 'per_mile' && !isOO
+  const isOO       = profile?.profile_type === 'owner_operator'
+  const isPerMile  = profile?.pay_type === 'per_mile' && !isOO
+  const isFlatRate = profile?.pay_type === 'flat_rate' && !isOO
 
   async function handleMarkPaid() {
     if (!onMarkPaid) return
@@ -78,7 +79,9 @@ ${cssLinks}
     }, 700)
   }
 
-  const loadTotal  = loads.reduce((s, l) => s + (Number(loadPay[l.id]?.amount) || 0), 0)
+  const loadTotal  = isFlatRate
+    ? (Number(profile?.pay_rate) || 0)
+    : loads.reduce((s, l) => s + (Number(loadPay[l.id]?.amount) || 0), 0)
   const addTotal   = additions.reduce((s, a) => s + (Number(a.amount) || 0), 0)
   const dedTotal   = deductions.reduce((s, d) => s + (Number(d.amount) || 0), 0)
   const grandTotal = loadTotal + addTotal - dedTotal
@@ -123,7 +126,7 @@ ${cssLinks}
                     {profile && (
                       <tr>
                         <td>Type</td>
-                        <td>{isOO ? 'Owner Operator' : `Company Driver${isPerMile ? ` · $${profile.pay_rate}/mi` : ''}`}</td>
+                        <td>{isOO ? 'Owner Operator' : `Company Driver${isPerMile ? ` · $${profile.pay_rate}/mi` : isFlatRate ? ` · $${Number(profile.pay_rate).toLocaleString('en-US')}/week flat rate` : ''}`}</td>
                       </tr>
                     )}
                   </tbody>
@@ -140,10 +143,8 @@ ${cssLinks}
                   <th>Origin</th>
                   <th>Delivery</th>
                   <th>Destination</th>
-                  <th>Loaded Mi</th>
-                  <th>Empty Mi</th>
-                  <th>Rate</th>
-                  <th>{isOO ? 'Gross' : 'Pay'}</th>
+                  {!isFlatRate && <><th>Loaded Mi</th><th>Empty Mi</th><th>Rate</th></>}
+                  {!isFlatRate && <th>{isOO ? 'Gross' : 'Pay'}</th>}
                 </tr>
               </thead>
               <tbody>
@@ -189,10 +190,12 @@ ${cssLinks}
                           <td>{isPU ? cityState(stop.location) : ''}</td>
                           <td>{!isPU ? (stop.date || '—') : ''}</td>
                           <td>{!isPU ? cityState(stop.location) : ''}</td>
-                          <td>{isFirst ? (isPerMile ? (pay.miles || l.total_miles || '—') : (l.total_miles || '—')) : ''}</td>
-                          <td>{isFirst ? (emptyMi || '—') : ''}</td>
-                          <td>{isFirst ? rateCell : ''}</td>
-                          <td className="inv-amount">{isLast ? (pay.amount ? fmt(pay.amount) : '—') : ''}</td>
+                          {!isFlatRate && <>
+                            <td>{isFirst ? (isPerMile ? (pay.miles || l.total_miles || '—') : (l.total_miles || '—')) : ''}</td>
+                            <td>{isFirst ? (emptyMi || '—') : ''}</td>
+                            <td>{isFirst ? rateCell : ''}</td>
+                            <td className="inv-amount">{isLast ? (pay.amount ? fmt(pay.amount) : '—') : ''}</td>
+                          </>}
                         </tr>
                       )
                     })
@@ -206,17 +209,21 @@ ${cssLinks}
                       <td>{cityState(l.pickup_location)}</td>
                       <td>{l.delivery_date || '—'}</td>
                       <td>{cityState(l.delivery_location)}</td>
-                      <td>{isPerMile ? (pay.miles || l.total_miles || '—') : (l.total_miles || '—')}</td>
-                      <td>{emptyMi || '—'}</td>
-                      <td>{rateCell}</td>
-                      <td className="inv-amount">{pay.amount ? fmt(pay.amount) : '—'}</td>
+                      {!isFlatRate && <>
+                        <td>{isPerMile ? (pay.miles || l.total_miles || '—') : (l.total_miles || '—')}</td>
+                        <td>{emptyMi || '—'}</td>
+                        <td>{rateCell}</td>
+                        <td className="inv-amount">{pay.amount ? fmt(pay.amount) : '—'}</td>
+                      </>}
                     </tr>
                   )]
                 })}
               </tbody>
               <tfoot>
                 <tr>
-                  <td colSpan={8} className="inv-total-label" style={{ fontWeight: 600 }}>Sub-Total</td>
+                  <td colSpan={isFlatRate ? 4 : 8} className="inv-total-label" style={{ fontWeight: 600 }}>
+                    {isFlatRate ? 'Weekly Flat Rate' : 'Sub-Total'}
+                  </td>
                   <td className="inv-amount" style={{ fontWeight: 700 }}>{fmt(loadTotal)}</td>
                 </tr>
               </tfoot>
