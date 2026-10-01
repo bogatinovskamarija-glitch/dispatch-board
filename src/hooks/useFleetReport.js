@@ -240,15 +240,15 @@ export function useFleetReport(year, quarter, company) {
       const payroll   = payrollByDriver[k]  || 0
       const grossFuel = grossFuelByDriver[k] || 0
       const rebate    = rebateByDriver[k]    || 0
-      const fuel      = Math.max(0, grossFuel - rebate)
+      const netFuel   = Math.max(0, grossFuel - rebate)
       const miles     = milesbyDriver[k]    || 0
-      // Display name: find original casing from loads, paystubs, or fuel
+      // Display name: find original casing from loads, paystubs, or fuel transactions
       const displayName =
         loads.find(l => norm(l.driver_name) === k)?.driver_name ||
         paystubs.find(p => norm(p.driver_name) === k)?.driver_name ||
         fuel.find(f => f.driver_name && norm(f.driver_name) === k)?.driver_name ||
         k
-      drivers.push({ name: displayName, profileType, gross, payroll, fuel, grossFuel, rebate, miles })
+      drivers.push({ name: displayName, profileType, gross, payroll, fuel: netFuel, grossFuel, rebate, miles })
     }
 
     const oo      = drivers.filter(d => d.profileType === 'owner_operator').sort((a,b) => b.gross - a.gross)
