@@ -67,7 +67,7 @@ export function useFleetReport(year, quarter, company) {
         (() => {
           let q = supabase
             .from('fuel_transactions')
-            .select('truck_number,driver_name,amount,rebate_amount,fuel_category,transaction_date,company')
+            .select('truck_number,driver_name,amount,rebate_amount,fuel_category,transaction_date,company,raw_row')
             .gte('transaction_date', from)
             .lte('transaction_date', to)
             .limit(10000)
@@ -218,23 +218,63 @@ export function useFleetReport(year, quarter, company) {
       ...Object.keys(payrollByDriver),
     ])
 
+    // For each OO driver, find the truck they drove most — OO drivers own their truck
+    // so ALL fuel for that truck belongs to the OO regardless of co-drivers.
+    const ooTruckCounts = {}
+    for (const l of loads) {
+      if (!l.driver_name || !l.truck_number) continue
+      const k = norm(l.driver_name)
+      if (profileMap[k] !== 'owner_operator') continue
+      const t = (l.truck_number || '').trim()
+      if (!ooTruckCounts[k]) ooTruckCounts[k] = {}
+      ooTruckCounts[k][t] = (ooTruckCounts[k][t] || 0) + 1
+    }
+    const truckToOO = {}
+    for (const [k, counts] of Object.entries(ooTruckCounts)) {
+      const primaryTruck = Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0]
+      truckToOO[primaryTruck] = k
+    }
+
+    // Compute real rebate per transaction:
+    // EFS stores retail price in raw_row.retail_amount. The policy discount
+    // (retail − policy) IS a rebate the company earns — the FuelTab adds both.
+    // rebate_amount alone is tiny; most of the rebate value is the policy discount.
+    function txnRebate(f) {
+      const retail = Number(f.raw_row?.retail_amount) || 0
+      const policy = Number(f.amount) || 0
+      return (retail > policy ? retail - policy : 0) + (Number(f.rebate_amount) || 0)
+    }
+    // For OO drivers we charge retail price (they don't benefit from policy discount)
+    function txnOOGross(f) {
+      const retail = Number(f.raw_row?.retail_amount) || 0
+      const policy = Number(f.amount) || 0
+      return retail > policy ? retail : policy
+    }
+
     // Fuel per driver — track gross and rebate separately
-    // Only trust driver_name on the fuel row if it matches a known driver.
-    // Fuel transactions often have stale/variant names ("John NEW", "John 207", etc.)
-    // so we fall back to the truck→driver map from loads for everything else.
     const grossFuelByDriver = {}
     const rebateByDriver    = {}
     for (const f of fuel) {
       const cat = String(f.fuel_category || '').toUpperCase()
       if (cat === 'DEFD') continue
-      const truckNum    = (f.truck_number || '').trim()
-      const nameOnFuel  = f.driver_name ? norm(f.driver_name) : null
+      const truckNum = (f.truck_number || '').trim()
+
+      // OO trucks: attribute all fuel to the OO (their truck, their fuel bill)
+      if (truckToOO[truckNum]) {
+        const k = truckToOO[truckNum]
+        grossFuelByDriver[k] = (grossFuelByDriver[k] || 0) + txnOOGross(f)
+        rebateByDriver[k]    = (rebateByDriver[k]    || 0) + txnRebate(f)
+        continue
+      }
+
+      // Company trucks: trust driver_name only if it matches a known driver
+      const nameOnFuel = f.driver_name ? norm(f.driver_name) : null
       const k = (nameOnFuel && knownDrivers.has(nameOnFuel))
         ? nameOnFuel
         : (primaryDriverByTruck[truckNum] || null)
       if (!k) continue
-      grossFuelByDriver[k] = (grossFuelByDriver[k] || 0) + (Number(f.amount)        || 0)
-      rebateByDriver[k]    = (rebateByDriver[k]    || 0) + (Number(f.rebate_amount) || 0)
+      grossFuelByDriver[k] = (grossFuelByDriver[k] || 0) + (Number(f.amount) || 0)
+      rebateByDriver[k]    = (rebateByDriver[k]    || 0) + txnRebate(f)
     }
 
     // Driver set = only real drivers from loads + paystubs (never phantom fuel-only names)
