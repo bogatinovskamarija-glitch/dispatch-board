@@ -470,6 +470,7 @@ export default function FleetReportTab({ company }) {
           <div style={{ fontSize: 11, color: '#9CA3AF', padding: '10px 14px', background: '#F9FAFB', border: '1px solid #E5E7EB', borderRadius: 8, marginBottom: 24, lineHeight: 1.6 }}>
             <strong style={{ color: '#6B7280' }}>Note:</strong> Fuel figures are net after rebate. Idle days are calendar days between pickup and delivery dates as entered in the dispatch board.
             OO gross = total load revenue attributed to that driver. Company driver payroll = paystubs issued in this period.
+            OO Fuel (gross) = total pump amount; Rebate = total rebate earned on those transactions. Both figures are sourced from the weekly fuel reports.
             Since tracking started in May 2026, earlier quarters will show partial or no data.
           </div>
         </>

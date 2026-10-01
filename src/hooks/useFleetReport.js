@@ -212,25 +212,35 @@ export function useFleetReport(year, quarter, company) {
       primaryDriverByTruck[t] = Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0]
     }
 
+    // Known real driver names (normalized) — only these are valid attribution targets
+    const knownDrivers = new Set([
+      ...Object.keys(grossByDriver),
+      ...Object.keys(payrollByDriver),
+    ])
+
     // Fuel per driver — track gross and rebate separately
-    // Use driver_name if set; fall back to truck_number→driver mapping from loads
+    // Only trust driver_name on the fuel row if it matches a known driver.
+    // Fuel transactions often have stale/variant names ("John NEW", "John 207", etc.)
+    // so we fall back to the truck→driver map from loads for everything else.
     const grossFuelByDriver = {}
     const rebateByDriver    = {}
     for (const f of fuel) {
       const cat = String(f.fuel_category || '').toUpperCase()
       if (cat === 'DEFD') continue
-      const truckNum = (f.truck_number || '').trim()
-      const k = f.driver_name ? norm(f.driver_name) : (primaryDriverByTruck[truckNum] || null)
+      const truckNum    = (f.truck_number || '').trim()
+      const nameOnFuel  = f.driver_name ? norm(f.driver_name) : null
+      const k = (nameOnFuel && knownDrivers.has(nameOnFuel))
+        ? nameOnFuel
+        : (primaryDriverByTruck[truckNum] || null)
       if (!k) continue
       grossFuelByDriver[k] = (grossFuelByDriver[k] || 0) + (Number(f.amount)        || 0)
       rebateByDriver[k]    = (rebateByDriver[k]    || 0) + (Number(f.rebate_amount) || 0)
     }
 
-    // Build combined driver set — include drivers who appear only in fuel
+    // Driver set = only real drivers from loads + paystubs (never phantom fuel-only names)
     const allDriverNames = new Set([
       ...Object.keys(grossByDriver),
       ...Object.keys(payrollByDriver),
-      ...Object.keys(grossFuelByDriver),
     ])
 
     const drivers = []
