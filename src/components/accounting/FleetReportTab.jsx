@@ -389,6 +389,23 @@ export default function FleetReportTab({ company }) {
                         </tr>
                       ))}
                     </tbody>
+                    <tfoot>
+                      {(() => {
+                        const totOOGross    = driverReport.oo.reduce((s,d) => s + d.gross, 0)
+                        const totOOFuel     = driverReport.oo.reduce((s,d) => s + d.grossFuel, 0)
+                        const totOORebate   = driverReport.oo.reduce((s,d) => s + d.rebate, 0)
+                        const totOOMiles    = driverReport.oo.reduce((s,d) => s + d.miles, 0)
+                        return (
+                          <tr style={{ background: '#F3F4F6', fontWeight: 800 }}>
+                            <td colSpan={2}>Total</td>
+                            <td style={{ textAlign: 'right', color: C.gross }}>{fmt$(totOOGross)}</td>
+                            <td style={{ textAlign: 'right', color: C.fuel }}>{totOOFuel > 0 ? fmt$(totOOFuel) : '—'}</td>
+                            <td style={{ textAlign: 'right', color: '#059669' }}>{totOORebate > 0 ? fmt$(totOORebate) : '—'}</td>
+                            <td style={{ textAlign: 'right', color: C.miles }}>{fmtMi(totOOMiles)}</td>
+                          </tr>
+                        )
+                      })()}
+                    </tfoot>
                   </table>
                 </div>
               )}
@@ -427,6 +444,23 @@ export default function FleetReportTab({ company }) {
                         </tr>
                       ))}
                     </tbody>
+                    <tfoot>
+                      {(() => {
+                        const totCoPayroll  = driverReport.company.reduce((s,d) => s + d.payroll, 0)
+                        const totCoGross    = driverReport.company.reduce((s,d) => s + d.gross, 0)
+                        const totCoRebate   = driverReport.company.reduce((s,d) => s + d.rebate, 0)
+                        const totCoMiles    = driverReport.company.reduce((s,d) => s + d.miles, 0)
+                        return (
+                          <tr style={{ background: '#F3F4F6', fontWeight: 800 }}>
+                            <td colSpan={2}>Total</td>
+                            <td style={{ textAlign: 'right', color: C.payroll }}>{fmt$(totCoPayroll)}</td>
+                            <td style={{ textAlign: 'right', color: C.gross }}>{totCoGross > 0 ? fmt$(totCoGross) : '—'}</td>
+                            <td style={{ textAlign: 'right', color: '#059669' }}>{totCoRebate > 0 ? fmt$(totCoRebate) : '—'}</td>
+                            <td style={{ textAlign: 'right', color: C.miles }}>{fmtMi(totCoMiles)}</td>
+                          </tr>
+                        )
+                      })()}
+                    </tfoot>
                   </table>
                 </div>
               )}

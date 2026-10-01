@@ -198,22 +198,39 @@ export function useFleetReport(year, quarter, company) {
       payrollByDriver[k] = (payrollByDriver[k] || 0) + (Number(p.grand_total) || 0)
     }
 
+    // Build truck → primary driver map from loads (for fuel attribution when driver_name missing)
+    const truckDriverCounts = {}
+    for (const l of loads) {
+      if (!l.driver_name || !l.truck_number) continue
+      const t = (l.truck_number || '').trim()
+      const k = norm(l.driver_name)
+      if (!truckDriverCounts[t]) truckDriverCounts[t] = {}
+      truckDriverCounts[t][k] = (truckDriverCounts[t][k] || 0) + 1
+    }
+    const primaryDriverByTruck = {}
+    for (const [t, counts] of Object.entries(truckDriverCounts)) {
+      primaryDriverByTruck[t] = Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0]
+    }
+
     // Fuel per driver — track gross and rebate separately
+    // Use driver_name if set; fall back to truck_number→driver mapping from loads
     const grossFuelByDriver = {}
     const rebateByDriver    = {}
     for (const f of fuel) {
-      if (!f.driver_name) continue
       const cat = String(f.fuel_category || '').toUpperCase()
       if (cat === 'DEFD') continue
-      const k = norm(f.driver_name)
+      const truckNum = (f.truck_number || '').trim()
+      const k = f.driver_name ? norm(f.driver_name) : (primaryDriverByTruck[truckNum] || null)
+      if (!k) continue
       grossFuelByDriver[k] = (grossFuelByDriver[k] || 0) + (Number(f.amount)        || 0)
       rebateByDriver[k]    = (rebateByDriver[k]    || 0) + (Number(f.rebate_amount) || 0)
     }
 
-    // Build combined driver set
+    // Build combined driver set — include drivers who appear only in fuel
     const allDriverNames = new Set([
       ...Object.keys(grossByDriver),
       ...Object.keys(payrollByDriver),
+      ...Object.keys(grossFuelByDriver),
     ])
 
     const drivers = []
@@ -225,10 +242,11 @@ export function useFleetReport(year, quarter, company) {
       const rebate    = rebateByDriver[k]    || 0
       const fuel      = Math.max(0, grossFuel - rebate)
       const miles     = milesbyDriver[k]    || 0
-      // Display name: find original casing from loads or paystubs
+      // Display name: find original casing from loads, paystubs, or fuel
       const displayName =
         loads.find(l => norm(l.driver_name) === k)?.driver_name ||
         paystubs.find(p => norm(p.driver_name) === k)?.driver_name ||
+        fuel.find(f => f.driver_name && norm(f.driver_name) === k)?.driver_name ||
         k
       drivers.push({ name: displayName, profileType, gross, payroll, fuel, grossFuel, rebate, miles })
     }
