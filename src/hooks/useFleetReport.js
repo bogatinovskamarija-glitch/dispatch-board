@@ -198,14 +198,16 @@ export function useFleetReport(year, quarter, company) {
       payrollByDriver[k] = (payrollByDriver[k] || 0) + (Number(p.grand_total) || 0)
     }
 
-    // Fuel per driver
-    const fuelByDriver = {}
+    // Fuel per driver — track gross and rebate separately
+    const grossFuelByDriver = {}
+    const rebateByDriver    = {}
     for (const f of fuel) {
       if (!f.driver_name) continue
       const cat = String(f.fuel_category || '').toUpperCase()
       if (cat === 'DEFD') continue
       const k = norm(f.driver_name)
-      fuelByDriver[k] = (fuelByDriver[k] || 0) + Math.max(0, (Number(f.amount) || 0) - (Number(f.rebate_amount) || 0))
+      grossFuelByDriver[k] = (grossFuelByDriver[k] || 0) + (Number(f.amount)        || 0)
+      rebateByDriver[k]    = (rebateByDriver[k]    || 0) + (Number(f.rebate_amount) || 0)
     }
 
     // Build combined driver set
@@ -217,16 +219,18 @@ export function useFleetReport(year, quarter, company) {
     const drivers = []
     for (const k of allDriverNames) {
       const profileType = profileMap[k] || 'company'
-      const gross   = grossByDriver[k]   || 0
-      const payroll = payrollByDriver[k] || 0
-      const fuel    = fuelByDriver[k]    || 0
-      const miles   = milesbyDriver[k]   || 0
+      const gross     = grossByDriver[k]    || 0
+      const payroll   = payrollByDriver[k]  || 0
+      const grossFuel = grossFuelByDriver[k] || 0
+      const rebate    = rebateByDriver[k]    || 0
+      const fuel      = Math.max(0, grossFuel - rebate)
+      const miles     = milesbyDriver[k]    || 0
       // Display name: find original casing from loads or paystubs
       const displayName =
         loads.find(l => norm(l.driver_name) === k)?.driver_name ||
         paystubs.find(p => norm(p.driver_name) === k)?.driver_name ||
         k
-      drivers.push({ name: displayName, profileType, gross, payroll, fuel, miles })
+      drivers.push({ name: displayName, profileType, gross, payroll, fuel, grossFuel, rebate, miles })
     }
 
     const oo      = drivers.filter(d => d.profileType === 'owner_operator').sort((a,b) => b.gross - a.gross)

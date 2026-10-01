@@ -61,16 +61,18 @@ function printFleetReport({ year, quarter, company, truckReport, driverReport, f
         <td style="font-weight:700">${d.name}</td>
         ${isOO
           ? `<td style="text-align:right;color:#059669;font-weight:600">${d.gross > 0 ? fmtFull(d.gross) : '—'}</td>
-             <td style="text-align:right;color:#D97706">${d.fuel > 0 ? fmtFull(d.fuel) : '—'}</td>
+             <td style="text-align:right;color:#D97706">${d.grossFuel > 0 ? fmtFull(d.grossFuel) : '—'}</td>
+             <td style="text-align:right;color:#059669;font-weight:600">${d.rebate > 0 ? fmtFull(d.rebate) : '—'}</td>
              <td style="text-align:right;color:#8B5CF6">${d.miles > 0 ? fmtMi(d.miles) : '—'}</td>`
           : `<td style="text-align:right;color:#4F46E5;font-weight:600">${d.payroll > 0 ? fmtFull(d.payroll) : '—'}</td>
              <td style="text-align:right;color:#059669">${d.gross > 0 ? fmtFull(d.gross) : '—'}</td>
+             <td style="text-align:right;color:#059669;font-weight:600">${d.rebate > 0 ? fmtFull(d.rebate) : '—'}</td>
              <td style="text-align:right;color:#8B5CF6">${d.miles > 0 ? fmtMi(d.miles) : '—'}</td>`}
       </tr>`).join('')
 
     const cols = isOO
-      ? '<th>Rank</th><th>Driver</th><th style="text-align:right;color:#059669">Gross Revenue</th><th style="text-align:right;color:#D97706">Fuel (net)</th><th style="text-align:right;color:#8B5CF6">Miles</th>'
-      : '<th>Rank</th><th>Driver</th><th style="text-align:right;color:#4F46E5">Total Payroll</th><th style="text-align:right;color:#059669">Gross Revenue</th><th style="text-align:right;color:#8B5CF6">Miles</th>'
+      ? '<th>Rank</th><th>Driver</th><th style="text-align:right;color:#059669">Gross Revenue</th><th style="text-align:right;color:#D97706">Fuel (gross)</th><th style="text-align:right;color:#059669">Rebate</th><th style="text-align:right;color:#8B5CF6">Miles</th>'
+      : '<th>Rank</th><th>Driver</th><th style="text-align:right;color:#4F46E5">Total Payroll</th><th style="text-align:right;color:#059669">Gross Revenue</th><th style="text-align:right;color:#059669">Rebate</th><th style="text-align:right;color:#8B5CF6">Miles</th>'
 
     return `
       <h2 style="margin-top:32px;font-size:15px;font-weight:800;border-bottom:2px solid #E5E7EB;padding-bottom:6px;margin-bottom:10px">${title}</h2>
@@ -367,7 +369,8 @@ export default function FleetReportTab({ company }) {
                         <th style={{ width: 30 }}>#</th>
                         <th>Driver</th>
                         <th style={{ textAlign: 'right', color: C.gross }}>Gross Rev.</th>
-                        <th style={{ textAlign: 'right', color: C.fuel }}>Fuel</th>
+                        <th style={{ textAlign: 'right', color: C.fuel }}>Fuel (gross)</th>
+                        <th style={{ textAlign: 'right', color: '#059669' }}>Rebate</th>
                         <th style={{ textAlign: 'right', color: C.miles }}>Miles</th>
                       </tr>
                     </thead>
@@ -380,7 +383,8 @@ export default function FleetReportTab({ company }) {
                             {i === 0 && <span style={{ marginLeft: 6, fontSize: 14 }}>🏆</span>}
                           </td>
                           <td style={{ textAlign: 'right', color: C.gross, fontWeight: 600 }}>{d.gross > 0 ? fmt$(d.gross) : '—'}</td>
-                          <td style={{ textAlign: 'right', color: d.fuel > 0 ? C.fuel : '#D1D5DB' }}>{d.fuel > 0 ? fmt$(d.fuel) : '—'}</td>
+                          <td style={{ textAlign: 'right', color: d.grossFuel > 0 ? C.fuel : '#D1D5DB' }}>{d.grossFuel > 0 ? fmt$(d.grossFuel) : '—'}</td>
+                          <td style={{ textAlign: 'right', color: d.rebate > 0 ? '#059669' : '#D1D5DB', fontWeight: d.rebate > 0 ? 600 : 400 }}>{d.rebate > 0 ? fmt$(d.rebate) : '—'}</td>
                           <td style={{ textAlign: 'right', color: d.miles > 0 ? C.miles : '#D1D5DB' }}>{d.miles > 0 ? fmtMi(d.miles) : '—'}</td>
                         </tr>
                       ))}
@@ -404,6 +408,7 @@ export default function FleetReportTab({ company }) {
                         <th>Driver</th>
                         <th style={{ textAlign: 'right', color: C.payroll }}>Payroll</th>
                         <th style={{ textAlign: 'right', color: C.gross }}>Gross Rev.</th>
+                        <th style={{ textAlign: 'right', color: '#059669' }}>Rebate</th>
                         <th style={{ textAlign: 'right', color: C.miles }}>Miles</th>
                       </tr>
                     </thead>
@@ -417,6 +422,7 @@ export default function FleetReportTab({ company }) {
                           </td>
                           <td style={{ textAlign: 'right', color: C.payroll, fontWeight: 600 }}>{d.payroll > 0 ? fmt$(d.payroll) : '—'}</td>
                           <td style={{ textAlign: 'right', color: d.gross > 0 ? C.gross : '#D1D5DB' }}>{d.gross > 0 ? fmt$(d.gross) : '—'}</td>
+                          <td style={{ textAlign: 'right', color: d.rebate > 0 ? '#059669' : '#D1D5DB', fontWeight: d.rebate > 0 ? 600 : 400 }}>{d.rebate > 0 ? fmt$(d.rebate) : '—'}</td>
                           <td style={{ textAlign: 'right', color: d.miles > 0 ? C.miles : '#D1D5DB' }}>{d.miles > 0 ? fmtMi(d.miles) : '—'}</td>
                         </tr>
                       ))}
