@@ -64,16 +64,13 @@ export function useFleetReport(year, quarter, company) {
           if (matchCo) q = q.eq('company', company)
           return q
         })(),
-        (() => {
-          let q = supabase
-            .from('fuel_transactions')
-            .select('truck_number,driver_name,amount,rebate_amount,fuel_category,transaction_date,company,raw_row')
-            .gte('transaction_date', from)
-            .lte('transaction_date', to)
-            .limit(10000)
-          if (matchCo) q = q.eq('company', company)
-          return q
-        })(),
+        // RPC aggregates per truck — immune to PostgREST max_rows cap
+        // returns: {truck_number, company, policy_amount, gross_amount, net_amount, rebate}
+        supabase.rpc('get_fuel_by_truck', {
+          p_from:    from,
+          p_to:      to,
+          p_company: matchCo ? company : null,
+        }),
         (() => {
           let q = supabase
             .from('maintenance_records')
@@ -149,13 +146,12 @@ export function useFleetReport(year, quarter, company) {
       }
     }
 
-    // Only apply fuel/maintenance to trucks already in the map (skips trailers, unknown units)
+    // fuel is now per-truck aggregates from RPC: {truck_number, net_amount, …}
+    // DEFD already excluded server-side; only apply to known tractors
     for (const f of fuel) {
       const t = (f.truck_number || '').trim()
-      if (!trucks[t]) continue  // not a known tractor — skip
-      const cat = String(f.fuel_category || '').toUpperCase()
-      if (cat === 'DEFD') continue
-      trucks[t].fuel += Math.max(0, (Number(f.amount) || 0) - (Number(f.rebate_amount) || 0))
+      if (!trucks[t]) continue
+      trucks[t].fuel += Number(f.net_amount) || 0
     }
 
     for (const m of maintenance) {
@@ -212,12 +208,6 @@ export function useFleetReport(year, quarter, company) {
       primaryDriverByTruck[t] = Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0]
     }
 
-    // Known real driver names (normalized) — only these are valid attribution targets
-    const knownDrivers = new Set([
-      ...Object.keys(grossByDriver),
-      ...Object.keys(payrollByDriver),
-    ])
-
     // For each OO driver, find the truck they drove most — OO drivers own their truck
     // so ALL fuel for that truck belongs to the OO regardless of co-drivers.
     const ooTruckCounts = {}
@@ -235,46 +225,28 @@ export function useFleetReport(year, quarter, company) {
       truckToOO[primaryTruck] = k
     }
 
-    // Compute real rebate per transaction:
-    // EFS stores retail price in raw_row.retail_amount. The policy discount
-    // (retail − policy) IS a rebate the company earns — the FuelTab adds both.
-    // rebate_amount alone is tiny; most of the rebate value is the policy discount.
-    function txnRebate(f) {
-      const retail = Number(f.raw_row?.retail_amount) || 0
-      const policy = Number(f.amount) || 0
-      return (retail > policy ? retail - policy : 0) + (Number(f.rebate_amount) || 0)
-    }
-    // For OO drivers we charge retail price (they don't benefit from policy discount)
-    function txnOOGross(f) {
-      const retail = Number(f.raw_row?.retail_amount) || 0
-      const policy = Number(f.amount) || 0
-      return retail > policy ? retail : policy
-    }
-
-    // Fuel per driver — track gross and rebate separately
+    // fuel is now per-truck aggregates from RPC:
+    // { truck_number, policy_amount, gross_amount (retail), net_amount, rebate }
+    // DEFD already excluded server-side; no row-limit issue.
     const grossFuelByDriver = {}
     const rebateByDriver    = {}
     for (const f of fuel) {
-      const cat = String(f.fuel_category || '').toUpperCase()
-      if (cat === 'DEFD') continue
       const truckNum = (f.truck_number || '').trim()
 
-      // OO trucks: attribute all fuel to the OO (their truck, their fuel bill)
+      // OO trucks: attribute all fuel to the OO owner
+      // OO is charged at retail (gross_amount); rebate is what the company earns
       if (truckToOO[truckNum]) {
         const k = truckToOO[truckNum]
-        grossFuelByDriver[k] = (grossFuelByDriver[k] || 0) + txnOOGross(f)
-        rebateByDriver[k]    = (rebateByDriver[k]    || 0) + txnRebate(f)
+        grossFuelByDriver[k] = (grossFuelByDriver[k] || 0) + (Number(f.gross_amount) || 0)
+        rebateByDriver[k]    = (rebateByDriver[k]    || 0) + (Number(f.rebate)        || 0)
         continue
       }
 
-      // Company trucks: trust driver_name only if it matches a known driver
-      const nameOnFuel = f.driver_name ? norm(f.driver_name) : null
-      const k = (nameOnFuel && knownDrivers.has(nameOnFuel))
-        ? nameOnFuel
-        : (primaryDriverByTruck[truckNum] || null)
+      // Company trucks: attribute to primary driver of that truck
+      const k = primaryDriverByTruck[truckNum] || null
       if (!k) continue
-      grossFuelByDriver[k] = (grossFuelByDriver[k] || 0) + (Number(f.amount) || 0)
-      rebateByDriver[k]    = (rebateByDriver[k]    || 0) + txnRebate(f)
+      grossFuelByDriver[k] = (grossFuelByDriver[k] || 0) + (Number(f.policy_amount) || 0)
+      rebateByDriver[k]    = (rebateByDriver[k]    || 0) + (Number(f.rebate)         || 0)
     }
 
     // Driver set = only real drivers from loads + paystubs (never phantom fuel-only names)
@@ -292,11 +264,9 @@ export function useFleetReport(year, quarter, company) {
       const rebate    = rebateByDriver[k]    || 0
       const netFuel   = Math.max(0, grossFuel - rebate)
       const miles     = milesbyDriver[k]    || 0
-      // Display name: find original casing from loads, paystubs, or fuel transactions
       const displayName =
         loads.find(l => norm(l.driver_name) === k)?.driver_name ||
         paystubs.find(p => norm(p.driver_name) === k)?.driver_name ||
-        fuel.find(f => f.driver_name && norm(f.driver_name) === k)?.driver_name ||
         k
       drivers.push({ name: displayName, profileType, gross, payroll, fuel: netFuel, grossFuel, rebate, miles })
     }
