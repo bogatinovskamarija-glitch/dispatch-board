@@ -263,6 +263,31 @@ export function useArchivedInvoiceLoads(company = 'all') {
   return { loads, loading, refetch: fetch }
 }
 
+// ── Unsent invoices summary (for widget — no row limit) ───────────────────
+export function useUnsentInvoicesSummary(company = 'all') {
+  const [count,   setCount]   = useState(0)
+  const [amount,  setAmount]  = useState(0)
+  const [loading, setLoading] = useState(true)
+
+  const fetch = useCallback(async () => {
+    setLoading(true)
+    let q = supabase
+      .from('invoices')
+      .select('total')
+      .eq('is_archived', false)
+      .eq('sent_to_factoring', false)
+    if (company !== 'all') q = q.eq('company', company)
+    const { data } = await q
+    const rows = data ?? []
+    setCount(rows.length)
+    setAmount(rows.reduce((s, r) => s + (Number(r.total) || 0), 0))
+    setLoading(false)
+  }, [company])
+
+  useEffect(() => { fetch() }, [fetch])
+  return { count, amount, loading, refetch: fetch }
+}
+
 // ── Mark invoice(s) as sent to factoring company ──────────────────────────
 export async function markInvoiceSent(id) {
   const { error } = await supabase

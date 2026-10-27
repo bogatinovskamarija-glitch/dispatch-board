@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { usePendingInvoices, useInvoiceHistory, useArchivedInvoiceLoads, createInvoice, fetchInvoiceLoads, archiveLoad, unarchiveLoad, archiveInvoice, unarchiveInvoice, updateLoadField, markInvoiceSent, markInvoicesSent } from '../../hooks/useAccounting'
+import { usePendingInvoices, useInvoiceHistory, useArchivedInvoiceLoads, useUnsentInvoicesSummary, createInvoice, fetchInvoiceLoads, archiveLoad, unarchiveLoad, archiveInvoice, unarchiveInvoice, updateLoadField, markInvoiceSent, markInvoicesSent } from '../../hooks/useAccounting'
 import InvoicePrintModal from './InvoicePrintModal'
 import LoadModal from '../LoadModal'
 import { useDrivers, useEquipment } from '../../hooks/useClickUp'
@@ -28,6 +28,7 @@ function PendingStatusBadge({ status }) {
 export default function InvoicesTab({ company }) {
   const { loads, loading, refetch }          = usePendingInvoices(company)
   const { invoices, loading: histLoad, refetch: refetchHist } = useInvoiceHistory(company)
+  const { count: unsentCount, amount: unsentAmt, refetch: refetchUnsent } = useUnsentInvoicesSummary(company)
   const { loads: archivedLoads, loading: archLoading, refetch: refetchArchived } = useArchivedInvoiceLoads(company)
   const { drivers }         = useDrivers()
   const { trucks, trailers } = useEquipment()
@@ -199,7 +200,7 @@ export default function InvoicesTab({ company }) {
     e.stopPropagation()
     try {
       await markInvoiceSent(id)
-      await refetchHist()
+      await Promise.all([refetchHist(), refetchUnsent()])
     } catch (err) {
       alert('Error: ' + err.message)
     }
@@ -229,7 +230,7 @@ export default function InvoicesTab({ company }) {
     try {
       await markInvoicesSent(ids)
       setHistSelected(new Set())
-      await refetchHist()
+      await Promise.all([refetchHist(), refetchUnsent()])
     } catch (err) {
       alert('Error: ' + err.message)
     }
@@ -243,11 +244,9 @@ export default function InvoicesTab({ company }) {
   const transitLoads  = loads.filter(l => l.status === 'covered' || l.status === 'at_pickup' || l.status === 'at_delivery')
   const readyAmt      = readyLoads.reduce((s, l) => s + (Number(l.price) || 0), 0)
   const transitAmt    = transitLoads.reduce((s, l) => s + (Number(l.price) || 0), 0)
-  // Unsent invoices = generated but not yet sent to factoring and not voided
-  const unsentInvoices = invoices.filter(inv => !inv.is_archived && !inv.sent_to_factoring)
-  const unsentAmt      = unsentInvoices.reduce((s, inv) => s + (Number(inv.total) || 0), 0)
-  const readyToSendAmt = readyAmt + unsentAmt
-  const readyToSendCount = readyLoads.length + unsentInvoices.length
+  // Unsent invoices from unlimited query — avoids the 300-row display limit skewing the widget
+  const readyToSendAmt   = readyAmt + unsentAmt
+  const readyToSendCount = readyLoads.length + unsentCount
 
   // ── CSV export (factoring format) ─────────────────────────────────────────
   function downloadFactoringCSV() {
@@ -323,7 +322,7 @@ export default function InvoicesTab({ company }) {
                   <div style={{ fontSize: 22, fontWeight: 800, color: '#78350F' }}>{fmt(readyToSendAmt)}</div>
                   <div style={{ fontSize: 13, color: '#92400E', marginTop: 2 }}>{readyToSendCount} item{readyToSendCount !== 1 ? 's' : ''}</div>
                   <div style={{ fontSize: 11, color: '#92400E', marginTop: 4, display: 'flex', gap: 10 }}>
-                    <span>{unsentInvoices.length} invoice{unsentInvoices.length !== 1 ? 's' : ''} generated</span>
+                    <span>{unsentCount} invoice{unsentCount !== 1 ? 's' : ''} generated</span>
                     <span style={{ color: '#D97706' }}>·</span>
                     <span>{readyLoads.length} load{readyLoads.length !== 1 ? 's' : ''} to invoice</span>
                   </div>
