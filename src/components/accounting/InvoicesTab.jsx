@@ -615,7 +615,7 @@ export default function InvoicesTab({ company }) {
                                 title="Mark as sent to factoring company"
                                 onClick={e => handleMarkSent(e, inv.id)}
                                 style={{ color: '#059669', fontWeight: 700, padding: '2px 7px', border: '1px solid #D1FAE5' }}
-                              >✓ Sent</button>
+                              >Mark Sent</button>
                             )}
                             {!inv.is_archived && inv.sent_to_factoring && (
                               <span style={{ fontSize: 11, color: '#059669', fontWeight: 600, padding: '2px 7px', background: '#F0FDF4', borderRadius: 6, border: '1px solid #BBF7D0' }}>✓ Sent</span>
