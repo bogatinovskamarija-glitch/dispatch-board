@@ -7,7 +7,7 @@ import { useDrivers, useEquipment } from '../../hooks/useClickUp'
 const fmt = n => '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2 })
 
 const STATUS_META = {
-  covered:     { label: 'Covered',     color: '#16A34A', bg: '#F0FDF4' },
+  covered:     { label: 'In Transit',  color: '#16A34A', bg: '#F0FDF4' },
   at_pickup:   { label: 'At Pick Up',  color: '#0284C7', bg: '#F0F9FF' },
   at_delivery: { label: 'At Delivery', color: '#EA580C', bg: '#FFF7ED' },
   tonu:        { label: 'TONU',        color: '#7C3AED', bg: '#F5F3FF' },
@@ -195,6 +195,40 @@ export default function InvoicesTab({ company }) {
   const selectedLoads = loads.filter(l => selected.has(l.id))
   const selTotal      = selectedLoads.reduce((s, l) => s + (Number(l.price) || 0), 0)
 
+  // ── Pending widgets ────────────────────────────────────────────────────────
+  const readyLoads   = loads.filter(l => l.status === 'empty')
+  const transitLoads = loads.filter(l => l.status === 'covered')
+  const readyAmt     = readyLoads.reduce((s, l) => s + (Number(l.price) || 0), 0)
+  const transitAmt   = transitLoads.reduce((s, l) => s + (Number(l.price) || 0), 0)
+
+  // ── CSV export (factoring format) ─────────────────────────────────────────
+  function downloadFactoringCSV() {
+    const header = ['DEBNAME', 'INV_ID', 'INV_DATE', 'PO_NO', 'INVAMT', 'Clientref']
+    const dataRows = filteredInvoices
+      .filter(inv => !inv.is_archived)
+      .map(inv => [
+        inv.bill_to_name || '',
+        inv.invoice_number || '',
+        inv.created_at ? new Date(inv.created_at).toLocaleDateString('en-US') : '',
+        (inv.load_numbers || []).join(', '),
+        inv.total || 0,
+        (inv.truck_numbers || []).join(', '),
+      ])
+    const csv = [header, ...dataRows]
+      .map(row => row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))
+      .join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url  = URL.createObjectURL(blob)
+    const a    = document.createElement('a')
+    a.href     = url
+    const dateSuffix = filterFrom || filterTo
+      ? `_${filterFrom || 'start'}_to_${filterTo || 'end'}`
+      : ''
+    a.download = `factoring_invoices${dateSuffix}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   if (loading) return <div className="acct-empty">Loading…</div>
 
   return (
@@ -233,6 +267,28 @@ export default function InvoicesTab({ company }) {
           ? <div className="acct-empty">No loads pending invoicing.<br />Once a load with a broker and price is saved, it appears here.</div>
           : (
             <>
+              {/* ── Summary widgets ── */}
+              <div style={{ display: 'flex', gap: 12, marginBottom: 18 }}>
+                {/* Ready to Bill */}
+                <div style={{ flex: 1, background: '#FEFCE8', border: '1px solid #FDE68A', borderRadius: 10, padding: '14px 18px' }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#92400E', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Ready to Bill</div>
+                  <div style={{ fontSize: 22, fontWeight: 800, color: '#78350F' }}>{fmt(readyAmt)}</div>
+                  <div style={{ fontSize: 13, color: '#92400E', marginTop: 2 }}>{readyLoads.length} load{readyLoads.length !== 1 ? 's' : ''}</div>
+                  <div style={{ fontSize: 11, color: '#B45309', marginTop: 8, borderTop: '1px solid #FDE68A', paddingTop: 7 }}>
+                    Load completed &amp; BOL sent — ready to invoice the broker.
+                  </div>
+                </div>
+                {/* In Transit */}
+                <div style={{ flex: 1, background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 10, padding: '14px 18px' }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#14532D', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>In Transit</div>
+                  <div style={{ fontSize: 22, fontWeight: 800, color: '#14532D' }}>{fmt(transitAmt)}</div>
+                  <div style={{ fontSize: 13, color: '#15803D', marginTop: 2 }}>{transitLoads.length} load{transitLoads.length !== 1 ? 's' : ''}</div>
+                  <div style={{ fontSize: 11, color: '#16A34A', marginTop: 8, borderTop: '1px solid #BBF7D0', paddingTop: 7 }}>
+                    Load still in transit — BOL not yet received, cannot invoice.
+                  </div>
+                </div>
+              </div>
+
               {/* Search bar for pending */}
               <div style={{ display: 'flex', gap: 10, marginBottom: 12, alignItems: 'center' }}>
                 <input
@@ -417,6 +473,16 @@ export default function InvoicesTab({ company }) {
                 <span style={{ fontSize: 12, color: '#9CA3AF', marginLeft: 'auto' }}>
                   {filteredInvoices.length} of {invoices.length} invoice{invoices.length !== 1 ? 's' : ''}
                 </span>
+                {filteredInvoices.filter(i => !i.is_archived).length > 0 && (
+                  <button
+                    className="btn btn-ghost btn-xs"
+                    onClick={downloadFactoringCSV}
+                    title="Download factoring CSV (DEBNAME, INV_ID, INV_DATE, PO_NO, INVAMT, Clientref)"
+                    style={{ color: '#059669', fontWeight: 600, border: '1px solid #D1FAE5' }}
+                  >
+                    ↓ Factoring CSV
+                  </button>
+                )}
               </div>
 
               {filteredInvoices.length === 0
