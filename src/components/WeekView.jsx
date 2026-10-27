@@ -15,7 +15,7 @@ const STATUS_COLORS = {
 }
 
 const STATUS_LABELS = {
-  covered: 'Covered', empty: 'Empty', home: 'At Home',
+  covered: 'In Transit', empty: 'Empty', home: 'At Home',
   broken: 'Broken Down', no_driver: 'No Driver',
   prebooked: 'Pre-Booked', at_pickup: 'At Pick Up',
   at_delivery: 'At Delivery', tonu: 'TONU',
@@ -58,7 +58,7 @@ function buildChain(truckLoads, weekStartStr, weekEndStr) {
   const sorted = truckLoads
     .filter(l => {
       const s = l.pickup_date  || l.date
-      const e = l.delivery_date || l.date
+      const e = l.delivery_date || l.pickup_date || l.date
       return s <= weekEndStr && e >= weekStartStr
     })
     .sort((a, b) => {

@@ -175,7 +175,7 @@ export default function App() {
         </div>
         <div className="filters-divider" />
         <div className="legend">
-          <div className="legend-item"><div className="legend-dot dot-green" /> Covered</div>
+          <div className="legend-item"><div className="legend-dot dot-green" /> In Transit</div>
           <div className="legend-item"><div className="legend-dot dot-yellow" /> Empty</div>
           <div className="legend-item"><div className="legend-dot dot-pink" /> At Home</div>
           <div className="legend-item"><div className="legend-dot dot-red" /> Broken Down</div>

@@ -65,7 +65,7 @@ export default function OnboardingGuide({ onClose }) {
 
             <div className="guide-item">
               <div className="guide-item-body">
-                When the status is <strong>Covered, At Pick Up, At Delivery, or TONU</strong>,
+                When the status is <strong>In Transit, At Pick Up, At Delivery, or TONU</strong>,
                 you must fill in these fields before saving:
               </div>
               <ul className="guide-list">
@@ -129,7 +129,7 @@ export default function OnboardingGuide({ onClose }) {
             <div className="guide-section-title">🎨 Status Colors at a Glance</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 24px', fontSize: 13 }}>
               {[
-                ['#16A34A', 'Covered — load is booked &amp; confirmed'],
+                ['#16A34A', 'In Transit — load is booked &amp; confirmed'],
                 ['#0284C7', 'At Pick Up — driver is at the pickup location'],
                 ['#EA580C', 'At Delivery — driver is delivering'],
                 ['#4F46E5', 'Pre-Booked — load booked for a future date'],

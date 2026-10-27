@@ -1,5 +1,5 @@
 const LABELS = {
-  covered:     'Covered',
+  covered:     'In Transit',
   empty:       'Empty',
   home:        'At Home',
   broken:      'Broken Down',

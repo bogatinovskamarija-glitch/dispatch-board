@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 
 const STATUSES = [
-  { value: 'covered',     label: 'Covered',      dot: '#16A34A' },
+  { value: 'covered',     label: 'In Transit',   dot: '#16A34A' },
   { value: 'empty',       label: 'Empty',        dot: '#CA8A04' },
   { value: 'home',        label: 'At Home',      dot: '#DB2777' },
   { value: 'broken',      label: 'Broken',       dot: '#DC2626' },

@@ -26,7 +26,7 @@ export default function StatsRow({ loads, statusFilter, onFilterChange }) {
   }
 
   const CARDS = [
-    { status: 'covered',   dot: 'dot-green',  label: 'Covered',    count: counts.covered   },
+    { status: 'covered',   dot: 'dot-green',  label: 'In Transit', count: counts.covered   },
     { status: 'empty',     dot: 'dot-yellow', label: 'Empty',      count: counts.empty     },
     { status: 'home',      dot: 'dot-pink',   label: 'At Home',    count: counts.home      },
     { status: 'broken',    dot: 'dot-red',    label: 'Broken',     count: counts.broken    },
