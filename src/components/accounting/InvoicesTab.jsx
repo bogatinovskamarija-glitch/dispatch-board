@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { usePendingInvoices, useInvoiceHistory, useArchivedInvoiceLoads, createInvoice, fetchInvoiceLoads, archiveLoad, unarchiveLoad, archiveInvoice, unarchiveInvoice, updateLoadField, markInvoiceSent } from '../../hooks/useAccounting'
+import { usePendingInvoices, useInvoiceHistory, useArchivedInvoiceLoads, createInvoice, fetchInvoiceLoads, archiveLoad, unarchiveLoad, archiveInvoice, unarchiveInvoice, updateLoadField, markInvoiceSent, markInvoicesSent } from '../../hooks/useAccounting'
 import InvoicePrintModal from './InvoicePrintModal'
 import LoadModal from '../LoadModal'
 import { useDrivers, useEquipment } from '../../hooks/useClickUp'
@@ -51,6 +51,9 @@ export default function InvoicesTab({ company }) {
       (l.driver_name  || '').toLowerCase().includes(q)
     )
   }, [loads, pendingSearch])
+
+  // ── History multi-select (for bulk mark sent) ─────────────────────────────
+  const [histSelected, setHistSelected] = useState(new Set())
 
   // ── History filters ────────────────────────────────────────────────────────
   const [filterText,    setFilterText]    = useState('')
@@ -196,6 +199,36 @@ export default function InvoicesTab({ company }) {
     e.stopPropagation()
     try {
       await markInvoiceSent(id)
+      await refetchHist()
+    } catch (err) {
+      alert('Error: ' + err.message)
+    }
+  }
+
+  function toggleHistRow(e, id) {
+    e.stopPropagation()
+    setHistSelected(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  function toggleAllUnsent() {
+    const unsentIds = filteredInvoices.filter(i => !i.is_archived && !i.sent_to_factoring).map(i => i.id)
+    setHistSelected(prev =>
+      prev.size === unsentIds.length && unsentIds.every(id => prev.has(id))
+        ? new Set()
+        : new Set(unsentIds)
+    )
+  }
+
+  async function handleBulkMarkSent() {
+    const ids = [...histSelected]
+    if (!ids.length) return
+    try {
+      await markInvoicesSent(ids)
+      setHistSelected(new Set())
       await refetchHist()
     } catch (err) {
       alert('Error: ' + err.message)
@@ -493,6 +526,15 @@ export default function InvoicesTab({ company }) {
                 <span style={{ fontSize: 12, color: '#9CA3AF', marginLeft: 'auto' }}>
                   {filteredInvoices.length} of {invoices.length} invoice{invoices.length !== 1 ? 's' : ''}
                 </span>
+                {histSelected.size > 0 && (
+                  <button
+                    className="btn btn-xs"
+                    onClick={handleBulkMarkSent}
+                    style={{ background: '#059669', color: '#fff', fontWeight: 700, border: 'none' }}
+                  >
+                    ✓ Mark {histSelected.size} as Sent
+                  </button>
+                )}
                 {filteredInvoices.filter(i => !i.is_archived).length > 0 && (
                   <button
                     className="btn btn-ghost btn-xs"
@@ -511,6 +553,14 @@ export default function InvoicesTab({ company }) {
                   <table className="acct-table">
                     <thead>
                       <tr>
+                        <th style={{ width: 32 }}>
+                          <input
+                            type="checkbox"
+                            title="Select all unsent"
+                            onChange={toggleAllUnsent}
+                            checked={(() => { const u = filteredInvoices.filter(i => !i.is_archived && !i.sent_to_factoring); return u.length > 0 && u.every(i => histSelected.has(i.id)) })()}
+                          />
+                        </th>
                         <th style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('invoice_number')}>Invoice #{sortIcon('invoice_number')}</th>
                         <th style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('created_at')}>Date{sortIcon('created_at')}</th>
                         <th style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('bill_to_name')}>Broker{sortIcon('bill_to_name')}</th>
@@ -528,6 +578,15 @@ export default function InvoicesTab({ company }) {
                           style={{ cursor: 'pointer', opacity: inv.is_archived ? 0.5 : 1 }}
                           onClick={() => !inv.is_archived && openHistoryInvoice(inv)}
                         >
+                          <td onClick={e => e.stopPropagation()}>
+                            {!inv.is_archived && !inv.sent_to_factoring && (
+                              <input
+                                type="checkbox"
+                                checked={histSelected.has(inv.id)}
+                                onChange={e => toggleHistRow(e, inv.id)}
+                              />
+                            )}
+                          </td>
                           <td>
                             <strong>{inv.invoice_number}</strong>
                             {inv.is_archived && <span style={{ marginLeft: 6, fontSize: 10, color: '#9CA3AF', background: '#F3F4F6', borderRadius: 4, padding: '1px 5px' }}>VOIDED</span>}

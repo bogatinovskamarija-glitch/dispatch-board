@@ -263,12 +263,20 @@ export function useArchivedInvoiceLoads(company = 'all') {
   return { loads, loading, refetch: fetch }
 }
 
-// ── Mark invoice as sent to factoring company ─────────────────────────────
+// ── Mark invoice(s) as sent to factoring company ──────────────────────────
 export async function markInvoiceSent(id) {
   const { error } = await supabase
     .from('invoices')
     .update({ sent_to_factoring: true })
     .eq('id', id)
+  if (error) throw new Error(error.message)
+}
+
+export async function markInvoicesSent(ids) {
+  const { error } = await supabase
+    .from('invoices')
+    .update({ sent_to_factoring: true })
+    .in('id', ids)
   if (error) throw new Error(error.message)
 }
 
