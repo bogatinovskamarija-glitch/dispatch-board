@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import * as XLSX from 'xlsx'
-import { usePendingInvoices, useInvoiceHistory, useArchivedInvoiceLoads, useUnsentInvoicesSummary, createInvoice, fetchInvoiceLoads, archiveLoad, unarchiveLoad, archiveInvoice, unarchiveInvoice, updateLoadField, markInvoiceSent, markInvoicesSent } from '../../hooks/useAccounting'
+import { usePendingInvoices, useInvoiceHistory, useArchivedInvoiceLoads, useUnsentInvoicesSummary, createInvoice, fetchInvoiceLoads, archiveLoad, unarchiveLoad, archiveInvoice, unarchiveInvoice, updateLoadField, markInvoiceSent, markInvoiceUnsent, markInvoicesSent } from '../../hooks/useAccounting'
 import InvoicePrintModal from './InvoicePrintModal'
 import LoadModal from '../LoadModal'
 import { useDrivers, useEquipment } from '../../hooks/useClickUp'
@@ -201,6 +201,16 @@ export default function InvoicesTab({ company }) {
     e.stopPropagation()
     try {
       await markInvoiceSent(id)
+      await Promise.all([refetchHist(), refetchUnsent()])
+    } catch (err) {
+      alert('Error: ' + err.message)
+    }
+  }
+
+  async function handleMarkUnsent(e, id) {
+    e.stopPropagation()
+    try {
+      await markInvoiceUnsent(id)
       await Promise.all([refetchHist(), refetchUnsent()])
     } catch (err) {
       alert('Error: ' + err.message)
@@ -611,7 +621,12 @@ export default function InvoicesTab({ company }) {
                               >Mark Sent</button>
                             )}
                             {!inv.is_archived && inv.sent_to_factoring && (
-                              <span style={{ fontSize: 11, color: '#059669', fontWeight: 600, padding: '2px 7px', background: '#F0FDF4', borderRadius: 6, border: '1px solid #BBF7D0' }}>✓ Sent</span>
+                              <button
+                                className="btn btn-ghost btn-xs"
+                                title="Click to undo — mark as not sent"
+                                onClick={e => handleMarkUnsent(e, inv.id)}
+                                style={{ fontSize: 11, color: '#059669', fontWeight: 600, padding: '2px 7px', background: '#F0FDF4', borderRadius: 6, border: '1px solid #BBF7D0' }}
+                              >✓ Sent</button>
                             )}
                             {!inv.is_archived && (
                               <button

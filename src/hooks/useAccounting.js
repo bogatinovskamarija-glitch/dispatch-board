@@ -297,6 +297,14 @@ export async function markInvoiceSent(id) {
   if (error) throw new Error(error.message)
 }
 
+export async function markInvoiceUnsent(id) {
+  const { error } = await supabase
+    .from('invoices')
+    .update({ sent_to_factoring: false })
+    .eq('id', id)
+  if (error) throw new Error(error.message)
+}
+
 export async function markInvoicesSent(ids) {
   const { error } = await supabase
     .from('invoices')
