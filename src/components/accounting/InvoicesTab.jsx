@@ -239,8 +239,8 @@ export default function InvoicesTab({ company }) {
   const selTotal      = selectedLoads.reduce((s, l) => s + (Number(l.price) || 0), 0)
 
   // ── Pending widgets ────────────────────────────────────────────────────────
-  const readyLoads    = loads.filter(l => l.status === 'empty')
-  const transitLoads  = loads.filter(l => l.status === 'covered')
+  const readyLoads    = loads.filter(l => l.status === 'empty' || l.status === 'tonu')
+  const transitLoads  = loads.filter(l => l.status === 'covered' || l.status === 'at_pickup' || l.status === 'at_delivery')
   const readyAmt      = readyLoads.reduce((s, l) => s + (Number(l.price) || 0), 0)
   const transitAmt    = transitLoads.reduce((s, l) => s + (Number(l.price) || 0), 0)
   // Unsent invoices = generated but not yet sent to factoring and not voided
@@ -328,7 +328,7 @@ export default function InvoicesTab({ company }) {
                     <span>{readyLoads.length} load{readyLoads.length !== 1 ? 's' : ''} to invoice</span>
                   </div>
                   <div style={{ fontSize: 11, color: '#B45309', marginTop: 8, borderTop: '1px solid #FDE68A', paddingTop: 7 }}>
-                    Includes generated invoices not yet sent + loads with BOL ready to bill.
+                    Includes generated invoices not yet sent + loads completed (BOL ready) or TONU.
                   </div>
                 </div>
                 {/* In Transit */}
@@ -337,7 +337,7 @@ export default function InvoicesTab({ company }) {
                   <div style={{ fontSize: 22, fontWeight: 800, color: '#14532D' }}>{fmt(transitAmt)}</div>
                   <div style={{ fontSize: 13, color: '#15803D', marginTop: 2 }}>{transitLoads.length} load{transitLoads.length !== 1 ? 's' : ''}</div>
                   <div style={{ fontSize: 11, color: '#16A34A', marginTop: 8, borderTop: '1px solid #BBF7D0', paddingTop: 7 }}>
-                    Load still in transit — BOL not yet received, cannot invoice.
+                    Load in transit, at pickup, or at delivery — BOL not yet received.
                   </div>
                 </div>
               </div>
