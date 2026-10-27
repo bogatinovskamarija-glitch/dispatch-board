@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { usePendingInvoices, useInvoiceHistory, useArchivedInvoiceLoads, createInvoice, fetchInvoiceLoads, archiveLoad, unarchiveLoad, archiveInvoice, unarchiveInvoice, updateLoadField } from '../../hooks/useAccounting'
+import { usePendingInvoices, useInvoiceHistory, useArchivedInvoiceLoads, createInvoice, fetchInvoiceLoads, archiveLoad, unarchiveLoad, archiveInvoice, unarchiveInvoice, updateLoadField, markInvoiceSent } from '../../hooks/useAccounting'
 import InvoicePrintModal from './InvoicePrintModal'
 import LoadModal from '../LoadModal'
 import { useDrivers, useEquipment } from '../../hooks/useClickUp'
@@ -192,14 +192,29 @@ export default function InvoicesTab({ company }) {
     }
   }
 
+  async function handleMarkSent(e, id) {
+    e.stopPropagation()
+    try {
+      await markInvoiceSent(id)
+      await refetchHist()
+    } catch (err) {
+      alert('Error: ' + err.message)
+    }
+  }
+
   const selectedLoads = loads.filter(l => selected.has(l.id))
   const selTotal      = selectedLoads.reduce((s, l) => s + (Number(l.price) || 0), 0)
 
   // ── Pending widgets ────────────────────────────────────────────────────────
-  const readyLoads   = loads.filter(l => l.status === 'empty')
-  const transitLoads = loads.filter(l => l.status === 'covered')
-  const readyAmt     = readyLoads.reduce((s, l) => s + (Number(l.price) || 0), 0)
-  const transitAmt   = transitLoads.reduce((s, l) => s + (Number(l.price) || 0), 0)
+  const readyLoads    = loads.filter(l => l.status === 'empty')
+  const transitLoads  = loads.filter(l => l.status === 'covered')
+  const readyAmt      = readyLoads.reduce((s, l) => s + (Number(l.price) || 0), 0)
+  const transitAmt    = transitLoads.reduce((s, l) => s + (Number(l.price) || 0), 0)
+  // Unsent invoices = generated but not yet sent to factoring and not voided
+  const unsentInvoices = invoices.filter(inv => !inv.is_archived && !inv.sent_to_factoring)
+  const unsentAmt      = unsentInvoices.reduce((s, inv) => s + (Number(inv.total) || 0), 0)
+  const readyToSendAmt = readyAmt + unsentAmt
+  const readyToSendCount = readyLoads.length + unsentInvoices.length
 
   // ── CSV export (factoring format) ─────────────────────────────────────────
   function downloadFactoringCSV() {
@@ -269,13 +284,18 @@ export default function InvoicesTab({ company }) {
             <>
               {/* ── Summary widgets ── */}
               <div style={{ display: 'flex', gap: 12, marginBottom: 18 }}>
-                {/* Ready to Bill */}
+                {/* Ready to Send */}
                 <div style={{ flex: 1, background: '#FEFCE8', border: '1px solid #FDE68A', borderRadius: 10, padding: '14px 18px' }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#92400E', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Ready to Bill</div>
-                  <div style={{ fontSize: 22, fontWeight: 800, color: '#78350F' }}>{fmt(readyAmt)}</div>
-                  <div style={{ fontSize: 13, color: '#92400E', marginTop: 2 }}>{readyLoads.length} load{readyLoads.length !== 1 ? 's' : ''}</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#92400E', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Ready to Send</div>
+                  <div style={{ fontSize: 22, fontWeight: 800, color: '#78350F' }}>{fmt(readyToSendAmt)}</div>
+                  <div style={{ fontSize: 13, color: '#92400E', marginTop: 2 }}>{readyToSendCount} item{readyToSendCount !== 1 ? 's' : ''}</div>
+                  <div style={{ fontSize: 11, color: '#92400E', marginTop: 4, display: 'flex', gap: 10 }}>
+                    <span>{unsentInvoices.length} invoice{unsentInvoices.length !== 1 ? 's' : ''} generated</span>
+                    <span style={{ color: '#D97706' }}>·</span>
+                    <span>{readyLoads.length} load{readyLoads.length !== 1 ? 's' : ''} to invoice</span>
+                  </div>
                   <div style={{ fontSize: 11, color: '#B45309', marginTop: 8, borderTop: '1px solid #FDE68A', paddingTop: 7 }}>
-                    Load completed &amp; BOL sent — ready to invoice the broker.
+                    Includes generated invoices not yet sent + loads with BOL ready to bill.
                   </div>
                 </div>
                 {/* In Transit */}
@@ -530,6 +550,17 @@ export default function InvoicesTab({ company }) {
                           <td className="acct-price">{inv.total ? fmt(inv.total) : '—'}</td>
                           <td style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                             {!inv.is_archived && <span className="acct-click-hint">View →</span>}
+                            {!inv.is_archived && !inv.sent_to_factoring && (
+                              <button
+                                className="btn btn-ghost btn-xs"
+                                title="Mark as sent to factoring company"
+                                onClick={e => handleMarkSent(e, inv.id)}
+                                style={{ color: '#059669', fontWeight: 700, padding: '2px 7px', border: '1px solid #D1FAE5' }}
+                              >✓ Sent</button>
+                            )}
+                            {!inv.is_archived && inv.sent_to_factoring && (
+                              <span style={{ fontSize: 11, color: '#059669', fontWeight: 600, padding: '2px 7px', background: '#F0FDF4', borderRadius: 6, border: '1px solid #BBF7D0' }}>✓ Sent</span>
+                            )}
                             {!inv.is_archived && (
                               <button
                                 className="btn btn-ghost btn-xs"
