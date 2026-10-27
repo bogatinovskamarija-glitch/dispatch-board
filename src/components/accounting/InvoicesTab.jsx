@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import * as XLSX from 'xlsx'
 import { usePendingInvoices, useInvoiceHistory, useArchivedInvoiceLoads, useUnsentInvoicesSummary, createInvoice, fetchInvoiceLoads, archiveLoad, unarchiveLoad, archiveInvoice, unarchiveInvoice, updateLoadField, markInvoiceSent, markInvoicesSent } from '../../hooks/useAccounting'
 import InvoicePrintModal from './InvoicePrintModal'
 import LoadModal from '../LoadModal'
@@ -248,32 +249,25 @@ export default function InvoicesTab({ company }) {
   const readyToSendAmt   = readyAmt + unsentAmt
   const readyToSendCount = readyLoads.length + unsentCount
 
-  // ── CSV export (factoring format) ─────────────────────────────────────────
-  function downloadFactoringCSV() {
-    const header = ['DEBNAME', 'INV_ID', 'INV_DATE', 'PO_NO', 'INVAMT', 'Clientref']
-    const dataRows = filteredInvoices
-      .filter(inv => !inv.is_archived)
-      .map(inv => [
-        inv.bill_to_name || '',
-        inv.invoice_number || '',
-        inv.created_at ? new Date(inv.created_at).toLocaleDateString('en-US') : '',
-        (inv.load_numbers || []).join(', '),
-        inv.total || 0,
-        (inv.truck_numbers || []).join(', '),
-      ])
-    const csv = [header, ...dataRows]
-      .map(row => row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))
-      .join('\n')
-    const blob = new Blob([csv], { type: 'text/csv' })
-    const url  = URL.createObjectURL(blob)
-    const a    = document.createElement('a')
-    a.href     = url
+  // ── Excel export (factoring format, unsent only) ──────────────────────────
+  function downloadFactoringExcel() {
+    const rows = filteredInvoices
+      .filter(inv => !inv.is_archived && !inv.sent_to_factoring)
+      .map(inv => ({
+        DEBNAME:   inv.bill_to_name || '',
+        INV_ID:    inv.invoice_number || '',
+        INV_DATE:  inv.created_at ? new Date(inv.created_at).toLocaleDateString('en-US') : '',
+        PO_NO:     (inv.load_numbers || []).join(', '),
+        INVAMT:    Number(inv.total) || 0,
+        Clientref: (inv.truck_numbers || []).join(', '),
+      }))
+    const ws = XLSX.utils.json_to_sheet(rows)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Invoices')
     const dateSuffix = filterFrom || filterTo
       ? `_${filterFrom || 'start'}_to_${filterTo || 'end'}`
       : ''
-    a.download = `factoring_invoices${dateSuffix}.csv`
-    a.click()
-    URL.revokeObjectURL(url)
+    XLSX.writeFile(wb, `factoring_invoices${dateSuffix}.xlsx`)
   }
 
   if (loading) return <div className="acct-empty">Loading…</div>
@@ -534,14 +528,14 @@ export default function InvoicesTab({ company }) {
                     ✓ Mark {histSelected.size} as Sent
                   </button>
                 )}
-                {filteredInvoices.filter(i => !i.is_archived).length > 0 && (
+                {filteredInvoices.filter(i => !i.is_archived && !i.sent_to_factoring).length > 0 && (
                   <button
                     className="btn btn-ghost btn-xs"
-                    onClick={downloadFactoringCSV}
-                    title="Download factoring CSV (DEBNAME, INV_ID, INV_DATE, PO_NO, INVAMT, Clientref)"
+                    onClick={downloadFactoringExcel}
+                    title="Download unsent invoices as Excel (DEBNAME, INV_ID, INV_DATE, PO_NO, INVAMT, Clientref)"
                     style={{ color: '#059669', fontWeight: 600, border: '1px solid #D1FAE5' }}
                   >
-                    ↓ Factoring CSV
+                    ↓ Factoring Excel
                   </button>
                 )}
               </div>
